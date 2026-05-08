@@ -3,6 +3,8 @@ import type { AiProvider, EmailProvider, InstagramProvider, PaymentProvider, Sto
 
 export class FakePaymentProvider implements PaymentProvider {
   keySecret = "test_secret";
+  captures: { paymentId: string; amount: number }[] = [];
+  refunds: { paymentId: string; amount: number; id: string }[] = [];
 
   async createOrder(input: { amount: number; currency: "INR"; receipt?: string; payment_capture?: 0 | 1 }) {
     return { id: `order_${crypto.randomUUID()}`, amount: input.amount, currency: input.currency };
@@ -16,10 +18,14 @@ export class FakePaymentProvider implements PaymentProvider {
     return { id: paymentId, method: paymentId.includes("upi") ? "upi" as const : "card" as const };
   }
 
-  async capturePayment() {}
+  async capturePayment(paymentId: string, amount: number) {
+    this.captures.push({ paymentId, amount });
+  }
 
-  async refundPayment() {
-    return { id: `refund_${crypto.randomUUID()}` };
+  async refundPayment(paymentId: string, amount: number) {
+    const id = `refund_${crypto.randomUUID()}`;
+    this.refunds.push({ paymentId, amount, id });
+    return { id };
   }
 
   verifySignature(input: { orderId: string; paymentId: string; signature: string }) {

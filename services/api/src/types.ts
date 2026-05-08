@@ -7,7 +7,7 @@ export type AuthUser = {
 
 export type HonoVariables = {
   requestId: string;
-  user: AuthUser;
+  user?: AuthUser;
   role?: UserRole;
 };
 

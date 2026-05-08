@@ -3,10 +3,18 @@
 Use `Plugoh Local.postman_environment.json` with `Plugoh API.postman_collection.json`.
 
 1. Start the API with `npm run api:dev` from the repo root.
-2. Fill `businessJwt` and `influencerJwt` with Supabase Auth access tokens for seeded users.
-3. Fill `internalSecret` and `cronSecret` from the local API environment.
-4. Create or seed a business profile and active influencer profile before booking.
-5. Run requests in this order for the main flow: create campaign, influencer accept, create escrow order, verify escrow, submit delivery, approve delivery.
+2. Copy the tracked environment into a personal local variant if you want to keep your real tokens out of git.
+3. Fill `businessJwt` and `influencerJwt` with fresh Supabase Auth access tokens for your local test users.
+4. Fill `internalSecret` and `cronSecret` from your local API environment.
+5. Fill `influencerId` and `influencerProfileId` after you seed or inspect your local data.
+6. Create or seed a business profile and active influencer profile before booking.
+7. Run requests in this order for the main flow: create campaign, influencer accept, create escrow order, verify escrow, submit delivery, approve delivery.
+
+Quick ways to get local values:
+
+- `businessJwt` / `influencerJwt`: sign into the app or Supabase Auth locally and copy the access token, or call the demo/local auth flow you use for development.
+- `internalSecret` / `cronSecret`: copy them from `services/api/.env` or your shell environment.
+- `influencerId` / `influencerProfileId`: fetch them from Supabase or from the API once the profile exists.
 
 The collection uses the consistent JSON response wrapper:
 

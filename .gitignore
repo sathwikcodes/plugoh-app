@@ -45,6 +45,8 @@ packages/*/.env.*
 !apps/*/.env.example
 !packages/*/.env.example
 services/*/postman/.postman/
+services/*/postman/*.local.postman_environment.json
+services/*/postman/postman/environments/*.local.environment.yaml
 
 # typescript
 *.tsbuildinfo

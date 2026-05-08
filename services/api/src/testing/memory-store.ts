@@ -14,33 +14,33 @@ export class MemoryDataStore implements DataStore {
     }
   }
 
-  async list<T extends Row>(table: string, options: QueryOptions = {}) {
+  async list<T extends Row>(table: string, options: QueryOptions = {}, _select = "*") {
     return this.applyOptions(this.rows(table), options).map((row) => ({ ...row })) as T[];
   }
 
-  async getById<T extends Row>(table: string, id: string) {
+  async getById<T extends Row>(table: string, id: string, _select = "*") {
     const row = this.rows(table).find((item) => item.id === id);
     return row ? ({ ...row } as T) : null;
   }
 
-  async findOne<T extends Row>(table: string, options: QueryOptions) {
+  async findOne<T extends Row>(table: string, options: QueryOptions, _select = "*") {
     const row = this.applyOptions(this.rows(table), options)[0];
     return row ? ({ ...row } as T) : null;
   }
 
-  async insert<T extends Row>(table: string, values: Row) {
+  async insert<T extends Row>(table: string, values: Row, _select = "*") {
     const row = { id: values.id ?? crypto.randomUUID(), ...values };
     this.rows(table).push(row);
     return { ...row } as unknown as T;
   }
 
-  async update<T extends Row>(table: string, options: QueryOptions, values: Row) {
+  async update<T extends Row>(table: string, options: QueryOptions, values: Row, _select = "*") {
     const rows = this.applyOptions(this.rows(table), options);
     for (const row of rows) Object.assign(row, values);
     return rows.map((row) => ({ ...row })) as T[];
   }
 
-  async upsert<T extends Row>(table: string, values: Row, onConflict = "id") {
+  async upsert<T extends Row>(table: string, values: Row, onConflict = "id", _select = "*") {
     const keys = onConflict.split(",").map((key) => key.trim());
     const rows = this.rows(table);
     const existing = rows.find((row) => keys.every((key) => row[key] === values[key]));
@@ -84,11 +84,19 @@ export class MemoryDataStore implements DataStore {
     });
     if (options.order) {
       const direction = options.order.ascending === false ? -1 : 1;
-      result = [...result].sort((a, b) => String(a[options.order!.column] ?? "").localeCompare(String(b[options.order!.column] ?? "")) * direction);
+      result = [...result].sort((a, b) => compareOrderedValues(a[options.order!.column], b[options.order!.column]) * direction);
     }
     if (options.limit) result = result.slice(0, options.limit);
     return result;
   }
+}
+
+function compareOrderedValues(a: unknown, b: unknown) {
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  const aDate = typeof a === "string" ? Date.parse(a) : Number.NaN;
+  const bDate = typeof b === "string" ? Date.parse(b) : Number.NaN;
+  if (!Number.isNaN(aDate) && !Number.isNaN(bDate)) return aDate - bDate;
+  return String(a ?? "").localeCompare(String(b ?? ""));
 }
 
 function ilike(value: unknown, pattern: string) {

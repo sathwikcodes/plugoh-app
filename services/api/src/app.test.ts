@@ -80,6 +80,15 @@ function makeApp(seed = {}) {
   return { app, store, payment };
 }
 
+class SearchFallbackStore extends MemoryDataStore {
+  override async list<T extends Record<string, any>>(table: string, options = {}, select?: string) {
+    if (table === "influencer_profiles" && "or" in options && options.or) {
+      return [] as T[];
+    }
+    return super.list<T>(table, options, select);
+  }
+}
+
 async function json(res: Response) {
   return (await res.json()) as any;
 }
@@ -100,6 +109,27 @@ describe("Plugoh API", () => {
     expect(res.status).toBe(200);
     expect(body.data).toHaveLength(1);
     expect(body.data[0].starterPrice).toBe(3000);
+  });
+
+  it("falls back to in-memory search when datastore search returns no rows", async () => {
+    const store = new SearchFallbackStore({
+      influencer_profiles: [
+        {
+          id: influencerProfileId,
+          user_id: influencerId,
+          display_name: "Creator One",
+          city: "Hyderabad",
+          category: "Food",
+          price_per_story: 3000,
+          is_active: true,
+        },
+      ],
+    });
+    const app = createApp({ store, config: { port: 4000, demoEnabled: false }, providers: {} });
+    const res = await app.request("/influencers?search=creator");
+    const body = await json(res);
+    expect(res.status).toBe(200);
+    expect(body.data).toHaveLength(1);
   });
 
   it("does not run auth verification for public influencer discovery", async () => {
@@ -194,6 +224,25 @@ describe("Plugoh API", () => {
     expect(store.tables.get("campaigns")?.[0].status).toBe("in_escrow");
   });
 
+  it("keeps create-order as an alias of create-escrow-order", async () => {
+    const { app } = makeApp({
+      campaigns: [{ id: campaignId, business_id: businessId, influencer_id: influencerId, title: "Booking", status: "payment_pending", price_offered: 10000, platform_fee_amount: 1200, total_charged_amount: 11200 }],
+    });
+    const first = await app.request("/payment/create-escrow-order", {
+      method: "POST",
+      headers: { authorization: "Bearer business", "content-type": "application/json" },
+      body: JSON.stringify({ campaign_id: campaignId }),
+    });
+    const second = await app.request("/payment/create-order", {
+      method: "POST",
+      headers: { authorization: "Bearer business", "content-type": "application/json" },
+      body: JSON.stringify({ campaign_id: campaignId }),
+    });
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect((await json(first)).data.orderId).toBe((await json(second)).data.orderId);
+  });
+
   it("submits and approves delivery", async () => {
     const { app, store } = makeApp({
       campaigns: [{ id: campaignId, business_id: businessId, influencer_id: influencerId, title: "Booking", status: "in_escrow", price_offered: 10000, platform_fee_amount: 1200, total_charged_amount: 11200 }],
@@ -257,6 +306,77 @@ describe("Plugoh API", () => {
     });
     expect(valid.status).toBe(200);
     expect(store.tables.get("campaigns")?.[0].payment_status).toBe("unpaid");
+  });
+
+  it("rejects instagram connect when query user does not match auth user", async () => {
+    const { app } = makeApp();
+    const res = await app.request(`/instagram/connect?userId=${businessId}&role=influencer`, {
+      headers: { authorization: "Bearer influencer" },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects instagram connect when query role does not match auth role", async () => {
+    const { app } = makeApp();
+    const res = await app.request(`/instagram/connect?userId=${influencerId}&role=business`, {
+      headers: { authorization: "Bearer influencer" },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("allows instagram connect for the authenticated user and role", async () => {
+    const { app } = makeApp();
+    const res = await app.request(`/instagram/connect?userId=${influencerId}&role=influencer`, {
+      headers: { authorization: "Bearer influencer" },
+    });
+    expect(res.status).toBe(200);
+    expect((await json(res)).data.url).toContain("instagram.test/oauth");
+  });
+
+  it("records a refund for declined UPI pre-authorized campaigns and reconciles the webhook", async () => {
+    const { app, store, payment } = makeApp({
+      campaigns: [{ id: campaignId, business_id: businessId, influencer_id: influencerId, title: "Booking", status: "pre_authorized", payment_method: "upi", razorpay_payment_id: "pay_upi", razorpay_order_id: "order_upi", price_offered: 10000, platform_fee_amount: 1200, total_charged_amount: 11200 }],
+    });
+    const declined = await app.request(`/campaigns/${campaignId}/decline`, {
+      method: "POST",
+      headers: { authorization: "Bearer influencer" },
+    });
+    expect(declined.status).toBe(200);
+    expect(payment.refunds).toHaveLength(1);
+    const refundRow = store.tables.get("escrow_transactions")?.find((row) => row.type === "refund");
+    expect(refundRow?.razorpay_refund_id).toBe(payment.refunds[0].id);
+    expect(refundRow?.status).toBe("pending");
+
+    const body = JSON.stringify({ event: "refund.processed", payload: { refund: { entity: { id: payment.refunds[0].id } } } });
+    const webhook = await app.request("/payment/webhook", {
+      method: "POST",
+      headers: { "x-razorpay-signature": webhookSignature(body) },
+      body,
+    });
+    expect(webhook.status).toBe(200);
+    expect(store.tables.get("escrow_transactions")?.find((row) => row.type === "refund")?.status).toBe("success");
+  });
+
+  it("does not refund card pre-authorized campaigns on decline because Razorpay auto-voids them", async () => {
+    const { app, payment } = makeApp({
+      campaigns: [{ id: campaignId, business_id: businessId, influencer_id: influencerId, title: "Booking", status: "pre_authorized", payment_method: "card", razorpay_payment_id: "pay_card", price_offered: 10000, platform_fee_amount: 1200, total_charged_amount: 11200 }],
+    });
+    const declined = await app.request(`/campaigns/${campaignId}/decline`, {
+      method: "POST",
+      headers: { authorization: "Bearer influencer" },
+    });
+    expect(declined.status).toBe(200);
+    expect(payment.refunds).toHaveLength(0);
+  });
+
+  it("refunds expired UPI pre-authorized campaigns from the cron flow", async () => {
+    const { app, store, payment } = makeApp({
+      campaigns: [{ id: campaignId, business_id: businessId, influencer_id: influencerId, title: "Booking", status: "pre_authorized", payment_method: "upi", razorpay_payment_id: "pay_upi", razorpay_order_id: "order_upi", expires_at: "2020-01-01T00:00:00.000Z", price_offered: 10000, platform_fee_amount: 1200, total_charged_amount: 11200 }],
+    });
+    const res = await app.request("/cron/auto-release", { headers: { "x-cron-secret": "cron" } });
+    expect(res.status).toBe(200);
+    expect(payment.refunds).toHaveLength(1);
+    expect(store.tables.get("campaigns")?.[0].status).toBe("expired");
   });
 
   it("guards internal AI and cron endpoints", async () => {

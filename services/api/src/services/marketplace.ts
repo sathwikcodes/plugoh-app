@@ -77,6 +77,12 @@ function platformFee(price: number) {
   return Number((price * PLATFORM_FEE_RATE).toFixed(2));
 }
 
+function matchesSearch(profile: Row, term: string) {
+  return ["display_name", "instagram_handle", "ig_username", "bio", "category", "city"].some((key) =>
+    String(profile[key] ?? "").toLowerCase().includes(term),
+  );
+}
+
 function starterPrice(profile: Row) {
   return Math.min(
     profile.price_per_reel ?? Number.POSITIVE_INFINITY,
@@ -146,28 +152,25 @@ export class DiscoveryService {
   constructor(private readonly store: DataStore) {}
 
   async list(query: Row) {
-    const options = {
+    const baseOptions = {
       eq: {
         is_active: true,
         ...(query.place && query.place !== "All" ? { city: query.place } : {}),
         ...(query.category && query.category !== "All" ? { category: query.category } : {}),
       },
-      ...(query.search
-        ? {
-            or: ["display_name", "instagram_handle", "ig_username", "bio", "category", "city"]
-              .map((field) => `${field}.ilike.%${String(query.search).replaceAll("%", "\\%")}%`)
-              .join(","),
-          }
-        : {}),
     };
-    let profiles = await this.store.list<Row>("influencer_profiles", options);
+    const searchOptions = query.search
+      ? {
+          ...baseOptions,
+          or: ["display_name", "instagram_handle", "ig_username", "bio", "category", "city"]
+            .map((field) => `${field}.ilike.%${String(query.search).replaceAll("%", "\\%")}%`)
+            .join(","),
+        }
+      : baseOptions;
+    let profiles = await this.store.list<Row>("influencer_profiles", searchOptions);
     if (query.search && profiles.length === 0) {
       const term = String(query.search).toLowerCase();
-      profiles = profiles.filter((profile) =>
-        ["display_name", "instagram_handle", "ig_username", "bio", "category", "city"].some((key) =>
-          String(profile[key] ?? "").toLowerCase().includes(term),
-        ),
-      );
+      profiles = (await this.store.list<Row>("influencer_profiles", baseOptions)).filter((profile) => matchesSearch(profile, term));
     }
     if (query.price_min !== undefined) profiles = profiles.filter((profile) => starterPrice(profile) >= Number(query.price_min));
     if (query.price_max !== undefined) profiles = profiles.filter((profile) => starterPrice(profile) <= Number(query.price_max));
@@ -368,8 +371,9 @@ export class CampaignService {
     const campaign = await requireCampaignRole(this.store, id, user.id, "influencer");
     requireStatus(campaign, ["requested", "payment_pending", "pre_authorized"]);
     if (campaign.status === "pre_authorized" && campaign.payment_method === "upi" && campaign.razorpay_payment_id) {
-      await this.payment?.refundPayment(campaign.razorpay_payment_id, paise(campaign.total_charged_amount));
+      await issueRefund(this.store, this.payment, campaign, "declined");
     }
+    // Card pre-auth is intentionally left alone per API_REFERENCE.md. Razorpay auto-voids the hold.
     await this.store.update("campaigns", { eq: { id } }, { status: "declined" });
     await this.notifications.create(campaign.business_id, "booking_rejected", this.notificationData(campaign));
     return { ok: true };
@@ -864,8 +868,9 @@ export class CronService {
       const rows = await this.store.list<Row>("campaigns", { eq: { status }, lt: { expires_at: nowIso() } });
       for (const campaign of rows) {
         if (status === "pre_authorized" && campaign.payment_method === "upi" && campaign.razorpay_payment_id) {
-          await this.payment?.refundPayment(campaign.razorpay_payment_id, paise(campaign.total_charged_amount));
+          await issueRefund(this.store, this.payment, campaign, "expired");
         }
+        // Card pre-auth is intentionally left alone per API_REFERENCE.md. Razorpay auto-voids the hold.
         await this.store.update("campaigns", { eq: { id: campaign.id } }, { status: "expired" });
         const recipients = status === "requested" ? [campaign.business_id] : [campaign.business_id, campaign.influencer_id];
         await this.notifications.createForMany(recipients, "booking_expired", { campaignId: campaign.id });
@@ -874,6 +879,22 @@ export class CronService {
     }
     return { autoReleased, expired };
   }
+}
+
+async function issueRefund(store: DataStore, payment: PaymentProvider | undefined, campaign: Row, reason: "declined" | "expired") {
+  if (!campaign.razorpay_payment_id) return;
+  const refund = await payment?.refundPayment(campaign.razorpay_payment_id, paise(campaign.total_charged_amount));
+  await store.insert("escrow_transactions", {
+    campaign_id: campaign.id,
+    type: "refund",
+    amount_paise: paise(campaign.total_charged_amount),
+    razorpay_payment_id: campaign.razorpay_payment_id,
+    razorpay_order_id: campaign.razorpay_order_id,
+    razorpay_refund_id: refund?.id,
+    status: refund?.id ? "pending" : "failed",
+    failure_reason: refund?.id ? undefined : `Refund provider unavailable during campaign ${reason}`,
+    created_at: nowIso(),
+  });
 }
 
 export { assertUser, requireCampaignRole };
