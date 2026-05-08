@@ -243,6 +243,28 @@ describe("Plugoh API", () => {
     expect((await json(first)).data.orderId).toBe((await json(second)).data.orderId);
   });
 
+  it("rejects booking verification when the paid Razorpay order amount does not match the requested booking amount", async () => {
+    const { app } = makeApp();
+    const res = await app.request("/payment/verify-booking-payment", {
+      method: "POST",
+      headers: { authorization: "Bearer business", "content-type": "application/json" },
+      body: JSON.stringify({
+        razorpay_order_id: "order_paid_for_small_amount",
+        razorpay_payment_id: "pay_card",
+        razorpay_signature: signature("order_paid_for_small_amount", "pay_card"),
+        influencer_id: influencerId,
+        influencer_profile_id: influencerProfileId,
+        package_type: "reel",
+        price_offered: 1000,
+        objective: "feature_product",
+        timing_mode: "asap",
+        contact_email: "brand@test.dev",
+        contact_phone: "+919999999999",
+      }),
+    });
+    expect(res.status).toBe(409);
+  });
+
   it("submits and approves delivery", async () => {
     const { app, store } = makeApp({
       campaigns: [{ id: campaignId, business_id: businessId, influencer_id: influencerId, title: "Booking", status: "in_escrow", price_offered: 10000, platform_fee_amount: 1200, total_charged_amount: 11200 }],
@@ -383,5 +405,65 @@ describe("Plugoh API", () => {
     const { app } = makeApp();
     expect((await app.request("/ai/generate-profile", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: influencerId }) })).status).toBe(403);
     expect((await app.request("/cron/auto-release", { headers: { "x-cron-secret": "cron" } })).status).toBe(200);
+  });
+
+  it("applies generated AI fields to empty influencer profiles", async () => {
+    const { app, store } = makeApp({
+      influencer_profiles: [
+        {
+          id: influencerProfileId,
+          user_id: influencerId,
+          display_name: "Creator One",
+          city: "Hyderabad",
+          ig_biography: "Food reels and restaurant reviews",
+          price_per_reel: null,
+          price_per_post: null,
+          price_per_story: null,
+          category: null,
+          languages: null,
+          bio: null,
+          ig_followers_count: 25000,
+          is_active: true,
+        },
+      ],
+      instagram_media: [
+        { id: "media-1", user_id: influencerId, caption: "Best cafe reel in Hyderabad", engagement: 500 },
+      ],
+    });
+    const res = await app.request("/ai/generate-profile", {
+      method: "POST",
+      headers: { "x-internal-secret": "internal", "content-type": "application/json" },
+      body: JSON.stringify({ userId: influencerId }),
+    });
+    expect(res.status).toBe(200);
+    const profile = store.tables.get("influencer_profiles")?.[0];
+    expect(profile?.category).toBeTruthy();
+    expect(profile?.bio).toBeTruthy();
+    expect(profile?.price_per_reel).toBeTruthy();
+  });
+
+  it("applies generated AI fields to empty business profiles", async () => {
+    const { app, store } = makeApp({
+      business_profiles: [
+        {
+          id: "bp-1",
+          user_id: businessId,
+          brand_name: "Plugoh Cafe",
+          brand_type: "Restaurant/Cafe",
+          ig_biography: "Modern coffee and brunch spot in Hyderabad",
+          brand_summary: null,
+          tagline: null,
+        },
+      ],
+    });
+    const res = await app.request("/ai/generate-business-profile", {
+      method: "POST",
+      headers: { "x-internal-secret": "internal", "content-type": "application/json" },
+      body: JSON.stringify({ userId: businessId }),
+    });
+    expect(res.status).toBe(200);
+    const profile = store.tables.get("business_profiles")?.[0];
+    expect(profile?.brand_summary).toBeTruthy();
+    expect(profile?.tagline).toBeTruthy();
   });
 });

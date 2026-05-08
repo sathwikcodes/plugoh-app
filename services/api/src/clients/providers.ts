@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { BUSINESS_TYPES, INFLUENCER_CATEGORIES, LANGUAGES } from "@plugoh/contracts";
 import Razorpay from "razorpay";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
@@ -214,13 +215,120 @@ export interface AiProvider {
 export class ExternalAiProvider implements AiProvider {
   constructor(private readonly config: EnvConfig) {}
 
-  async generateInfluencerProfile() {
+  async generateInfluencerProfile(input: { profile: Record<string, unknown>; media: Record<string, unknown>[] }) {
     requireConfig(this.config.anthropicApiKey ?? this.config.googleAiKey, "ANTHROPIC_API_KEY or GOOGLE_AI_KEY");
-    return {};
+    const text = [input.profile.ig_biography, input.profile.bio, ...input.media.map((item) => item.caption)]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const followerCount = Number(input.profile.ig_followers_count ?? input.profile.follower_count ?? 0);
+    const avgEngagement = average(input.media.map((item) => Number(item.engagement ?? 0)));
+    const category = inferInfluencerCategory(text);
+    const languages = inferLanguages(text);
+    const bio = buildInfluencerBio(input.profile, category, languages);
+    const pricing = estimateInfluencerPricing(followerCount, avgEngagement);
+    return {
+      category,
+      languages,
+      bio,
+      ...pricing,
+    };
   }
 
-  async generateBusinessProfile() {
+  async generateBusinessProfile(input: { profile: Record<string, unknown> }) {
     requireConfig(this.config.anthropicApiKey ?? this.config.googleAiKey, "ANTHROPIC_API_KEY or GOOGLE_AI_KEY");
-    return {};
+    const brandName = String(input.profile.brand_name ?? input.profile.ig_username ?? "Brand").trim();
+    const brandType = String(input.profile.brand_type ?? inferBusinessType(String(input.profile.ig_biography ?? ""))).trim();
+    const summary = buildBusinessSummary(brandName, brandType, String(input.profile.ig_biography ?? ""));
+    return {
+      brand_summary: summary,
+      tagline: buildBusinessTagline(brandName, brandType),
+    };
   }
+}
+
+function average(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function inferInfluencerCategory(text: string) {
+  const categoryMatchers: Record<(typeof INFLUENCER_CATEGORIES)[number], string[]> = {
+    Food: ["food", "recipe", "restaurant", "cafe", "meal", "biryani", "coffee"],
+    Fitness: ["fitness", "gym", "workout", "health", "trainer", "exercise", "protein"],
+    Beauty: ["beauty", "makeup", "skincare", "cosmetic", "glow", "haircare"],
+    Lifestyle: ["lifestyle", "daily", "routine", "self care", "life update"],
+    Travel: ["travel", "trip", "vacation", "hotel", "flight", "destination"],
+    Education: ["education", "study", "learn", "tutorial", "guide", "career"],
+    Tech: ["tech", "software", "app", "gadget", "review", "ai", "startup"],
+    Fashion: ["fashion", "style", "outfit", "lookbook", "wardrobe"],
+    Other: [],
+  };
+  for (const [category, keywords] of Object.entries(categoryMatchers)) {
+    if (keywords.some((keyword) => text.includes(keyword))) return category;
+  }
+  return "Other";
+}
+
+function inferLanguages(text: string) {
+  const languages: (typeof LANGUAGES)[number][] = [];
+  const normalized = text.toLowerCase();
+  if (/[ऀ-ॿ]/u.test(text) || /\b(namaste|dhanyavaad|hindi)\b/.test(normalized)) languages.push("Hindi");
+  if (/[ఀ-౿]/u.test(text) || /\b(telugu)\b/.test(normalized)) languages.push("Telugu");
+  if (/[஀-௿]/u.test(text) || /\b(tamil)\b/.test(normalized)) languages.push("Tamil");
+  if (/[ಀ-೿]/u.test(text) || /\b(kannada)\b/.test(normalized)) languages.push("Kannada");
+  if (/[ഀ-ൿ]/u.test(text) || /\b(malayalam)\b/.test(normalized)) languages.push("Malayalam");
+  if (languages.length === 0 || /[a-z]/i.test(text)) languages.unshift("English");
+  return [...new Set(languages)];
+}
+
+function buildInfluencerBio(profile: Record<string, unknown>, category: string, languages: string[]) {
+  const displayName = String(profile.display_name ?? profile.ig_username ?? "Creator").trim();
+  const city = String(profile.city ?? "").trim();
+  const location = city ? ` based in ${city}` : "";
+  const languageLabel = languages.slice(0, 2).join(" & ");
+  return `${displayName}${location} creating ${category.toLowerCase()} content for brands and audiences in ${languageLabel}.`;
+}
+
+function estimateInfluencerPricing(followerCount: number, avgEngagement: number) {
+  const safeFollowers = Math.max(followerCount, 1000);
+  const engagementMultiplier = avgEngagement > 0 ? Math.max(1, avgEngagement / 100) : 1;
+  const reel = roundToNearestHundred((safeFollowers * 0.12 + engagementMultiplier * 250) / 10);
+  return {
+    price_per_reel: Math.max(1500, reel),
+    price_per_post: Math.max(1000, roundToNearestHundred(reel * 0.75)),
+    price_per_story: Math.max(500, roundToNearestHundred(reel * 0.35)),
+  };
+}
+
+function roundToNearestHundred(value: number) {
+  return Math.round(value / 100) * 100;
+}
+
+function inferBusinessType(bio: string) {
+  const normalized = bio.toLowerCase();
+  const businessMatchers: Record<(typeof BUSINESS_TYPES)[number], string[]> = {
+    "Restaurant/Cafe": ["restaurant", "cafe", "food", "dining", "bistro"],
+    "D2C Brand": ["brand", "shop", "product", "storefront"],
+    "Local Business": ["local", "service", "studio", "clinic", "salon"],
+    "E-commerce": ["e-commerce", "ecommerce", "online store", "shipping"],
+    "SaaS/Tech": ["software", "saas", "tech", "platform", "app"],
+    Agency: ["agency", "marketing", "creative"],
+    "Personal Brand": ["coach", "founder", "creator", "consultant"],
+    Other: [],
+  };
+  for (const [type, keywords] of Object.entries(businessMatchers)) {
+    if (keywords.some((keyword) => normalized.includes(keyword))) return type;
+  }
+  return "Other";
+}
+
+function buildBusinessSummary(brandName: string, brandType: string, bio: string) {
+  const baseBio = bio.trim();
+  if (baseBio) return `${brandName} is a ${brandType} focused on ${baseBio.replace(/\.$/, "")}.`;
+  return `${brandName} is a ${brandType} building a clear, audience-friendly brand presence on Plugoh.`;
+}
+
+function buildBusinessTagline(brandName: string, brandType: string) {
+  return `${brandName}: standout ${brandType.toLowerCase()} experiences.`;
 }

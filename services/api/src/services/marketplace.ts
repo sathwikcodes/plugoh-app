@@ -537,6 +537,11 @@ export class PaymentService {
     if (!provider.verifySignature({ orderId: input.razorpay_order_id, paymentId: input.razorpay_payment_id, signature: input.razorpay_signature })) {
       throw forbidden("Invalid Razorpay signature");
     }
+    const order = await provider.fetchOrder(input.razorpay_order_id);
+    const expectedAmount = paise(Number(input.price_offered) + platformFee(Number(input.price_offered)));
+    if (order.amount !== expectedAmount) {
+      throw conflict("PAYMENT_AMOUNT_MISMATCH", "Paid order amount does not match the requested booking amount");
+    }
     const payment = await provider.fetchPayment(input.razorpay_payment_id);
     const created = await this.campaigns.create(user, input, {
       status: "pre_authorized",
