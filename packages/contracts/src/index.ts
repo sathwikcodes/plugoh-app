@@ -88,6 +88,24 @@ export type UserRole = (typeof USER_ROLES)[number];
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
+export interface Influencer {
+  id: string;
+  user_id: string;
+  display_name?: string;
+  ig_username?: string;
+  instagram_handle?: string;
+  bio?: string;
+  city?: string;
+  category?: string;
+  follower_count?: number;
+  avg_likes_per_reel?: number;
+  price_per_reel?: number;
+  price_per_post?: number;
+  price_per_story?: number;
+  starterPrice?: number | null;
+  is_active?: boolean;
+}
+
 export interface HealthResponse {
   service: string;
   status: "ok";

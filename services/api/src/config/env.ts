@@ -32,27 +32,49 @@ export type EnvConfig = {
   googleAiKey?: string;
   cronSecret?: string;
   internalSecret?: string;
+  redisConnectionString?: string;
+  applicationInsightsConnectionString?: string;
+  aiProvider?: "anthropic" | "heuristic";
+  readinessRazorpayPaymentId?: string;
+  cronHttpEnabled: boolean;
   corsOrigin: string;
   demoEnabled: boolean;
 };
 
 export function readEnv(env = process.env): EnvConfig {
+  const optional: Partial<EnvConfig> = {};
+  const setIfDefined = (key: string, value: string | undefined) => {
+    if (value) {
+      (optional as Record<string, string>)[key] = value;
+    }
+  };
+
+  setIfDefined("supabaseUrl", env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL);
+  setIfDefined("supabaseAnonKey", env.SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY);
+  setIfDefined("supabaseServiceRoleKey", env.SUPABASE_SERVICE_ROLE_KEY);
+  setIfDefined("razorpayKeyId", env.RAZORPAY_KEY_ID);
+  setIfDefined("razorpayKeySecret", env.RAZORPAY_KEY_SECRET);
+  setIfDefined("razorpayWebhookSecret", env.RAZORPAY_WEBHOOK_SECRET);
+  setIfDefined("instagramClientId", env.INSTAGRAM_CLIENT_ID ?? env.INSTAGRAM_APP_ID);
+  setIfDefined("instagramAppSecret", env.INSTAGRAM_APP_SECRET);
+  setIfDefined("instagramRedirectUri", env.INSTAGRAM_REDIRECT_URI ?? env.NEXT_PUBLIC_INSTAGRAM_REDIRECT_URI);
+  setIfDefined("resendApiKey", env.RESEND_API_KEY);
+  setIfDefined("anthropicApiKey", env.ANTHROPIC_API_KEY);
+  setIfDefined("googleAiKey", env.GOOGLE_AI_KEY ?? env.GOOGLE_AI_API_KEY);
+  setIfDefined("cronSecret", env.CRON_SECRET);
+  setIfDefined("internalSecret", env.INTERNAL_SECRET);
+  setIfDefined("redisConnectionString", env.REDIS_CONNECTION_STRING);
+  setIfDefined("applicationInsightsConnectionString", env.APPLICATIONINSIGHTS_CONNECTION_STRING);
+  const aiProvider = env.AI_PROVIDER;
+  if (aiProvider === "anthropic" || aiProvider === "heuristic") {
+    optional.aiProvider = aiProvider;
+  }
+  setIfDefined("readinessRazorpayPaymentId", env.READINESS_RAZORPAY_PAYMENT_ID);
+
   return {
     port: Number(env.PORT ?? 4000),
-    supabaseUrl: env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL,
-    supabaseAnonKey: env.SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
-    supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
-    razorpayKeyId: env.RAZORPAY_KEY_ID,
-    razorpayKeySecret: env.RAZORPAY_KEY_SECRET,
-    razorpayWebhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
-    instagramClientId: env.INSTAGRAM_CLIENT_ID ?? env.INSTAGRAM_APP_ID,
-    instagramAppSecret: env.INSTAGRAM_APP_SECRET,
-    instagramRedirectUri: env.INSTAGRAM_REDIRECT_URI ?? env.NEXT_PUBLIC_INSTAGRAM_REDIRECT_URI,
-    resendApiKey: env.RESEND_API_KEY,
-    anthropicApiKey: env.ANTHROPIC_API_KEY,
-    googleAiKey: env.GOOGLE_AI_KEY ?? env.GOOGLE_AI_API_KEY,
-    cronSecret: env.CRON_SECRET,
-    internalSecret: env.INTERNAL_SECRET,
+    ...optional,
+    cronHttpEnabled: env.CRON_HTTP_ENABLED !== "false",
     corsOrigin: env.CORS_ORIGIN ?? "*",
     demoEnabled: env.NEXT_PUBLIC_DEMO_ENABLED === "true",
   };

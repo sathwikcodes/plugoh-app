@@ -3,9 +3,60 @@ import { BUSINESS_TYPES, INFLUENCER_CATEGORIES, LANGUAGES } from "@plugoh/contra
 import Razorpay from "razorpay";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
+import pRetry, { AbortError } from "p-retry";
 import type { EnvConfig } from "../config/env.js";
 import { requireConfig } from "../config/env.js";
 import { badRequest } from "../core/errors.js";
+
+class HttpStatusError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+async function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await run(controller.signal);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`TIMEOUT_${timeoutMs}MS`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function shouldRetry(error: unknown) {
+  if (error instanceof AbortError) return false;
+  if (error instanceof HttpStatusError) return error.status >= 500;
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes("timeout") ||
+    message.includes("network") ||
+    message.includes("econnreset") ||
+    message.includes("socket") ||
+    message.includes("5xx")
+  );
+}
+
+async function withRetry<T>(run: () => Promise<T>) {
+  return pRetry(run, {
+    retries: 3,
+    factor: 2,
+    minTimeout: 200,
+    onFailedAttempt(error) {
+      if (!shouldRetry(error)) {
+        throw new AbortError(String(error));
+      }
+    },
+  });
+}
 
 export type PaymentMethod = "card" | "upi" | "other";
 
@@ -37,27 +88,40 @@ export class RazorpayProvider implements PaymentProvider {
   }
 
   async createOrder(input: { amount: number; currency: "INR"; receipt?: string; payment_capture?: 0 | 1 }) {
-    const order = await this.razorpay.orders.create(input);
+    const order = (await withRetry(() => withTimeout(() => this.razorpay.orders.create(input), 10_000))) as {
+      id: string;
+      amount: number;
+      currency: string;
+    };
     return { id: order.id, amount: order.amount, currency: order.currency };
   }
 
   async fetchOrder(orderId: string) {
-    const order = await this.razorpay.orders.fetch(orderId);
+    const order = (await withRetry(() => withTimeout(() => this.razorpay.orders.fetch(orderId), 10_000))) as {
+      id: string;
+      amount: number;
+      currency: string;
+    };
     return { id: order.id, amount: order.amount, currency: order.currency };
   }
 
   async fetchPayment(paymentId: string) {
-    const payment = await this.razorpay.payments.fetch(paymentId);
-    const method = payment.method === "card" || payment.method === "upi" ? payment.method : "other";
+    const payment = (await withRetry(() => withTimeout(() => this.razorpay.payments.fetch(paymentId), 10_000))) as {
+      id: string;
+      method: string;
+    };
+    const method: PaymentMethod = payment.method === "card" || payment.method === "upi" ? payment.method : "other";
     return { id: payment.id, method };
   }
 
   async capturePayment(paymentId: string, amount: number) {
-    await this.razorpay.payments.capture(paymentId, amount, "INR");
+    await withRetry(() => withTimeout(() => this.razorpay.payments.capture(paymentId, amount, "INR"), 10_000));
   }
 
   async refundPayment(paymentId: string, amount: number) {
-    const refund = await this.razorpay.payments.refund(paymentId, { amount });
+    const refund = (await withRetry(() =>
+      withTimeout(() => this.razorpay.payments.refund(paymentId, { amount }), 10_000),
+    )) as { id: string };
     return { id: refund.id };
   }
 
@@ -89,7 +153,7 @@ export class ResendEmailProvider implements EmailProvider {
   }
 
   async sendCallRequest(input: { to: string; subject: string; html: string }) {
-    await this.resend.emails.send({ from: "Plugoh <noreply@plugoh.app>", ...input });
+    await withRetry(() => withTimeout(() => this.resend.emails.send({ from: "Plugoh <noreply@plugoh.app>", ...input }), 10_000));
   }
 }
 
@@ -122,16 +186,26 @@ export class MetaInstagramProvider implements InstagramProvider {
       redirect_uri: requireConfig(this.config.instagramRedirectUri, "INSTAGRAM_REDIRECT_URI"),
       code,
     });
-    const shortRes = await fetch("https://api.instagram.com/oauth/access_token", { method: "POST", body });
-    if (!shortRes.ok) throw badRequest("INSTAGRAM_TOKEN_EXCHANGE_FAILED", "Instagram token exchange failed");
+    const shortRes = await withRetry(() =>
+      withTimeout((signal) => fetch("https://api.instagram.com/oauth/access_token", { method: "POST", body, signal }), 10_000),
+    );
+    if (!shortRes.ok) {
+      if (shortRes.status >= 500) throw new HttpStatusError(shortRes.status, "Instagram token exchange failed");
+      throw badRequest("INSTAGRAM_TOKEN_EXCHANGE_FAILED", "Instagram token exchange failed");
+    }
     const shortToken = (await shortRes.json()) as { access_token: string };
     const longParams = new URLSearchParams({
       grant_type: "ig_exchange_token",
       client_secret: requireConfig(this.config.instagramAppSecret, "INSTAGRAM_APP_SECRET"),
       access_token: shortToken.access_token,
     });
-    const longRes = await fetch(`https://graph.instagram.com/access_token?${longParams.toString()}`);
-    if (!longRes.ok) throw badRequest("INSTAGRAM_TOKEN_EXCHANGE_FAILED", "Instagram long-lived token exchange failed");
+    const longRes = await withRetry(() =>
+      withTimeout((signal) => fetch(`https://graph.instagram.com/access_token?${longParams.toString()}`, { signal }), 10_000),
+    );
+    if (!longRes.ok) {
+      if (longRes.status >= 500) throw new HttpStatusError(longRes.status, "Instagram long-lived token exchange failed");
+      throw badRequest("INSTAGRAM_TOKEN_EXCHANGE_FAILED", "Instagram long-lived token exchange failed");
+    }
     const longToken = (await longRes.json()) as { access_token: string; expires_in: number };
     return {
       accessToken: longToken.access_token,
@@ -141,8 +215,13 @@ export class MetaInstagramProvider implements InstagramProvider {
 
   async fetchProfile(accessToken: string) {
     const fields = "id,username,biography,profile_picture_url,followers_count,follows_count,media_count";
-    const res = await fetch(`https://graph.instagram.com/me?fields=${fields}&access_token=${accessToken}`);
-    if (!res.ok) throw badRequest("INSTAGRAM_PROFILE_FETCH_FAILED", "Instagram profile fetch failed");
+    const res = await withRetry(() =>
+      withTimeout((signal) => fetch(`https://graph.instagram.com/me?fields=${fields}&access_token=${accessToken}`, { signal }), 10_000),
+    );
+    if (!res.ok) {
+      if (res.status >= 500) throw new HttpStatusError(res.status, "Instagram profile fetch failed");
+      throw badRequest("INSTAGRAM_PROFILE_FETCH_FAILED", "Instagram profile fetch failed");
+    }
     const profile = (await res.json()) as Record<string, unknown>;
     return {
       ig_user_id: profile.id,
@@ -158,8 +237,13 @@ export class MetaInstagramProvider implements InstagramProvider {
 
   async fetchMedia(accessToken: string) {
     const fields = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count";
-    const res = await fetch(`https://graph.instagram.com/me/media?fields=${fields}&limit=100&access_token=${accessToken}`);
-    if (!res.ok) throw badRequest("INSTAGRAM_MEDIA_FETCH_FAILED", "Instagram media fetch failed");
+    const res = await withRetry(() =>
+      withTimeout((signal) => fetch(`https://graph.instagram.com/me/media?fields=${fields}&limit=100&access_token=${accessToken}`, { signal }), 10_000),
+    );
+    if (!res.ok) {
+      if (res.status >= 500) throw new HttpStatusError(res.status, "Instagram media fetch failed");
+      throw badRequest("INSTAGRAM_MEDIA_FETCH_FAILED", "Instagram media fetch failed");
+    }
     const payload = (await res.json()) as { data?: Record<string, unknown>[] };
     return (payload.data ?? []).map((item) => ({
       ig_media_id: item.id,
@@ -216,7 +300,28 @@ export class ExternalAiProvider implements AiProvider {
   constructor(private readonly config: EnvConfig) {}
 
   async generateInfluencerProfile(input: { profile: Record<string, unknown>; media: Record<string, unknown>[] }) {
-    requireConfig(this.config.anthropicApiKey ?? this.config.googleAiKey, "ANTHROPIC_API_KEY or GOOGLE_AI_KEY");
+    if (this.config.aiProvider === "anthropic" && this.config.anthropicApiKey) {
+      try {
+        return await this.generateInfluencerWithAnthropic(input);
+      } catch {
+        return this.generateInfluencerHeuristic(input);
+      }
+    }
+    return this.generateInfluencerHeuristic(input);
+  }
+
+  async generateBusinessProfile(input: { profile: Record<string, unknown> }) {
+    if (this.config.aiProvider === "anthropic" && this.config.anthropicApiKey) {
+      try {
+        return await this.generateBusinessWithAnthropic(input);
+      } catch {
+        return this.generateBusinessHeuristic(input);
+      }
+    }
+    return this.generateBusinessHeuristic(input);
+  }
+
+  private generateInfluencerHeuristic(input: { profile: Record<string, unknown>; media: Record<string, unknown>[] }) {
     const text = [input.profile.ig_biography, input.profile.bio, ...input.media.map((item) => item.caption)]
       .filter(Boolean)
       .join(" ")
@@ -235,8 +340,7 @@ export class ExternalAiProvider implements AiProvider {
     };
   }
 
-  async generateBusinessProfile(input: { profile: Record<string, unknown> }) {
-    requireConfig(this.config.anthropicApiKey ?? this.config.googleAiKey, "ANTHROPIC_API_KEY or GOOGLE_AI_KEY");
+  private generateBusinessHeuristic(input: { profile: Record<string, unknown> }) {
     const brandName = String(input.profile.brand_name ?? input.profile.ig_username ?? "Brand").trim();
     const brandType = String(input.profile.brand_type ?? inferBusinessType(String(input.profile.ig_biography ?? ""))).trim();
     const summary = buildBusinessSummary(brandName, brandType, String(input.profile.ig_biography ?? ""));
@@ -244,6 +348,85 @@ export class ExternalAiProvider implements AiProvider {
       brand_summary: summary,
       tagline: buildBusinessTagline(brandName, brandType),
     };
+  }
+
+  private async generateInfluencerWithAnthropic(input: { profile: Record<string, unknown>; media: Record<string, unknown>[] }) {
+    const response = await this.callAnthropic(
+      [
+        "Return strict JSON with keys: category, languages, bio, price_per_reel, price_per_post, price_per_story.",
+        `Profile: ${JSON.stringify(input.profile)}`,
+        `Media: ${JSON.stringify(input.media.slice(0, 20))}`,
+      ].join("\n"),
+      60_000,
+    );
+    const parsed = parseAnthropicJson(response);
+    return {
+      category: String(parsed.category ?? "Other"),
+      languages: Array.isArray(parsed.languages) ? parsed.languages.map((item) => String(item)) : ["English"],
+      bio: String(parsed.bio ?? ""),
+      price_per_reel: Number(parsed.price_per_reel ?? 1500),
+      price_per_post: Number(parsed.price_per_post ?? 1000),
+      price_per_story: Number(parsed.price_per_story ?? 500),
+    };
+  }
+
+  private async generateBusinessWithAnthropic(input: { profile: Record<string, unknown> }) {
+    const response = await this.callAnthropic(
+      [
+        "Return strict JSON with keys: brand_summary, tagline.",
+        `Profile: ${JSON.stringify(input.profile)}`,
+      ].join("\n"),
+      120_000,
+    );
+    const parsed = parseAnthropicJson(response);
+    return {
+      brand_summary: String(parsed.brand_summary ?? ""),
+      tagline: String(parsed.tagline ?? ""),
+    };
+  }
+
+  private async callAnthropic(prompt: string, timeoutMs: number) {
+    const apiKey = requireConfig(this.config.anthropicApiKey, "ANTHROPIC_API_KEY");
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            signal,
+            headers: {
+              "content-type": "application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: "claude-3-5-haiku-latest",
+              max_tokens: 1024,
+              temperature: 0.2,
+              messages: [{ role: "user", content: prompt }],
+            }),
+          }),
+        timeoutMs,
+      ),
+    );
+    if (!response.ok) {
+      if (response.status >= 500) throw new HttpStatusError(response.status, "Anthropic API failed");
+      throw badRequest("AI_PROVIDER_ERROR", "Anthropic API rejected request");
+    }
+    const payload = (await response.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    return payload.content?.find((item) => item.type === "text")?.text ?? "{}";
+  }
+}
+
+function parseAnthropicJson(text: string) {
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace < 0 || lastBrace < 0 || lastBrace <= firstBrace) return {};
+  try {
+    return JSON.parse(text.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
+  } catch {
+    return {};
   }
 }
 

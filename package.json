@@ -2,6 +2,10 @@
   "name": "plugoh",
   "private": true,
   "version": "1.0.0",
+  "engines": {
+    "node": ">=22.11 <23"
+  },
+  "packageManager": "npm@10.9.0",
   "workspaces": [
     "apps/*",
     "services/*",
@@ -10,6 +14,7 @@
   "scripts": {
     "start": "npm run mobile:start",
     "contracts:build": "npm run --workspace @plugoh/contracts build",
+    "db:build": "npm run --workspace @plugoh/db build",
     "mobile:start": "npm run --workspace @plugoh/mobile start",
     "mobile:android": "npm run --workspace @plugoh/mobile android",
     "mobile:ios": "npm run --workspace @plugoh/mobile ios",
@@ -21,6 +26,21 @@
     "api:test": "npm run contracts:build && npm run --workspace @plugoh/api test",
     "api:test:coverage": "npm run contracts:build && npm run --workspace @plugoh/api test:coverage",
     "jobs:dev": "npm run --workspace @plugoh/jobs dev",
-    "ai:dev": "npm run --workspace @plugoh/ai dev"
+    "lint": "eslint --no-warn-ignored --max-warnings=0 services/**/*.ts packages/**/*.ts apps/mobile/**/*.{ts,tsx}",
+    "typecheck": "npm run contracts:build && npm run db:build && npm run --workspace @plugoh/api build && npm run --workspace @plugoh/jobs build && npm run --workspace @plugoh/mobile typecheck",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "lint-staged"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "eslint": "^9.39.1",
+    "lint-staged": "^16.2.6",
+    "prettier": "^3.6.2",
+    "simple-git-hooks": "^2.13.1",
+    "typescript-eslint": "^8.46.2"
   }
 }

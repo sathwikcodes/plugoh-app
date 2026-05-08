@@ -96,7 +96,7 @@ async function json(res: Response) {
 describe("Plugoh API", () => {
   it("returns health and consistent 404 errors", async () => {
     const { app } = makeApp();
-    expect((await app.request("/health")).status).toBe(200);
+    expect((await app.request("/healthz/live")).status).toBe(200);
     const missing = await app.request("/missing");
     expect(missing.status).toBe(404);
     expect((await json(missing)).success).toBe(false);
@@ -217,8 +217,16 @@ describe("Plugoh API", () => {
       razorpay_payment_id: paymentId,
       razorpay_signature: signature(orderId, paymentId),
     };
-    const first = await app.request("/payment/verify-escrow", { method: "POST", headers: { authorization: "Bearer business", "content-type": "application/json" }, body: JSON.stringify(payload) });
-    const second = await app.request("/payment/verify", { method: "POST", headers: { authorization: "Bearer business", "content-type": "application/json" }, body: JSON.stringify(payload) });
+    const first = await app.request("/payment/verify-escrow", {
+      method: "POST",
+      headers: { authorization: "Bearer business", "content-type": "application/json", "idempotency-key": "verify-1" },
+      body: JSON.stringify(payload),
+    });
+    const second = await app.request("/payment/verify", {
+      method: "POST",
+      headers: { authorization: "Bearer business", "content-type": "application/json", "idempotency-key": "verify-2" },
+      body: JSON.stringify(payload),
+    });
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
     expect(store.tables.get("campaigns")?.[0].status).toBe("in_escrow");
@@ -247,7 +255,7 @@ describe("Plugoh API", () => {
     const { app } = makeApp();
     const res = await app.request("/payment/verify-booking-payment", {
       method: "POST",
-      headers: { authorization: "Bearer business", "content-type": "application/json" },
+      headers: { authorization: "Bearer business", "content-type": "application/json", "idempotency-key": "booking-verify-1" },
       body: JSON.stringify({
         razorpay_order_id: "order_paid_for_small_amount",
         razorpay_payment_id: "pay_card",
@@ -303,7 +311,7 @@ describe("Plugoh API", () => {
     });
     const res = await app.request("/payment/release-escrow", {
       method: "POST",
-      headers: { authorization: "Bearer business", "content-type": "application/json" },
+      headers: { authorization: "Bearer business", "content-type": "application/json", "idempotency-key": "release-1" },
       body: JSON.stringify({ campaign_id: campaignId }),
     });
     expect(res.status).toBe(200);

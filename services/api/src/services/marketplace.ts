@@ -127,7 +127,7 @@ export class NotificationService {
     });
   }
 
-  async markRead(user: AuthUser, input: { ids?: string[]; all?: boolean }) {
+  async markRead(user: AuthUser, input: { ids?: string[] | undefined; all?: boolean | undefined }) {
     const options = input.all ? { eq: { user_id: user.id } } : { eq: { user_id: user.id }, in: { id: input.ids ?? [] } };
     await this.store.update("notifications", options, { read: true });
     return { ok: true };
@@ -163,7 +163,7 @@ export class DiscoveryService {
       ? {
           ...baseOptions,
           or: ["display_name", "instagram_handle", "ig_username", "bio", "category", "city"]
-            .map((field) => `${field}.ilike.%${String(query.search).replaceAll("%", "\\%")}%`)
+            .map((field) => `${field}.ilike.%${String(query.search).replaceAll("%", "\\%").replaceAll("_", "\\_")}%`)
             .join(","),
         }
       : baseOptions;
@@ -336,52 +336,29 @@ export class CampaignService {
   }
 
   async accept(user: AuthUser, id: string) {
-    const campaign = await requireCampaignRole(this.store, id, user.id, "influencer");
-    requireStatus(campaign, ["requested", "payment_pending", "pre_authorized"]);
-    if (campaign.status === "pre_authorized") {
-      if (campaign.payment_method === "card") await this.payment?.capturePayment(campaign.razorpay_payment_id, paise(campaign.total_charged_amount));
-      await this.store.update("campaigns", { eq: { id } }, {
-        status: "in_escrow",
-        payment_status: "paid",
-        accepted_at: nowIso(),
-        payment_captured_at: nowIso(),
-      });
-      await this.store.insert("escrow_transactions", {
-        campaign_id: id,
-        type: "escrow_lock",
-        amount_paise: paise(campaign.total_charged_amount),
-        platform_fee_paise: paise(campaign.platform_fee_amount),
-        razorpay_order_id: campaign.razorpay_order_id,
-        razorpay_payment_id: campaign.razorpay_payment_id,
-        status: "success",
-        created_at: nowIso(),
-      });
-    } else {
-      await this.store.update("campaigns", { eq: { id } }, {
-        status: "payment_pending",
-        expires_at: futureIso(24 * HOUR_MS),
-        accepted_at: nowIso(),
-      });
+    const campaign = await this.store.rpc<Row>("accept_campaign", { p_campaign_id: id, p_actor: user.id });
+    if (campaign.status === "in_escrow" && campaign.payment_method === "card" && campaign.razorpay_payment_id) {
+      await this.payment?.capturePayment(campaign.razorpay_payment_id, paise(campaign.total_charged_amount));
     }
     await this.notifications.create(campaign.business_id, "booking_accepted", this.notificationData(campaign));
     return { ok: true };
   }
 
   async decline(user: AuthUser, id: string) {
-    const campaign = await requireCampaignRole(this.store, id, user.id, "influencer");
-    requireStatus(campaign, ["requested", "payment_pending", "pre_authorized"]);
-    if (campaign.status === "pre_authorized" && campaign.payment_method === "upi" && campaign.razorpay_payment_id) {
+    const declined = await this.store.rpc<{ campaign: Row; should_refund: boolean }>("decline_campaign", {
+      p_campaign_id: id,
+      p_actor: user.id,
+    });
+    const campaign = declined.campaign;
+    if (declined.should_refund) {
       await issueRefund(this.store, this.payment, campaign, "declined");
     }
-    // Card pre-auth is intentionally left alone per API_REFERENCE.md. Razorpay auto-voids the hold.
-    await this.store.update("campaigns", { eq: { id } }, { status: "declined" });
     await this.notifications.create(campaign.business_id, "booking_rejected", this.notificationData(campaign));
     return { ok: true };
   }
 
   async approve(user: AuthUser, id: string) {
-    const campaign = await requireCampaignRole(this.store, id, user.id, "business");
-    requireStatus(campaign, ["delivery_submitted"]);
+    const campaign = await this.store.rpc<Row>("approve_delivery", { p_campaign_id: id, p_actor: user.id });
     await this.release(campaign, user.id);
     return { ok: true };
   }
@@ -396,37 +373,40 @@ export class CampaignService {
   }
 
   async release(campaign: Row, approvedBy?: string, notify = true) {
+    const transitioned = await this.store.rpc<Row>("release_escrow", {
+      p_campaign_id: campaign.id,
+      p_actor: approvedBy ?? null,
+    });
     const existingLedger = await this.store.list<Row>("escrow_transactions", {
-      eq: { campaign_id: campaign.id },
+      eq: { campaign_id: transitioned.id },
       in: { type: ["payout_influencer", "platform_fee"] },
     });
     const hasPayout = existingLedger.some((row) => row.type === "payout_influencer");
     const hasPlatformFee = existingLedger.some((row) => row.type === "platform_fee");
-    if (campaign.status === "completed" && hasPayout && hasPlatformFee) return { alreadyReleased: true };
+    if (transitioned.status === "completed" && hasPayout && hasPlatformFee) return { alreadyReleased: true };
 
-    await this.store.update("deliveries", { eq: { campaign_id: campaign.id } }, { approved_at: nowIso(), approved_by: approvedBy });
-    await this.store.update("campaigns", { eq: { id: campaign.id } }, { status: "completed", completed_at: campaign.completed_at ?? nowIso() });
+    await this.store.update("deliveries", { eq: { campaign_id: transitioned.id } }, { approved_at: nowIso(), approved_by: approvedBy });
     if (!hasPayout) {
       await this.store.insert("escrow_transactions", {
-        campaign_id: campaign.id,
+        campaign_id: transitioned.id,
         type: "payout_influencer",
-        amount_paise: paise(campaign.price_offered),
+        amount_paise: paise(transitioned.price_offered),
         status: "pending",
         created_at: nowIso(),
       });
     }
     if (!hasPlatformFee) {
       await this.store.insert("escrow_transactions", {
-        campaign_id: campaign.id,
+        campaign_id: transitioned.id,
         type: "platform_fee",
-        amount_paise: paise(campaign.platform_fee_amount),
-        platform_fee_paise: paise(campaign.platform_fee_amount),
+        amount_paise: paise(transitioned.platform_fee_amount),
+        platform_fee_paise: paise(transitioned.platform_fee_amount),
         status: "success",
         created_at: nowIso(),
       });
     }
     if (notify && campaign.status !== "completed") {
-      await this.notifications.create(campaign.influencer_id, "booking_completed", this.notificationData(campaign));
+      await this.notifications.create(transitioned.influencer_id, "booking_completed", this.notificationData(transitioned));
     }
     return { alreadyReleased: false };
   }
@@ -502,24 +482,13 @@ export class PaymentService {
       throw forbidden("Invalid Razorpay signature");
     }
     const payment = await provider.fetchPayment(input.razorpay_payment_id);
-    await this.store.update("campaigns", { eq: { id: campaign.id } }, {
-      status: "in_escrow",
-      payment_status: "paid",
-      payment_method: payment.method,
-      razorpay_payment_id: input.razorpay_payment_id,
-      payment_captured_at: nowIso(),
+    const transitioned = await this.store.rpc<Row>("verify_escrow", {
+      p_campaign_id: campaign.id,
+      p_actor: user.id,
+      p_payment_id: input.razorpay_payment_id,
+      p_method: payment.method,
     });
-    await this.store.insert("escrow_transactions", {
-      campaign_id: campaign.id,
-      type: "escrow_lock",
-      amount_paise: paise(campaign.total_charged_amount),
-      platform_fee_paise: paise(campaign.platform_fee_amount),
-      razorpay_order_id: input.razorpay_order_id,
-      razorpay_payment_id: input.razorpay_payment_id,
-      status: "success",
-      created_at: nowIso(),
-    });
-    await this.notifications.create(campaign.influencer_id, "payment_secured", this.campaigns.notificationData(campaign));
+    await this.notifications.create(transitioned.influencer_id, "payment_secured", this.campaigns.notificationData(transitioned));
     return { success: true, campaignId: campaign.id };
   }
 
@@ -632,20 +601,12 @@ export class DeliveryService {
   }
 
   async submit(user: AuthUser, id: string, input: Row) {
-    const campaign = await requireCampaignRole(this.store, id, user.id, "influencer");
-    requireStatus(campaign, ["in_escrow"]);
-    const existing = await this.store.findOne<Row>("deliveries", { eq: { campaign_id: id } });
-    if (existing) throw conflict("DELIVERY_ALREADY_SUBMITTED", "Delivery has already been submitted for this campaign");
-    await this.store.insert("deliveries", {
-      campaign_id: id,
-      submitted_by: user.id,
-      content_url: input.storagePath,
-      notes: input.notes,
-      submitted_at: nowIso(),
-      created_at: nowIso(),
-      updated_at: nowIso(),
+    const campaign = await this.store.rpc<Row>("submit_delivery", {
+      p_campaign_id: id,
+      p_actor: user.id,
+      p_storage_path: input.storagePath,
+      p_notes: input.notes ?? null,
     });
-    await this.store.update("campaigns", { eq: { id } }, { status: "delivery_submitted", delivery_submitted_at: nowIso() });
     await this.notifications.create(campaign.business_id, "delivery_submitted", { campaignId: id, campaignTitle: campaign.title });
     return { ok: true };
   }

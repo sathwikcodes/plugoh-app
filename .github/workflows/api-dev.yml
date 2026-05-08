@@ -52,11 +52,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build API
-        run: npm run api:build
+      - name: Lint
+        run: npm run lint
 
-      - name: Run API tests
-        run: npm run api:test
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run API tests with coverage threshold
+        run: npm run api:test -- --coverage --coverage.thresholds.lines=70 --coverage.thresholds.functions=70
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
 
   deploy-dev:
     if: github.event_name != 'pull_request'

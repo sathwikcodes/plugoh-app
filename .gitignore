@@ -34,6 +34,9 @@ yarn-error.*
 .env
 .env.*
 .env*.local
+**/.env
+**/.env.local
+**/.env.*.local
 services/*/.env
 services/*/.env.*
 apps/*/.env
