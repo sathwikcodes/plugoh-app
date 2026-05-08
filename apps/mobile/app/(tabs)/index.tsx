@@ -1,22 +1,64 @@
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
-import type { Influencer } from '@plugoh/contracts';
 import { useInfluencers } from '@/hooks/useInfluencers';
 
-function InfluencerCard({ influencer }: { influencer: Influencer }) {
+type InfluencerListItem = {
+  id: string;
+  displayName: string;
+  username: string;
+  city: string;
+  category: string;
+  startingPrice: number;
+};
+
+function getStringValue(source: Record<string, unknown>, key: string): string | undefined {
+  const value = source[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getNumberValue(source: Record<string, unknown>, key: string): number | undefined {
+  const value = source[key];
+  return typeof value === 'number' ? value : undefined;
+}
+
+function normalizeInfluencer(item: unknown): InfluencerListItem | null {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const source = item as Record<string, unknown>;
+  const id = getStringValue(source, 'id');
+  if (!id) {
+    return null;
+  }
+
+  const displayName = getStringValue(source, 'display_name') ?? 'Influencer';
+  const username = getStringValue(source, 'ig_username') ?? '';
+  const city = getStringValue(source, 'city') ?? 'Unknown city';
+  const category = getStringValue(source, 'category') ?? 'Other';
+  const startingPrice =
+    getNumberValue(source, 'starterPrice') ??
+    getNumberValue(source, 'price_per_story') ??
+    getNumberValue(source, 'price_per_post') ??
+    getNumberValue(source, 'price_per_reel') ??
+    0;
+
+  return { id, displayName, username, city, category, startingPrice };
+}
+
+function InfluencerCard({ influencer }: { influencer: InfluencerListItem }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.name}>{influencer.display_name ?? influencer.ig_username ?? 'Influencer'}</Text>
-      <Text style={styles.meta}>{influencer.city ?? 'Unknown city'}</Text>
-      <Text style={styles.meta}>{influencer.category ?? 'Other'}</Text>
-      <Text style={styles.price}>
-        Starting at ₹{influencer.starterPrice ?? influencer.price_per_story ?? influencer.price_per_post ?? influencer.price_per_reel ?? 0}
-      </Text>
+      <Text style={styles.name}>{influencer.displayName || influencer.username || 'Influencer'}</Text>
+      <Text style={styles.meta}>{influencer.city}</Text>
+      <Text style={styles.meta}>{influencer.category}</Text>
+      <Text style={styles.price}>Starting at ₹{influencer.startingPrice}</Text>
     </View>
   );
 }
 
 export default function HomeScreen() {
   const influencers = useInfluencers();
+  const influencerItems = (influencers.data ?? []).map(normalizeInfluencer).filter((item): item is InfluencerListItem => item !== null);
 
   if (influencers.isLoading) {
     return (
@@ -36,7 +78,7 @@ export default function HomeScreen() {
 
   return (
     <FlatList
-      data={influencers.data ?? []}
+      data={influencerItems}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.list}
       renderItem={({ item }) => <InfluencerCard influencer={item} />}
