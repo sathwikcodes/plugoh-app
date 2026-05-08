@@ -20,7 +20,8 @@ type ApiFailure = {
 type ApiResponseEnvelope<T> = ApiSuccess<T> | ApiFailure;
 
 function getApiBaseUrl() {
-  const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL;
+  const env = process.env as Record<string, unknown>;
+  const fromEnv = env.EXPO_PUBLIC_API_BASE_URL;
   if (typeof fromEnv === 'string' && fromEnv.length > 0) {
     return fromEnv;
   }
