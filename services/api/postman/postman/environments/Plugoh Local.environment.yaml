@@ -1,0 +1,24 @@
+name: Plugoh Local
+values:
+  - key: baseUrl
+    value: 'http://localhost:4000'
+  - key: businessJwt
+    value: REPLACE_WITH_LOCAL_BUSINESS_JWT
+  - key: influencerJwt
+    value: REPLACE_WITH_LOCAL_INFLUENCER_JWT
+  - key: internalSecret
+    value: REPLACE_WITH_LOCAL_INTERNAL_SECRET
+  - key: cronSecret
+    value: REPLACE_WITH_LOCAL_CRON_SECRET
+  - key: campaignId
+    value: ''
+  - key: influencerId
+    value: REPLACE_WITH_LOCAL_INFLUENCER_ID
+  - key: influencerProfileId
+    value: REPLACE_WITH_LOCAL_INFLUENCER_PROFILE_ID
+  - key: razorpayOrderId
+    value: ''
+  - key: razorpayPaymentId
+    value: ''
+  - key: razorpaySignature
+    value: ''

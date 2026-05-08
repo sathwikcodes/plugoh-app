@@ -1,0 +1,11 @@
+.git
+.github
+.expo
+node_modules
+apps/**/node_modules
+services/**/node_modules
+packages/**/node_modules
+**/dist
+**/.env
+**/.env.*
+services/api/postman

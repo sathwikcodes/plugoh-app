@@ -1,0 +1,130 @@
+identity:
+  type: SystemAssigned
+location: South India
+name: plugoh-api-dev
+properties:
+  environmentId: /subscriptions/c2b63534-af41-4a35-a681-46ee21d11efa/resourceGroups/plugoh-dev-rg/providers/Microsoft.App/managedEnvironments/plugoh-dev-env
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      allowInsecure: false
+      external: true
+      targetPort: 4000
+      traffic:
+        - latestRevision: true
+          weight: 100
+      transport: Auto
+    registries:
+      - server: plugohdev.azurecr.io
+        identity: system
+    secrets:
+      - name: supabase-url
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/supabase-url
+        identity: system
+      - name: supabase-anon-key
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/supabase-anon-key
+        identity: system
+      - name: supabase-service-role-key
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/supabase-service-role-key
+        identity: system
+      - name: razorpay-key-id
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/razorpay-key-id
+        identity: system
+      - name: razorpay-key-secret
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/razorpay-key-secret
+        identity: system
+      - name: razorpay-webhook-secret
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/razorpay-webhook-secret
+        identity: system
+      - name: instagram-client-id
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/instagram-client-id
+        identity: system
+      - name: instagram-app-secret
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/instagram-app-secret
+        identity: system
+      - name: instagram-redirect-uri
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/instagram-redirect-uri
+        identity: system
+      - name: resend-api-key
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/resend-api-key
+        identity: system
+      - name: anthropic-api-key
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/anthropic-api-key
+        identity: system
+      - name: google-ai-key
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/google-ai-key
+        identity: system
+      - name: internal-secret
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/internal-secret
+        identity: system
+      - name: cron-secret
+        keyVaultUrl: https://plugohdev.vault.azure.net/secrets/cron-secret
+        identity: system
+  template:
+    containers:
+      - name: plugoh-api-dev
+        image: __API_IMAGE__
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+        env:
+          - name: PORT
+            value: "4000"
+          - name: CORS_ORIGIN
+            value: "*"
+          - name: SUPABASE_URL
+            secretRef: supabase-url
+          - name: SUPABASE_ANON_KEY
+            secretRef: supabase-anon-key
+          - name: SUPABASE_SERVICE_ROLE_KEY
+            secretRef: supabase-service-role-key
+          - name: RAZORPAY_KEY_ID
+            secretRef: razorpay-key-id
+          - name: RAZORPAY_KEY_SECRET
+            secretRef: razorpay-key-secret
+          - name: RAZORPAY_WEBHOOK_SECRET
+            secretRef: razorpay-webhook-secret
+          - name: INSTAGRAM_CLIENT_ID
+            secretRef: instagram-client-id
+          - name: INSTAGRAM_APP_SECRET
+            secretRef: instagram-app-secret
+          - name: INSTAGRAM_REDIRECT_URI
+            secretRef: instagram-redirect-uri
+          - name: RESEND_API_KEY
+            secretRef: resend-api-key
+          - name: ANTHROPIC_API_KEY
+            secretRef: anthropic-api-key
+          - name: GOOGLE_AI_KEY
+            secretRef: google-ai-key
+          - name: INTERNAL_SECRET
+            secretRef: internal-secret
+          - name: CRON_SECRET
+            secretRef: cron-secret
+        probes:
+          - type: Startup
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 3
+            periodSeconds: 2
+            timeoutSeconds: 3
+            failureThreshold: 60
+          - type: Readiness
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+          - type: Liveness
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+    scale:
+      minReplicas: 1
+      maxReplicas: 3

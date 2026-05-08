@@ -1,0 +1,9 @@
+$kind: http-request
+url: "{{baseUrl}}/influencers?search=&place=All&category=All&sort=followers_desc"
+method: GET
+queryParams:
+  search: ""
+  place: All
+  category: All
+  sort: followers_desc
+order: 1000

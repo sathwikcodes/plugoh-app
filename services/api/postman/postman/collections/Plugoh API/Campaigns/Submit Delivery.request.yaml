@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{baseUrl}}/campaigns/{{campaignId}}/deliver"
+method: POST
+headers:
+  Authorization: Bearer {{influencerJwt}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "storagePath": "campaign/path/file.mp4",
+      "notes": "Submitted for review"
+    }
+order: 5000

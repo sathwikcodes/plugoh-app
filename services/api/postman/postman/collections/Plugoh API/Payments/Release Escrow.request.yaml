@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseUrl}}/payment/release-escrow"
+method: POST
+headers:
+  Authorization: Bearer {{businessJwt}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "campaign_id": "{{campaignId}}"
+    }
+order: 3000

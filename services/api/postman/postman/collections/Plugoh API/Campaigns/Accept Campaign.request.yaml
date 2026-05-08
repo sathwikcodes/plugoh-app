@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{baseUrl}}/campaigns/{{campaignId}}/accept"
+method: POST
+headers:
+  Authorization: Bearer {{influencerJwt}}
+order: 4000

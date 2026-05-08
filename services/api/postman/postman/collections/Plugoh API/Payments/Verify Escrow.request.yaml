@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{baseUrl}}/payment/verify-escrow"
+method: POST
+headers:
+  Authorization: Bearer {{businessJwt}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "campaign_id": "{{campaignId}}",
+      "razorpay_order_id": "{{razorpayOrderId}}",
+      "razorpay_payment_id": "{{razorpayPaymentId}}",
+      "razorpay_signature": "{{razorpaySignature}}"
+    }
+order: 2000
