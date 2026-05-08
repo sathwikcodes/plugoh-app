@@ -10,7 +10,7 @@ image="$1"
 resource_group="${AZURE_RESOURCE_GROUP:-Plugoh-dev-rg}"
 container_app="${AZURE_CONTAINER_APP:-plugoh-api-dev}"
 template_path="${AZURE_CONTAINERAPP_TEMPLATE:-infra/azure/api.dev.containerapp.yaml}"
-health_path="${AZURE_HEALTH_PATH:-/health}"
+health_path="${AZURE_HEALTH_PATH:-/healthz/live}"
 
 if ! command -v az >/dev/null 2>&1; then
   echo "Azure CLI is required." >&2
@@ -32,6 +32,37 @@ bash infra/azure/render-containerapp-spec.sh "$template_path" "$image" "$rendere
 
 az config set extension.use_dynamic_install=yes_without_prompt >/dev/null
 
+print_diagnostics() {
+  local revision="${1:-}"
+  echo "Deployment diagnostics for ${container_app} in ${resource_group}:" >&2
+  az containerapp show \
+    --name "$container_app" \
+    --resource-group "$resource_group" \
+    --query "{latestRevisionName:properties.latestRevisionName,latestReadyRevisionName:properties.latestReadyRevisionName,runningStatus:properties.runningStatus}" \
+    -o json >&2 || true
+
+  if [ -n "$revision" ]; then
+    az containerapp revision show \
+      --name "$container_app" \
+      --resource-group "$resource_group" \
+      --revision "$revision" \
+      --query "{name:name,healthState:properties.healthState,runningState:properties.runningState,runningStateDetails:properties.runningStateDetails}" \
+      -o json >&2 || true
+    az containerapp logs show \
+      --name "$container_app" \
+      --resource-group "$resource_group" \
+      --type system \
+      --revision "$revision" \
+      --tail 40 >&2 || true
+  else
+    az containerapp logs show \
+      --name "$container_app" \
+      --resource-group "$resource_group" \
+      --type system \
+      --tail 40 >&2 || true
+  fi
+}
+
 if az containerapp show --name "$container_app" --resource-group "$resource_group" >/dev/null 2>&1; then
   az containerapp update --name "$container_app" --resource-group "$resource_group" --yaml "$rendered_spec" >/dev/null
 else
@@ -51,6 +82,7 @@ while [ "$attempt" -le "$max_attempts" ]; do
 
   if [ "$attempt" -eq "$max_attempts" ]; then
     echo "Container App did not reach a ready running revision in time." >&2
+    print_diagnostics "$latest_revision"
     exit 1
   fi
 
