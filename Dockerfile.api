@@ -9,7 +9,7 @@ COPY packages/config/package.json ./packages/config/package.json
 COPY packages/contracts/package.json ./packages/contracts/package.json
 COPY packages/db/package.json ./packages/db/package.json
 
-RUN npm ci --include-workspace-root=false --workspace @plugoh/contracts --workspace @plugoh/api
+RUN npm ci --ignore-scripts --include-workspace-root=false --workspace @plugoh/contracts --workspace @plugoh/api
 
 COPY packages/config ./packages/config
 COPY packages/contracts ./packages/contracts
@@ -25,7 +25,7 @@ RUN npm pack ./services/api --pack-destination /packs
 RUN mkdir -p /runtime
 RUN printf '%s\n' '{"name":"plugoh-api-runtime","private":true}' > /app/runtime-package.json
 RUN cp /app/runtime-package.json /runtime/package.json
-RUN cd /runtime && npm install --omit=dev /packs/plugoh-contracts-1.0.0.tgz /packs/plugoh-api-1.0.0.tgz
+RUN cd /runtime && npm install --ignore-scripts --omit=dev /packs/plugoh-contracts-1.0.0.tgz /packs/plugoh-api-1.0.0.tgz
 
 FROM gcr.io/distroless/nodejs22-debian12 AS runtime
 WORKDIR /app
