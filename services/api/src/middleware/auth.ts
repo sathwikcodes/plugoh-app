@@ -18,7 +18,15 @@ export function createSupabaseAuthVerifier(config: EnvConfig): AuthVerifier {
   return async (token) => {
     const { data, error } = await client.auth.getUser(token);
     if (error || !data.user) throw unauthorized("Invalid bearer token");
-    return { id: data.user.id, email: data.user.email };
+    const user: AuthUser = {
+      id: data.user.id,
+      ...(data.user.email ? { email: data.user.email } : {}),
+    };
+    const claimRole = data.user.app_metadata?.role;
+    if (claimRole === "business" || claimRole === "influencer") {
+      user.app_metadata = { role: claimRole };
+    }
+    return user;
   };
 }
 
@@ -28,9 +36,15 @@ export function requireAuth(store: DataStore, verifyToken: AuthVerifier) {
     const token = header?.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) throw unauthorized();
     const user = await verifyToken(token);
-    const roleRow = await store.findOne<{ role: UserRole }>("user_roles", { eq: { user_id: user.id } });
+    const roleFromClaim = user.app_metadata?.role;
+    const roleRow = roleFromClaim ? null : await store.findOne<{ role: UserRole }>("user_roles", { eq: { user_id: user.id } });
     c.set("user", user);
-    if (roleRow?.role) c.set("role", roleRow.role);
+    c.set("authToken", token);
+    if (roleFromClaim) {
+      c.set("role", roleFromClaim);
+    } else if (roleRow?.role) {
+      c.set("role", roleRow.role);
+    }
     await next();
   });
 }

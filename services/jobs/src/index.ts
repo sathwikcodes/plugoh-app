@@ -1,8 +1,14 @@
-const POLL_MS = 10_000;
+import { runAutoRelease } from "@plugoh/api/jobs";
 
-function tick() {
-  console.log("[jobs] worker heartbeat", new Date().toISOString());
+async function main() {
+  try {
+    const result = await runAutoRelease();
+    console.log("[jobs] auto-release completed", result);
+    process.exit(0);
+  } catch (error) {
+    console.error("[jobs] auto-release failed", error);
+    process.exit(1);
+  }
 }
 
-tick();
-setInterval(tick, POLL_MS);
+void main();
