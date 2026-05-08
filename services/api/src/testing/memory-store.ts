@@ -128,7 +128,7 @@ export class MemoryDataStore implements DataStore {
     if (campaign.influencer_id !== params.p_actor) {
       throw forbidden("Influencer on campaign required");
     }
-    if (!["requested", "payment_pending", "pre_authorized"].includes(String(campaign.status))) {
+    if (!["requested", "pre_authorized"].includes(String(campaign.status))) {
       this.assertIllegalTransition(campaign.status, "accepted");
     }
     if (campaign.status === "pre_authorized") {
@@ -163,7 +163,7 @@ export class MemoryDataStore implements DataStore {
     if (campaign.influencer_id !== params.p_actor) {
       throw forbidden("Influencer on campaign required");
     }
-    if (!["requested", "payment_pending", "pre_authorized"].includes(String(campaign.status))) {
+    if (!["requested", "pre_authorized"].includes(String(campaign.status))) {
       this.assertIllegalTransition(campaign.status, "declined");
     }
     const shouldRefund = campaign.status === "pre_authorized" && campaign.payment_method === "upi" && Boolean(campaign.razorpay_payment_id);
