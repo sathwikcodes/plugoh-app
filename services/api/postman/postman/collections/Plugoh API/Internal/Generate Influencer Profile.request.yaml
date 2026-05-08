@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseUrl}}/ai/generate-profile"
+method: POST
+headers:
+  x-internal-secret: "{{internalSecret}}"
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "userId": "{{influencerId}}"
+    }
+order: 1000

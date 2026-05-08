@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{baseUrl}}/influencers/{{influencerProfileId}}"
+method: GET
+order: 2000

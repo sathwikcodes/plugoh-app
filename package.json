@@ -9,13 +9,17 @@
   ],
   "scripts": {
     "start": "npm run mobile:start",
+    "contracts:build": "npm run --workspace @plugoh/contracts build",
     "mobile:start": "npm run --workspace @plugoh/mobile start",
     "mobile:android": "npm run --workspace @plugoh/mobile android",
     "mobile:ios": "npm run --workspace @plugoh/mobile ios",
     "mobile:web": "npm run --workspace @plugoh/mobile web",
     "mobile:lint": "npm run --workspace @plugoh/mobile lint",
     "mobile:reset-project": "npm run --workspace @plugoh/mobile reset-project",
-    "api:dev": "npm run --workspace @plugoh/api dev",
+    "api:dev": "npm run contracts:build && npm run --workspace @plugoh/api dev",
+    "api:build": "npm run contracts:build && npm run --workspace @plugoh/api build",
+    "api:test": "npm run contracts:build && npm run --workspace @plugoh/api test",
+    "api:test:coverage": "npm run contracts:build && npm run --workspace @plugoh/api test:coverage",
     "jobs:dev": "npm run --workspace @plugoh/jobs dev",
     "ai:dev": "npm run --workspace @plugoh/ai dev"
   }

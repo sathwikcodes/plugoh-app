@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{baseUrl}}/cron/auto-release"
+method: GET
+headers:
+  x-cron-secret: "{{cronSecret}}"
+order: 2000

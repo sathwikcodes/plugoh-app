@@ -1,0 +1,8 @@
+$kind: http-request
+url: "{{baseUrl}}/campaigns?role=influencer"
+method: GET
+headers:
+  Authorization: Bearer {{influencerJwt}}
+queryParams:
+  role: influencer
+order: 3000

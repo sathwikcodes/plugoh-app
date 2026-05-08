@@ -1,0 +1,69 @@
+{
+  "info": {
+    "name": "Plugoh API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        { "name": "Root", "request": { "method": "GET", "url": "{{baseUrl}}/" } },
+        { "name": "Health", "request": { "method": "GET", "url": "{{baseUrl}}/health" } }
+      ]
+    },
+    {
+      "name": "Discovery",
+      "item": [
+        { "name": "List Influencers", "request": { "method": "GET", "url": "{{baseUrl}}/influencers?search=&place=All&category=All&sort=followers_desc" } },
+        { "name": "Get Influencer", "request": { "method": "GET", "url": "{{baseUrl}}/influencers/{{influencerProfileId}}" } }
+      ]
+    },
+    {
+      "name": "Campaigns",
+      "item": [
+        {
+          "name": "Create Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{businessJwt}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/campaigns",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"influencer_id\": \"{{influencerId}}\",\n  \"influencer_profile_id\": \"{{influencerProfileId}}\",\n  \"package_type\": \"reel\",\n  \"price_offered\": 10000,\n  \"objective\": \"visit_place\",\n  \"timing_mode\": \"choose_date\",\n  \"due_date\": \"2026-07-01\",\n  \"event_name\": \"Venue address\",\n  \"contact_email\": \"brand@example.com\",\n  \"contact_phone\": \"+919999999999\"\n}"
+            }
+          }
+        },
+        { "name": "List Business Campaigns", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{businessJwt}}" }], "url": "{{baseUrl}}/campaigns?role=business" } },
+        { "name": "List Influencer Campaigns", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{influencerJwt}}" }], "url": "{{baseUrl}}/campaigns?role=influencer" } },
+        { "name": "Accept Campaign", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{influencerJwt}}" }], "url": "{{baseUrl}}/campaigns/{{campaignId}}/accept" } },
+        { "name": "Submit Delivery", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{influencerJwt}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/campaigns/{{campaignId}}/deliver", "body": { "mode": "raw", "raw": "{\n  \"storagePath\": \"campaign/path/file.mp4\",\n  \"notes\": \"Submitted for review\"\n}" } } },
+        { "name": "Approve Delivery", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{businessJwt}}" }], "url": "{{baseUrl}}/campaigns/{{campaignId}}/approve" } }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        { "name": "Create Escrow Order", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{businessJwt}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/payment/create-escrow-order", "body": { "mode": "raw", "raw": "{\n  \"campaign_id\": \"{{campaignId}}\"\n}" } } },
+        { "name": "Verify Escrow", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{businessJwt}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/payment/verify-escrow", "body": { "mode": "raw", "raw": "{\n  \"campaign_id\": \"{{campaignId}}\",\n  \"razorpay_order_id\": \"{{razorpayOrderId}}\",\n  \"razorpay_payment_id\": \"{{razorpayPaymentId}}\",\n  \"razorpay_signature\": \"{{razorpaySignature}}\"\n}" } } },
+        { "name": "Release Escrow", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{businessJwt}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/payment/release-escrow", "body": { "mode": "raw", "raw": "{\n  \"campaign_id\": \"{{campaignId}}\"\n}" } } }
+      ]
+    },
+    {
+      "name": "Profiles",
+      "item": [
+        { "name": "Influencer Profile", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{influencerJwt}}" }], "url": "{{baseUrl}}/influencer/profile" } },
+        { "name": "Business Profile", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{businessJwt}}" }], "url": "{{baseUrl}}/business/profile" } }
+      ]
+    },
+    {
+      "name": "Internal",
+      "item": [
+        { "name": "Generate Influencer Profile", "request": { "method": "POST", "header": [{ "key": "x-internal-secret", "value": "{{internalSecret}}" }, { "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/ai/generate-profile", "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{influencerId}}\"\n}" } } },
+        { "name": "Auto Release Cron", "request": { "method": "GET", "header": [{ "key": "x-cron-secret", "value": "{{cronSecret}}" }], "url": "{{baseUrl}}/cron/auto-release" } }
+      ]
+    }
+  ]
+}

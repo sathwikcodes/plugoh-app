@@ -1,0 +1,22 @@
+$kind: http-request
+url: "{{baseUrl}}/campaigns"
+method: POST
+headers:
+  Authorization: Bearer {{businessJwt}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "influencer_id": "{{influencerId}}",
+      "influencer_profile_id": "{{influencerProfileId}}",
+      "package_type": "reel",
+      "price_offered": 10000,
+      "objective": "visit_place",
+      "timing_mode": "choose_date",
+      "due_date": "2026-07-01",
+      "event_name": "Venue address",
+      "contact_email": "brand@example.com",
+      "contact_phone": "+919999999999"
+    }
+order: 1000

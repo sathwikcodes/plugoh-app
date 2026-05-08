@@ -1,0 +1,149 @@
+name: API Dev CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/api-dev.yml
+      - Dockerfile.api
+      - infra/azure/**
+      - package.json
+      - package-lock.json
+      - packages/contracts/**
+      - services/api/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/api-dev.yml
+      - Dockerfile.api
+      - infra/azure/**
+      - package.json
+      - package-lock.json
+      - packages/contracts/**
+      - services/api/**
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Existing ACR tag to deploy. Leave empty to build the current commit.
+        required: false
+        type: string
+
+concurrency:
+  group: api-dev-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API
+        run: npm run api:build
+
+      - name: Run API tests
+        run: npm run api:test
+
+  deploy-dev:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: azure-dev
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_CONTAINER_APP: ${{ vars.AZURE_CONTAINER_APP }}
+      AZURE_CONTAINER_ENV: ${{ vars.AZURE_CONTAINER_ENV }}
+      AZURE_ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
+      AZURE_ACR_LOGIN_SERVER: ${{ vars.AZURE_ACR_LOGIN_SERVER }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate deploy configuration
+        run: |
+          set -euo pipefail
+          required_vars=(
+            AZURE_CLIENT_ID
+            AZURE_TENANT_ID
+            AZURE_SUBSCRIPTION_ID
+            AZURE_RESOURCE_GROUP
+            AZURE_CONTAINER_APP
+            AZURE_CONTAINER_ENV
+            AZURE_ACR_NAME
+            AZURE_ACR_LOGIN_SERVER
+          )
+          for var_name in "${required_vars[@]}"; do
+            if [ -z "${!var_name:-}" ]; then
+              echo "Missing GitHub environment variable: ${var_name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Resolve image target
+        id: image
+        env:
+          INPUT_IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_IMAGE_TAG:-}" ]; then
+            tag="$INPUT_IMAGE_TAG"
+            should_build="false"
+          else
+            tag="$GITHUB_SHA"
+            should_build="true"
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "should_build=$should_build" >> "$GITHUB_OUTPUT"
+          echo "image=${AZURE_ACR_LOGIN_SERVER}/plugoh-api:$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Docker Buildx
+        if: steps.image.outputs.should_build == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Azure Container Registry
+        if: steps.image.outputs.should_build == 'true'
+        run: az acr login --name "$AZURE_ACR_NAME"
+
+      - name: Build and push API image
+        if: steps.image.outputs.should_build == 'true'
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --file Dockerfile.api \
+            --tag "${{ steps.image.outputs.image }}" \
+            --tag "${AZURE_ACR_LOGIN_SERVER}/plugoh-api:dev" \
+            --cache-from type=gha,scope=plugoh-api-dev \
+            --cache-to type=gha,mode=max,scope=plugoh-api-dev \
+            --push \
+            .
+
+      - name: Deploy to Azure Container Apps
+        run: bash infra/azure/deploy-api-dev.sh "${{ steps.image.outputs.image }}"
