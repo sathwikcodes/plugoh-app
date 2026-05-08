@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -74,12 +74,14 @@ beforeAll(async () => {
     );
   `);
 
-  const migrationPath = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../../../../../infra/db/migrations/0001_state_transition_functions.sql",
-  );
-  const migrationSql = readFileSync(migrationPath, "utf8");
-  await pool.query(migrationSql);
+  const migrationsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../infra/db/migrations");
+  const migrationFiles = readdirSync(migrationsDir)
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+  for (const migrationFile of migrationFiles) {
+    const migrationSql = readFileSync(resolve(migrationsDir, migrationFile), "utf8");
+    await pool.query(migrationSql);
+  }
 }, 120_000);
 
 afterAll(async () => {
