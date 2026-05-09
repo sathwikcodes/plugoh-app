@@ -24,10 +24,16 @@ export function instagramRoutes(deps: RouteDeps) {
   });
   app.get("/auth/callback/instagram", zQuery(instagramCallbackQuerySchema), async (c) => {
     const result = await deps.services.instagram.callback(c.req.valid("query"), getCookie(c, "ig_oauth_state"));
+    if (result.role === "influencer") {
+      void deps.services.ai.influencer(result.userId).catch(() => undefined);
+    }
     return c.redirect(result.redirectTo);
   });
   app.post("/instagram/sync", auth, deps.authDefaultRateLimit, requireRole("influencer"), async (c) =>
     ok(c, await deps.scopedReadServices(c).instagram.sync(deps.requireUser(c))),
+  );
+  app.post("/instagram/disconnect", auth, deps.authDefaultRateLimit, requireRole("influencer"), async (c) =>
+    ok(c, await deps.services.instagram.disconnect(deps.requireUser(c))),
   );
 
   return app;

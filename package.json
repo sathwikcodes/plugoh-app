@@ -15,12 +15,12 @@
     "start": "npm run mobile:start",
     "contracts:build": "npm run --workspace @plugoh/contracts build",
     "db:build": "npm run --workspace @plugoh/db build",
-    "mobile:start": "npm run --workspace @plugoh/mobile start",
-    "mobile:android": "npm run --workspace @plugoh/mobile android",
-    "mobile:ios": "npm run --workspace @plugoh/mobile ios",
-    "mobile:web": "npm run --workspace @plugoh/mobile web",
-    "mobile:lint": "npm run --workspace @plugoh/mobile lint",
-    "mobile:reset-project": "npm run --workspace @plugoh/mobile reset-project",
+    "mobile:start": "npm run --workspace @plugoh/mobile start --",
+    "mobile:android": "npm run --workspace @plugoh/mobile android --",
+    "mobile:ios": "npm run --workspace @plugoh/mobile ios --",
+    "mobile:web": "npm run --workspace @plugoh/mobile web --",
+    "mobile:lint": "npm run --workspace @plugoh/mobile lint --",
+    "mobile:reset-project": "npm run --workspace @plugoh/mobile reset-project --",
     "api:dev": "npm run contracts:build && npm run --workspace @plugoh/api dev",
     "api:build": "npm run contracts:build && npm run --workspace @plugoh/api build",
     "api:test": "npm run contracts:build && npm run --workspace @plugoh/api test",
@@ -28,7 +28,9 @@
     "jobs:dev": "npm run --workspace @plugoh/jobs dev",
     "lint": "eslint --no-warn-ignored --max-warnings=0 services/**/*.ts packages/**/*.ts apps/mobile/**/*.{ts,tsx}",
     "typecheck": "npm run contracts:build && npm run db:build && npm run --workspace @plugoh/api build && npm run --workspace @plugoh/jobs build && npm run --workspace @plugoh/mobile typecheck",
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks",
+    "android": "npm run mobile:android",
+    "ios": "npm run mobile:ios"
   },
   "simple-git-hooks": {
     "pre-commit": "npx --no-install lint-staged"

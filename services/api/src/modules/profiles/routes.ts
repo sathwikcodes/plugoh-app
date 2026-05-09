@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   businessProfilePatchSchema,
   influencerActivePatchSchema,
+  influencerOnboardingSchema,
   influencerPricingPatchSchema,
   influencerProfilePatchSchema,
   payoutUpsertSchema,
@@ -15,6 +16,13 @@ import type { RouteDeps } from "../deps.js";
 export function profileRoutes(deps: RouteDeps) {
   const app = new Hono<AppEnv>();
   const auth = requireAuth(deps.store, deps.authVerifier ?? createSupabaseAuthVerifier(deps.config));
+
+  app.get("/me/bootstrap", auth, deps.authDefaultRateLimit, async (c) => {
+    return ok(c, await deps.services.profiles.bootstrap(deps.requireUser(c), c.get("role") ?? null));
+  });
+  app.post("/influencer/onboarding", auth, deps.authDefaultRateLimit, zJson(influencerOnboardingSchema), async (c) => {
+    return ok(c, await deps.services.profiles.upsertInfluencerOnboarding(deps.requireUser(c), c.req.valid("json")));
+  });
 
   app.get("/influencer/profile", auth, deps.authDefaultRateLimit, requireRole("influencer"), async (c) => {
     return ok(c, await deps.scopedReadServices(c).profiles.getInfluencer(deps.requireUser(c)));

@@ -2,6 +2,7 @@ import { MemoryStore } from "hono-rate-limiter";
 import type { Context } from "hono";
 import type { UserRole } from "@plugoh/contracts";
 import {
+  ExpoPushProvider,
   ExternalAiProvider,
   MetaInstagramProvider,
   RazorpayProvider,
@@ -11,6 +12,7 @@ import {
   type EmailProvider,
   type InstagramProvider,
   type PaymentProvider,
+  type PushProvider,
   type StorageProvider,
 } from "../clients/providers.js";
 import type { EnvConfig } from "../config/env.js";
@@ -34,12 +36,14 @@ export function createDefaultProviders(config: EnvConfig): ProviderBundle {
     instagram?: InstagramProvider;
     storage?: StorageProvider;
     ai?: AiProvider;
+    push?: PushProvider;
   } = {};
   if (config.razorpayKeyId && config.razorpayKeySecret) providers.payment = new RazorpayProvider(config);
   if (config.resendApiKey) providers.email = new ResendEmailProvider(config);
   if (config.instagramClientId && config.instagramAppSecret && config.instagramRedirectUri) providers.instagram = new MetaInstagramProvider(config);
   if (config.supabaseUrl && config.supabaseServiceRoleKey) providers.storage = new SupabaseStorageProvider(config);
   providers.ai = new ExternalAiProvider(config);
+  providers.push = new ExpoPushProvider();
   return providers;
 }
 

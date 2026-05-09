@@ -7,7 +7,8 @@ import {
   tooManyRequests,
   unauthorized,
 } from "../core/errors.js";
-import type { AiProvider, EmailProvider, InstagramProvider, PaymentProvider, StorageProvider } from "../clients/providers.js";
+import { logger } from "../core/logger.js";
+import type { AiProvider, EmailProvider, InstagramProvider, PaymentProvider, PushProvider, StorageProvider } from "../clients/providers.js";
 import { verifyHmacSha256 } from "../clients/providers.js";
 import type { EnvConfig } from "../config/env.js";
 import { requireConfig } from "../config/env.js";
@@ -40,10 +41,11 @@ export type ProviderBundle = {
   instagram?: InstagramProvider;
   storage?: StorageProvider;
   ai?: AiProvider;
+  push?: PushProvider;
 };
 
 export function createServices(store: DataStore, providers: ProviderBundle, config: EnvConfig): Services {
-  const notifications = new NotificationService(store);
+  const notifications = new NotificationService(store, providers.push);
   const campaignCore = new CampaignService(store, notifications, providers.payment);
   const payments = new PaymentService(store, notifications, campaignCore, config, providers.payment);
   return {
@@ -52,7 +54,7 @@ export function createServices(store: DataStore, providers: ProviderBundle, conf
     campaigns: campaignCore,
     payments,
     delivery: new DeliveryService(store, notifications, providers.storage),
-    messaging: new MessagingService(store, providers.email),
+    messaging: new MessagingService(store, providers.email, providers.storage),
     notifications,
     instagram: new InstagramService(store, providers.instagram),
     ai: new AiProfileService(store, providers.ai),
@@ -91,6 +93,21 @@ function starterPrice(profile: Row) {
   );
 }
 
+function hasInfluencerBasics(profile?: Row | null) {
+  return Boolean(String(profile?.full_name ?? "").trim() && String(profile?.phone ?? "").trim() && String(profile?.location ?? "").trim());
+}
+
+function hasInstagramConnection(profile?: Row | null) {
+  return Boolean(profile?.access_token || profile?.ig_username || profile?.instagram_connected_at);
+}
+
+function hasGeneratedInfluencerFields(profile?: Row | null) {
+  return Boolean(
+    profile?.category &&
+      (profile?.price_per_reel != null || profile?.price_per_post != null || profile?.price_per_story != null),
+  );
+}
+
 function assertUser(user?: AuthUser): AuthUser {
   if (!user) throw unauthorized();
   return user;
@@ -118,7 +135,10 @@ function requireStatus(campaign: Row, statuses: CampaignStatus[]) {
 }
 
 export class NotificationService {
-  constructor(private readonly store: DataStore) {}
+  constructor(
+    private readonly store: DataStore,
+    private readonly push?: PushProvider,
+  ) {}
 
   async list(user: AuthUser) {
     return this.store.list<Row>("notifications", {
@@ -141,10 +161,98 @@ export class NotificationService {
       read: false,
       created_at: nowIso(),
     });
+    await this.sendPush(userId, type, data);
   }
 
   async createForMany(userIds: string[], type: NotificationType, data: Row = {}) {
     await Promise.all(userIds.map((userId) => this.create(userId, type, data)));
+  }
+
+  async registerPush(user: AuthUser, input: { expo_push_token: string; platform: string }) {
+    return this.store.upsert(
+      "user_push_tokens",
+      {
+        user_id: user.id,
+        expo_push_token: input.expo_push_token,
+        platform: input.platform,
+        updated_at: nowIso(),
+      },
+      "user_id",
+    );
+  }
+
+  async unregisterPush(user: AuthUser) {
+    await this.store.update("user_push_tokens", { eq: { user_id: user.id } }, { expo_push_token: null, updated_at: nowIso() });
+    return { ok: true };
+  }
+
+  private async sendPush(userId: string, type: NotificationType, data: Row) {
+    const tokens = await this.store.list<Row>("user_push_tokens", {
+      eq: { user_id: userId },
+    });
+    const activeTokens = tokens.map((row) => row.expo_push_token).filter((value): value is string => typeof value === "string" && value.length > 0);
+    if (activeTokens.length === 0 || !this.push) return;
+    try {
+      const result = await this.push.send(
+        activeTokens.map((to) => ({
+          to,
+          title: notificationTitle(type),
+          body: notificationBody(type, data),
+          data: { type, ...data },
+        })),
+      );
+      if (result.failed > 0) {
+        logger.warn(
+          { userId, type, failed: result.failed, errors: result.errors },
+          "Push notifications had delivery failures",
+        );
+      } else {
+        logger.info({ userId, type, sent: result.sent }, "Push notifications delivered");
+      }
+    } catch (error) {
+      logger.error({ err: error, userId, type }, "Push provider send failed");
+    }
+  }
+}
+
+function notificationTitle(type: NotificationType) {
+  switch (type) {
+    case "new_booking":
+      return "New campaign request";
+    case "booking_accepted":
+      return "Campaign accepted";
+    case "payment_secured":
+      return "Payment secured";
+    case "delivery_submitted":
+      return "Delivery submitted";
+    case "booking_completed":
+      return "Campaign completed";
+    case "booking_rejected":
+      return "Campaign declined";
+    case "booking_expired":
+      return "Campaign expired";
+    case "delivery_disputed":
+      return "Delivery disputed";
+    default:
+      return "Plugoh update";
+  }
+}
+
+function notificationBody(type: NotificationType, data: Row) {
+  const title = String(data.campaignTitle ?? "campaign");
+  switch (type) {
+    case "new_booking":
+      return `${title} needs your response.`;
+    case "payment_secured":
+      return `${title} is funded and ready to execute.`;
+    case "delivery_submitted":
+      return `${title} is waiting for approval.`;
+    case "booking_completed":
+      return `${title} has been completed.`;
+    case "delivery_disputed":
+      return `${title} needs revision or review.`;
+    default:
+      return `${title} has a new update.`;
   }
 }
 
@@ -210,10 +318,79 @@ export class DiscoveryService {
 export class ProfileService {
   constructor(private readonly store: DataStore) {}
 
+  async bootstrap(user: AuthUser, role: UserRole | null) {
+    const [accountProfile, influencerProfile, notifications] = await Promise.all([
+      this.store.findOne<Row>("profiles", { eq: { id: user.id } }),
+      this.store.findOne<Row>("influencer_profiles", { eq: { user_id: user.id } }),
+      this.store.list<Row>("notifications", { eq: { user_id: user.id } }),
+    ]);
+
+    let inboxUnread = 0;
+    if (role === "influencer") {
+      const campaigns = await this.store.list<Row>("campaigns", { eq: { influencer_id: user.id } });
+      const campaignIds = campaigns.map((campaign) => campaign.id);
+      const messages = campaignIds.length
+        ? await this.store.list<Row>("campaign_messages", { in: { campaign_id: campaignIds } })
+        : [];
+      inboxUnread = messages.filter((message) => !Array.isArray(message.read_by) || !message.read_by.includes(user.id)).length;
+    }
+
+    const onboardingStage = !role || !hasInfluencerBasics(accountProfile)
+      ? "needs_basics"
+      : !hasInstagramConnection(influencerProfile)
+        ? "needs_instagram"
+        : !hasGeneratedInfluencerFields(influencerProfile)
+          ? "ai_pending"
+          : "ready";
+
+    return {
+      user: { id: user.id, email: user.email },
+      role,
+      onboardingStage,
+      unreadCounts: {
+        notifications: notifications.filter((item) => item.read !== true).length,
+        inbox: inboxUnread,
+      },
+    };
+  }
+
   async getInfluencer(user: AuthUser) {
     const profile = await this.store.findOne<Row>("influencer_profiles", { eq: { user_id: user.id } });
     if (!profile) throw notFound("Influencer profile");
-    return profile;
+    return {
+      ...profile,
+      instagram_connected: hasInstagramConnection(profile),
+    };
+  }
+
+  async upsertInfluencerOnboarding(user: AuthUser, input: { full_name: string; phone: string; location: string }) {
+    await this.store.upsert(
+      "user_roles",
+      { user_id: user.id, role: "influencer" },
+      "user_id",
+    );
+    await this.store.upsert(
+      "profiles",
+      {
+        id: user.id,
+        email: user.email,
+        full_name: input.full_name,
+        phone: input.phone,
+        location: input.location,
+        updated_at: nowIso(),
+      },
+      "id",
+    );
+    return this.store.upsert<Row>(
+      "influencer_profiles",
+      {
+        user_id: user.id,
+        city: input.location,
+        is_active: false,
+        updated_at: nowIso(),
+      },
+      "user_id",
+    );
   }
 
   async updateInfluencer(user: AuthUser, input: Row) {
@@ -612,7 +789,7 @@ export class DeliveryService {
   }
 
   async signedUrl(user: AuthUser, id: string) {
-    await requireCampaignRole(this.store, id, user.id, "business");
+    await campaignForParticipant(this.store, id, user.id);
     const delivery = await this.store.findOne<Row>("deliveries", { eq: { campaign_id: id } });
     if (!delivery) throw notFound("Delivery");
     if (!this.storage) throw badRequest("STORAGE_PROVIDER_UNAVAILABLE", "Storage provider is not configured");
@@ -622,7 +799,11 @@ export class DeliveryService {
 }
 
 export class MessagingService {
-  constructor(private readonly store: DataStore, private readonly email?: EmailProvider) {}
+  constructor(
+    private readonly store: DataStore,
+    private readonly email?: EmailProvider,
+    private readonly storage?: StorageProvider,
+  ) {}
 
   async inbox(user: AuthUser, role: UserRole) {
     const key = role === "business" ? "business_id" : "influencer_id";
@@ -664,6 +845,29 @@ export class MessagingService {
     });
   }
 
+  async sendAttachment(user: AuthUser, id: string, input: { caption?: string; file: File }) {
+    await campaignForParticipant(this.store, id, user.id);
+    if (!this.storage) throw badRequest("STORAGE_PROVIDER_UNAVAILABLE", "Storage provider is not configured");
+    const ext = input.file.name.split(".").pop() ?? "bin";
+    const path = `messages/${id}/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const storagePath = await this.storage.uploadMessageAttachment({ path, file: input.file });
+    const message = await this.store.insert<Row>("campaign_messages", {
+      campaign_id: id,
+      sender_id: user.id,
+      message_type: "attachment",
+      content: input.caption?.trim() || input.file.name,
+      metadata: {
+        storagePath,
+        fileName: input.file.name,
+        mimeType: input.file.type,
+        fileSize: input.file.size,
+      },
+      read_by: [user.id],
+      created_at: nowIso(),
+    });
+    return message;
+  }
+
   async markRead(user: AuthUser, id: string) {
     await campaignForParticipant(this.store, id, user.id);
     const messages = await this.store.list<Row>("campaign_messages", { eq: { campaign_id: id } });
@@ -702,9 +906,10 @@ export class MessagingService {
 export class InstagramService {
   constructor(private readonly store: DataStore, private readonly instagram?: InstagramProvider) {}
 
-  connect(input: { userId: string; role: UserRole }) {
+  connect(input: { userId: string; role: UserRole; platform?: "web" | "mobile" }) {
     if (!this.instagram) throw badRequest("INSTAGRAM_PROVIDER_UNAVAILABLE", "Instagram provider is not configured");
-    const state = `${input.role}:${crypto.randomUUID()}:${input.userId}`;
+    const platform = input.platform ?? "web";
+    const state = `${input.role}:${platform}:${crypto.randomUUID()}:${input.userId}`;
     const scopes = ["instagram_basic", "instagram_content_publish", "instagram_manage_insights", "pages_show_list", "pages_read_engagement"];
     return { state, url: this.instagram.buildOAuthUrl({ state, scopes }) };
   }
@@ -712,7 +917,7 @@ export class InstagramService {
   async callback(input: { code: string; state: string }, cookieState?: string) {
     if (!cookieState || cookieState !== input.state) throw forbidden("Invalid Instagram OAuth state");
     if (!this.instagram) throw badRequest("INSTAGRAM_PROVIDER_UNAVAILABLE", "Instagram provider is not configured");
-    const [role, , userId] = input.state.split(":") as [UserRole, string, string];
+    const [role, platform, , userId] = input.state.split(":") as [UserRole, "web" | "mobile", string, string];
     const token = await this.instagram.exchangeCode(input.code);
     const profile = await this.instagram.fetchProfile(token.accessToken);
     if (role === "influencer") {
@@ -724,12 +929,27 @@ export class InstagramService {
         access_token: token.accessToken,
         token_expires_at: token.expiresAt,
         is_active: true,
+        instagram_connected_at: nowIso(),
       }, "user_id");
       await Promise.all(media.map((item) => this.store.upsert("instagram_media", { user_id: userId, ...item, synced_at: nowIso() }, "user_id,ig_media_id")));
-      return { redirectTo: "/dashboard/influencer/profile?source=onboarding" };
+      return {
+        redirectTo:
+          platform === "mobile"
+            ? "plugoh://instagram/callback?status=success&role=influencer&source=onboarding"
+            : "/dashboard/influencer/profile?source=onboarding",
+        userId,
+        role,
+      };
     }
     await this.store.upsert("business_profiles", { user_id: userId, ...profile, access_token: token.accessToken, token_expires_at: token.expiresAt, instagram_connected_at: nowIso() }, "user_id");
-    return { redirectTo: "/dashboard/business/profile?source=onboarding" };
+    return {
+      redirectTo:
+        platform === "mobile"
+          ? "plugoh://instagram/callback?status=success&role=business&source=onboarding"
+          : "/dashboard/business/profile?source=onboarding",
+      userId,
+      role,
+    };
   }
 
   async sync(user: AuthUser) {
@@ -740,6 +960,22 @@ export class InstagramService {
     await Promise.all(media.map((item) => this.store.upsert("instagram_media", { user_id: user.id, ...item, synced_at: nowIso() }, "user_id,ig_media_id")));
     await this.store.update("influencer_profiles", { eq: { user_id: user.id } }, instagramAverages(media));
     return { synced: media.length };
+  }
+
+  async disconnect(user: AuthUser) {
+    const [profile] = await this.store.update<Row>(
+      "influencer_profiles",
+      { eq: { user_id: user.id } },
+      {
+        access_token: null,
+        token_expires_at: null,
+        ig_username: null,
+        instagram_connected_at: null,
+        is_active: false,
+      },
+    );
+    if (!profile) throw notFound("Influencer profile");
+    return { ok: true };
   }
 }
 

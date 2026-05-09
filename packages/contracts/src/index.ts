@@ -83,10 +83,16 @@ export const NOTIFICATION_TYPES = [
   "booking_expired",
   "delivery_disputed",
 ] as const;
+export const ONBOARDING_STAGES = ["needs_basics", "needs_instagram", "ai_pending", "ready"] as const;
+export const APP_PLATFORMS = ["web", "mobile"] as const;
+export const MESSAGE_TYPES = ["text", "booking_card", "system", "attachment"] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+export type OnboardingStage = (typeof ONBOARDING_STAGES)[number];
+export type AppPlatform = (typeof APP_PLATFORMS)[number];
+export type MessageType = (typeof MESSAGE_TYPES)[number];
 
 export interface Influencer {
   id: string;
@@ -104,6 +110,108 @@ export interface Influencer {
   price_per_story?: number;
   starterPrice?: number | null;
   is_active?: boolean;
+}
+
+export interface MeBootstrapResponse {
+  user: {
+    id: string;
+    email?: string;
+  };
+  role: UserRole | null;
+  onboardingStage: OnboardingStage;
+  unreadCounts: {
+    notifications: number;
+    inbox: number;
+  };
+}
+
+export interface BusinessProfileSummary {
+  id?: string;
+  user_id?: string;
+  brand_name?: string;
+  brand_type?: string;
+  brand_location?: string;
+  brand_summary?: string;
+}
+
+export interface InfluencerProfileResponse extends Influencer {
+  instagram_connected?: boolean;
+}
+
+export interface CampaignListItem {
+  id: string;
+  title: string;
+  brief?: string;
+  status: CampaignStatus;
+  price_offered?: number;
+  package_type?: string;
+  expires_at?: string;
+  delivery_submitted_at?: string;
+  completed_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  payment_status?: string;
+  business_profile?: BusinessProfileSummary | null;
+  influencer_profile?: InfluencerProfileResponse | null;
+}
+
+export interface CampaignMessage {
+  id: string;
+  campaign_id: string;
+  sender_id: string;
+  message_type: MessageType;
+  content: string;
+  metadata?: Record<string, unknown>;
+  read_by?: string[];
+  created_at: string;
+}
+
+export interface AttachmentMessageMetadata {
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+}
+
+export interface InboxItem {
+  campaign: CampaignListItem;
+  latestMessage: CampaignMessage | null;
+  unreadCount: number;
+}
+
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  data?: Record<string, unknown>;
+  read: boolean;
+  created_at: string;
+}
+
+export interface EarningsSummary {
+  total_earnings: number;
+  pending_earnings: number;
+  this_month: number;
+  last_month: number;
+  month_over_month_change: number;
+  monthly_breakdown: { month: string; amount: number }[];
+  transactions: { campaignId: string; title: string; amount: number; status: CampaignStatus; date?: string }[];
+  tier: "nano" | "micro" | "mid" | "macro";
+  tier_progress: number;
+}
+
+export interface DeliveryPreviewResponse {
+  signedUrl: string;
+  expiresAt: string;
+}
+
+export interface PushRegisterResponse {
+  expo_push_token: string;
+  platform: "ios" | "android" | "web";
+}
+
+export interface PushUnregisterResponse {
+  ok: true;
 }
 
 export interface HealthResponse {
@@ -187,6 +295,12 @@ export const businessProfilePatchSchema = z.object({
   tagline: optionalText,
 });
 
+export const influencerOnboardingSchema = z.object({
+  full_name: z.string().trim().min(1),
+  phone: z.string().trim().min(5),
+  location: z.string().trim().min(1),
+});
+
 export const createCampaignSchema = z
   .object({
     influencer_id: uuid,
@@ -250,7 +364,11 @@ export const deliverySubmitSchema = z.object({
 
 export const messageCreateSchema = z.object({
   content: z.string().trim().min(1),
-  message_type: z.literal("text").default("text"),
+  message_type: z.enum(MESSAGE_TYPES).default("text"),
+});
+
+export const messageAttachmentCreateSchema = z.object({
+  caption: z.string().trim().optional(),
 });
 
 export const notificationsReadSchema = z
@@ -269,6 +387,7 @@ export const requestCallSchema = z.object({
 export const instagramConnectQuerySchema = z.object({
   userId: uuid,
   role: roleSchema,
+  platform: z.enum(APP_PLATFORMS).default("web"),
 });
 
 export const instagramCallbackQuerySchema = z.object({
@@ -280,10 +399,16 @@ export const aiGenerateSchema = z.object({
   userId: uuid,
 });
 
+export const pushRegisterSchema = z.object({
+  expo_push_token: z.string().trim().min(1),
+  platform: z.enum(["ios", "android", "web"]).default("ios"),
+});
+
 export type InfluencerListQuery = z.infer<typeof influencerListQuerySchema>;
 export type InfluencerProfilePatch = z.infer<typeof influencerProfilePatchSchema>;
 export type InfluencerPricingPatch = z.infer<typeof influencerPricingPatchSchema>;
 export type InfluencerActivePatch = z.infer<typeof influencerActivePatchSchema>;
+export type InfluencerOnboardingRequest = z.infer<typeof influencerOnboardingSchema>;
 export type PayoutUpsert = z.infer<typeof payoutUpsertSchema>;
 export type BusinessProfilePatch = z.infer<typeof businessProfilePatchSchema>;
 export type CreateCampaignRequest = z.infer<typeof createCampaignSchema>;
@@ -296,8 +421,10 @@ export type VerifyBookingPaymentRequest = z.infer<typeof verifyBookingPaymentSch
 export type CampaignIdRequest = z.infer<typeof campaignIdSchema>;
 export type DeliverySubmitRequest = z.infer<typeof deliverySubmitSchema>;
 export type MessageCreateRequest = z.infer<typeof messageCreateSchema>;
+export type MessageAttachmentCreateRequest = z.infer<typeof messageAttachmentCreateSchema>;
 export type NotificationsReadRequest = z.infer<typeof notificationsReadSchema>;
 export type RequestCallRequest = z.infer<typeof requestCallSchema>;
 export type InstagramConnectQuery = z.infer<typeof instagramConnectQuerySchema>;
 export type InstagramCallbackQuery = z.infer<typeof instagramCallbackQuerySchema>;
 export type AiGenerateRequest = z.infer<typeof aiGenerateSchema>;
+export type PushRegisterRequest = z.infer<typeof pushRegisterSchema>;

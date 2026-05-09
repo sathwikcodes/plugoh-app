@@ -262,6 +262,7 @@ export class MetaInstagramProvider implements InstagramProvider {
 
 export interface StorageProvider {
   uploadDelivery(input: { path: string; file: File }): Promise<string>;
+  uploadMessageAttachment(input: { path: string; file: File }): Promise<string>;
   signedUrl(path: string, expiresInSeconds: number): Promise<string>;
 }
 
@@ -284,6 +285,15 @@ export class SupabaseStorageProvider implements StorageProvider {
     return input.path;
   }
 
+  async uploadMessageAttachment(input: { path: string; file: File }) {
+    const { error } = await this.client.storage.from("campaign-deliveries").upload(input.path, input.file, {
+      contentType: input.file.type,
+      upsert: false,
+    });
+    if (error) throw error;
+    return input.path;
+  }
+
   async signedUrl(path: string, expiresInSeconds: number) {
     const { data, error } = await this.client.storage.from("campaign-deliveries").createSignedUrl(path, expiresInSeconds);
     if (error) throw error;
@@ -294,6 +304,65 @@ export class SupabaseStorageProvider implements StorageProvider {
 export interface AiProvider {
   generateInfluencerProfile(input: { profile: Record<string, unknown>; media: Record<string, unknown>[] }): Promise<Record<string, unknown>>;
   generateBusinessProfile(input: { profile: Record<string, unknown> }): Promise<Record<string, unknown>>;
+}
+
+export type PushMessage = {
+  to: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+};
+
+export type PushSendResult = {
+  sent: number;
+  failed: number;
+  errors: string[];
+};
+
+export interface PushProvider {
+  send(messages: PushMessage[]): Promise<PushSendResult>;
+}
+
+export class ExpoPushProvider implements PushProvider {
+  async send(messages: PushMessage[]) {
+    if (messages.length === 0) {
+      return { sent: 0, failed: 0, errors: [] };
+    }
+
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch("https://exp.host/--/api/v2/push/send", {
+            method: "POST",
+            signal,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(messages),
+          }),
+        10_000,
+      ),
+    );
+
+    if (!response.ok) {
+      if (response.status >= 500) throw new HttpStatusError(response.status, "Expo push send failed");
+      throw badRequest("PUSH_PROVIDER_ERROR", "Push provider rejected request");
+    }
+
+    const payload = (await response.json()) as {
+      data?: Array<{ status?: string; message?: string }>;
+      errors?: Array<{ message?: string }>;
+    };
+    const ticketErrors = (payload.data ?? [])
+      .filter((ticket) => ticket.status === "error")
+      .map((ticket) => ticket.message ?? "Push ticket returned error");
+    const topErrors = (payload.errors ?? []).map((row) => row.message ?? "Push request failed");
+    const errors = [...ticketErrors, ...topErrors];
+
+    return {
+      sent: Math.max(0, messages.length - errors.length),
+      failed: errors.length,
+      errors,
+    };
+  }
 }
 
 export class ExternalAiProvider implements AiProvider {
