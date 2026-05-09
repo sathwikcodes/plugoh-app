@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { idParamSchema, messageCreateSchema, requestCallSchema } from "@plugoh/contracts";
+import { idParamSchema, messageAttachmentCreateSchema, messageCreateSchema, requestCallSchema } from "@plugoh/contracts";
+import { badRequest } from "../../core/errors.js";
 import { created, ok } from "../../core/response.js";
 import { requireAuth, requireRole } from "../../middleware/auth.js";
 import { zJson, zParam } from "../../middleware/validate.js";
@@ -20,7 +21,32 @@ export function messagingRoutes(deps: RouteDeps) {
     ok(c, await deps.scopedReadServices(c).messaging.messages(deps.requireUser(c), c.req.valid("param").id)),
   );
   app.post("/campaigns/:id/messages", auth, deps.authDefaultRateLimit, zParam(idParamSchema), zJson(messageCreateSchema), async (c) => {
-    return created(c, await deps.services.messaging.send(deps.requireUser(c), c.req.valid("param").id, c.req.valid("json")));
+    const input = c.req.valid("json");
+    return created(
+      c,
+      await deps.services.messaging.send(deps.requireUser(c), c.req.valid("param").id, {
+        content: input.content,
+        message_type: "text",
+      }),
+    );
+  });
+  app.post("/campaigns/:id/messages/attachment", auth, deps.authDefaultRateLimit, zParam(idParamSchema), async (c) => {
+    const form = await c.req.formData();
+    const file = form.get("file");
+    const caption = form.get("caption");
+    if (!(file instanceof File)) {
+      throw badRequest("VALIDATION_ERROR", "file is required");
+    }
+    const parsed = messageAttachmentCreateSchema.parse({
+      caption: typeof caption === "string" ? caption : undefined,
+    });
+    return created(
+      c,
+      await deps.services.messaging.sendAttachment(deps.requireUser(c), c.req.valid("param").id, {
+        ...(parsed.caption ? { caption: parsed.caption } : {}),
+        file,
+      }),
+    );
   });
   app.patch("/campaigns/:id/messages/read", auth, deps.authDefaultRateLimit, zParam(idParamSchema), async (c) =>
     ok(c, await deps.services.messaging.markRead(deps.requireUser(c), c.req.valid("param").id)),

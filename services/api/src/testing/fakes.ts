@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { AiProvider, EmailProvider, InstagramProvider, PaymentProvider, StorageProvider } from "../clients/providers.js";
+import type { AiProvider, EmailProvider, InstagramProvider, PaymentProvider, PushProvider, StorageProvider } from "../clients/providers.js";
 
 export class FakePaymentProvider implements PaymentProvider {
   keySecret = "test_secret";
@@ -36,6 +36,10 @@ export class FakePaymentProvider implements PaymentProvider {
 
 export class FakeStorageProvider implements StorageProvider {
   async uploadDelivery(input: { path: string; file: File }) {
+    return input.path;
+  }
+
+  async uploadMessageAttachment(input: { path: string; file: File }) {
     return input.path;
   }
 
@@ -76,5 +80,22 @@ export class FakeAiProvider implements AiProvider {
 
   async generateBusinessProfile() {
     return { brand_summary: "Generated summary", tagline: "Generated tagline" };
+  }
+}
+
+export class FakePushProvider implements PushProvider {
+  shouldFail = false;
+  sent: Array<{ to: string; title: string; body: string; data: Record<string, unknown> }> = [];
+
+  async send(messages: Array<{ to: string; title: string; body: string; data: Record<string, unknown> }>) {
+    this.sent.push(...messages);
+    if (this.shouldFail) {
+      throw new Error("Push provider failure");
+    }
+    return {
+      sent: messages.length,
+      failed: 0,
+      errors: [],
+    };
   }
 }

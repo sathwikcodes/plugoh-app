@@ -25,6 +25,7 @@ import { messagingRoutes } from "./messaging/routes.js";
 import { notificationRoutes } from "./notifications/routes.js";
 import { paymentRoutes } from "./payments/routes.js";
 import { profileRoutes } from "./profiles/routes.js";
+import { pushRoutes } from "./push/routes.js";
 import { systemRoutes } from "./system/routes.js";
 
 export function applyGlobalMiddleware(app: Hono<AppEnv>, config: EnvConfig) {
@@ -91,6 +92,7 @@ export function mountDomainRoutes(app: Hono<AppEnv>, deps: RouteDeps) {
   app.route("/", deliveryRoutes(deps));
   app.route("/", messagingRoutes(deps));
   app.route("/", notificationRoutes(deps));
+  app.route("/", pushRoutes(deps));
   app.route("/", instagramRoutes(deps));
   app.route("/", aiRoutes(deps));
   app.route("/", cronRoutes(deps));

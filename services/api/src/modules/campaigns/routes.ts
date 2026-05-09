@@ -40,7 +40,7 @@ export function campaignRoutes(deps: RouteDeps) {
   app.post("/campaigns/:id/deliver", auth, deps.authDefaultRateLimit, requireRole("influencer"), zParam(idParamSchema), zJson(deliverySubmitSchema), async (c) => {
     return ok(c, await deps.services.delivery.submit(deps.requireUser(c), c.req.valid("param").id, c.req.valid("json")));
   });
-  app.get("/campaigns/:id/delivery/url", auth, deps.authDefaultRateLimit, requireRole("business"), zParam(idParamSchema), async (c) => {
+  app.get("/campaigns/:id/delivery/url", auth, deps.authDefaultRateLimit, zParam(idParamSchema), async (c) => {
     return ok(c, await deps.services.delivery.signedUrl(deps.requireUser(c), c.req.valid("param").id));
   });
 
