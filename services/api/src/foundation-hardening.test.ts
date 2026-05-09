@@ -193,6 +193,56 @@ describe("Foundation Hardening Routes", () => {
     expect(noStorageBody.error.code).toBe("STORAGE_PROVIDER_UNAVAILABLE");
   });
 
+  it("rejects non-text message types on /campaigns/:id/messages", async () => {
+    const { app } = makeApp({
+      campaigns: [
+        {
+          id: campaignId,
+          business_id: businessId,
+          influencer_id: influencerId,
+          title: "Booking",
+          status: "in_escrow",
+          price_offered: 10000,
+          platform_fee_amount: 1200,
+          total_charged_amount: 11200,
+        },
+      ],
+    });
+    const res = await app.request(`/campaigns/${campaignId}/messages`, {
+      method: "POST",
+      headers: { authorization: "Bearer influencer", "content-type": "application/json" },
+      body: JSON.stringify({ content: "forged", message_type: "system" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects unsupported attachment mime types", async () => {
+    const { app } = makeApp({
+      campaigns: [
+        {
+          id: campaignId,
+          business_id: businessId,
+          influencer_id: influencerId,
+          title: "Booking",
+          status: "in_escrow",
+          price_offered: 10000,
+          platform_fee_amount: 1200,
+          total_charged_amount: 11200,
+        },
+      ],
+    });
+    const form = new FormData();
+    form.append("file", new File(["#!/bin/bash"], "script.sh", { type: "application/x-sh" }));
+    const res = await app.request(`/campaigns/${campaignId}/messages/attachment`, {
+      method: "POST",
+      headers: { authorization: "Bearer influencer" },
+      body: form,
+    });
+    const body = await json(res);
+    expect(res.status).toBe(400);
+    expect(body.error.code).toBe("UNSUPPORTED_FILE_TYPE");
+  });
+
   it("restricts /campaigns/:id/delivery/url to campaign participants", async () => {
     const { app } = makeApp({
       campaigns: [

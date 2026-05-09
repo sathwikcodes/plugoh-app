@@ -1,5 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-export async function invalidateQueryKeys(queryClient: QueryClient, keys: ReadonlyArray<readonly unknown[]>) {
+export type QueryInvalidator = Pick<QueryClient, "invalidateQueries">;
+
+export async function invalidateQueryKeys(queryClient: QueryInvalidator, keys: ReadonlyArray<readonly unknown[]>) {
   await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }

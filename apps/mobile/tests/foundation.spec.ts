@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/client";
 import { resolveGateStatus } from "@/lib/auth/gate-status";
 import { influencerBasicsSchema } from "@/lib/forms/onboarding";
-import { invalidateQueryKeys } from "@/lib/query/invalidation";
+import { invalidateQueryKeys, type QueryInvalidator } from "@/lib/query/invalidation";
 
 describe("mobile foundation", () => {
   it("maps gate statuses deterministically", () => {
@@ -46,7 +46,8 @@ describe("mobile foundation", () => {
 
   it("invalidates all requested query keys", async () => {
     const invalidateQueries = vi.fn().mockResolvedValue(undefined);
-    await invalidateQueryKeys({ invalidateQueries } as any, [["bootstrap"], ["campaigns"]]);
+    const queryClient: QueryInvalidator = { invalidateQueries };
+    await invalidateQueryKeys(queryClient, [["bootstrap"], ["campaigns"]]);
     expect(invalidateQueries).toHaveBeenCalledTimes(2);
     expect(invalidateQueries).toHaveBeenNthCalledWith(1, { queryKey: ["bootstrap"] });
     expect(invalidateQueries).toHaveBeenNthCalledWith(2, { queryKey: ["campaigns"] });

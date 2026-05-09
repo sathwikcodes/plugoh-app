@@ -1,3 +1,7 @@
+import type { TextStyle } from "react-native";
+
+const tabularNums: NonNullable<TextStyle["fontVariant"]> = ["tabular-nums"];
+
 export const theme = {
   colors: {
     background: "#FFFFFF",
@@ -83,7 +87,7 @@ export const theme = {
       fontSize: 15,
       lineHeight: 20,
       fontWeight: "600" as const,
-      fontVariant: ["tabular-nums"] as any,
+      fontVariant: tabularNums,
     },
   },
   shadow: {

@@ -20,6 +20,18 @@ type Row = Record<string, any>;
 const PLATFORM_FEE_RATE = 0.12;
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
+const MAX_MESSAGE_ATTACHMENT_SIZE = 25 * 1024 * 1024;
+const MESSAGE_ATTACHMENT_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "application/pdf",
+  "text/plain",
+]);
 
 export type Services = {
   discovery: DiscoveryService;
@@ -335,13 +347,16 @@ export class ProfileService {
       inboxUnread = messages.filter((message) => !Array.isArray(message.read_by) || !message.read_by.includes(user.id)).length;
     }
 
-    const onboardingStage = !role || !hasInfluencerBasics(accountProfile)
-      ? "needs_basics"
-      : !hasInstagramConnection(influencerProfile)
-        ? "needs_instagram"
-        : !hasGeneratedInfluencerFields(influencerProfile)
-          ? "ai_pending"
-          : "ready";
+    let onboardingStage: "needs_basics" | "needs_instagram" | "ai_pending" | "ready" = "ready";
+    if (!role || !hasInfluencerBasics(accountProfile)) {
+      onboardingStage = "needs_basics";
+    } else if (role === "influencer") {
+      if (!hasInstagramConnection(influencerProfile)) {
+        onboardingStage = "needs_instagram";
+      } else if (!hasGeneratedInfluencerFields(influencerProfile)) {
+        onboardingStage = "ai_pending";
+      }
+    }
 
     return {
       user: { id: user.id, email: user.email },
@@ -848,6 +863,12 @@ export class MessagingService {
   async sendAttachment(user: AuthUser, id: string, input: { caption?: string; file: File }) {
     await campaignForParticipant(this.store, id, user.id);
     if (!this.storage) throw badRequest("STORAGE_PROVIDER_UNAVAILABLE", "Storage provider is not configured");
+    if (input.file.size > MAX_MESSAGE_ATTACHMENT_SIZE) {
+      throw badRequest("FILE_TOO_LARGE", "Message attachments must be 25 MB or smaller");
+    }
+    if (!MESSAGE_ATTACHMENT_MIME_TYPES.has(input.file.type)) {
+      throw badRequest("UNSUPPORTED_FILE_TYPE", "Unsupported message attachment file type");
+    }
     const ext = input.file.name.split(".").pop() ?? "bin";
     const path = `messages/${id}/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
     const storagePath = await this.storage.uploadMessageAttachment({ path, file: input.file });

@@ -35,9 +35,10 @@ export function BootstrapErrorScreen({ message, onRetry }: { message?: string; o
       <PrimaryButton label="Retry" onPress={onRetry} />
       <SecondaryButton
         label="Sign out"
-        onPress={async () => {
-          await supabase.auth.signOut();
-          router.replace("/(auth)/login");
+        onPress={() => {
+          void supabase.auth.signOut().finally(() => {
+            router.replace("/(auth)/login");
+          });
         }}
       />
     </Screen>

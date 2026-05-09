@@ -15,8 +15,12 @@ let authUnsubscribe: (() => void) | null = null;
 export const useAuthStore = create<AuthState>((set) => ({
   initialized: false,
   session: null,
-  setSession: (session) => set({ session }),
-  setInitialized: (initialized) => set({ initialized }),
+  setSession: (session) => {
+    set({ session });
+  },
+  setInitialized: (initialized) => {
+    set({ initialized });
+  },
 }));
 
 export function initializeAuth() {
@@ -28,14 +32,12 @@ export function initializeAuth() {
     useAuthStore.getState().setSession(session);
     useAuthStore.getState().setInitialized(true);
   })
-    .then(({ initialSession, subscription }) => {
-      useAuthStore.getState().setSession(initialSession);
-      useAuthStore.getState().setInitialized(true);
+    .then(({ subscription }) => {
       authUnsubscribe = () => {
         subscription.unsubscribe();
       };
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       console.warn("Auth bootstrap failed", error);
       setSession(null);
       setInitialized(true);

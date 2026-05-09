@@ -364,7 +364,7 @@ export const deliverySubmitSchema = z.object({
 
 export const messageCreateSchema = z.object({
   content: z.string().trim().min(1),
-  message_type: z.enum(MESSAGE_TYPES).default("text"),
+  message_type: z.literal("text").default("text"),
 });
 
 export const messageAttachmentCreateSchema = z.object({

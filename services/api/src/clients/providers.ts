@@ -286,7 +286,7 @@ export class SupabaseStorageProvider implements StorageProvider {
   }
 
   async uploadMessageAttachment(input: { path: string; file: File }) {
-    const { error } = await this.client.storage.from("campaign-deliveries").upload(input.path, input.file, {
+    const { error } = await this.client.storage.from("campaign-messages").upload(input.path, input.file, {
       contentType: input.file.type,
       upsert: false,
     });

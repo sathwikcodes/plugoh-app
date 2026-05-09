@@ -21,7 +21,14 @@ export function messagingRoutes(deps: RouteDeps) {
     ok(c, await deps.scopedReadServices(c).messaging.messages(deps.requireUser(c), c.req.valid("param").id)),
   );
   app.post("/campaigns/:id/messages", auth, deps.authDefaultRateLimit, zParam(idParamSchema), zJson(messageCreateSchema), async (c) => {
-    return created(c, await deps.services.messaging.send(deps.requireUser(c), c.req.valid("param").id, c.req.valid("json")));
+    const input = c.req.valid("json");
+    return created(
+      c,
+      await deps.services.messaging.send(deps.requireUser(c), c.req.valid("param").id, {
+        content: input.content,
+        message_type: "text",
+      }),
+    );
   });
   app.post("/campaigns/:id/messages/attachment", auth, deps.authDefaultRateLimit, zParam(idParamSchema), async (c) => {
     const form = await c.req.formData();

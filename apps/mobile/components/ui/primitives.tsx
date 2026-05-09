@@ -1,6 +1,32 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type PressableProps, type ScrollViewProps, type TextInputProps, type ViewProps } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type PressableProps,
+  type PressableStateCallbackType,
+  type ScrollViewProps,
+  type StyleProp,
+  type TextInputProps,
+  type ViewProps,
+  type ViewStyle,
+} from "react-native";
 import { theme, statusTone } from "@/constants/theme";
+
+function mergePressableStyle(
+  baseStyle: StyleProp<ViewStyle>,
+  style: PressableProps["style"],
+): PressableProps["style"] {
+  if (!style) return baseStyle;
+  if (typeof style === "function") {
+    return (state: PressableStateCallbackType) => [baseStyle, style(state)];
+  }
+  return [baseStyle, style];
+}
 
 export function Screen({ children, contentContainerStyle, ...props }: ScrollViewProps) {
   return (
@@ -75,7 +101,7 @@ export function AccentHero({ title, subtitle }: { title: string; subtitle?: stri
 
 export function PrimaryButton({ label, style, ...props }: PressableProps & { label: string }) {
   return (
-    <Pressable {...props} style={[styles.button, typeof style === "function" ? undefined : style]}>
+    <Pressable {...props} style={mergePressableStyle(styles.button, style)}>
       <Text style={styles.buttonLabel}>{label}</Text>
     </Pressable>
   );
@@ -83,7 +109,7 @@ export function PrimaryButton({ label, style, ...props }: PressableProps & { lab
 
 export function SecondaryButton({ label, style, ...props }: PressableProps & { label: string }) {
   return (
-    <Pressable {...props} style={[styles.secondaryButton, typeof style === "function" ? undefined : style]}>
+    <Pressable {...props} style={mergePressableStyle(styles.secondaryButton, style)}>
       <Text style={styles.secondaryButtonLabel}>{label}</Text>
     </Pressable>
   );
