@@ -46,7 +46,7 @@ export default function BrandDiscoverScreen() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => {
-                router.push(`/(app)/creator/${item.id}` as never);
+                router.push(`/(app)/creator/${item.id}`);
               }}
             >
               <Card>

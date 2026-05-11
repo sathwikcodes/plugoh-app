@@ -20,7 +20,7 @@ export default function BrandInboxScreen() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => {
-                router.push(`/(app)/inbox/${item.campaign.id}` as never);
+                router.push(`/(app)/inbox/${item.campaign.id}`);
               }}
             >
               <Card>

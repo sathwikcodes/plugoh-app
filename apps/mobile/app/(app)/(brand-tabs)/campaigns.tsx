@@ -26,7 +26,7 @@ export default function BrandCampaignsScreen() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => {
-                router.push(`/(app)/campaigns/${item.id}` as never);
+                router.push(`/(app)/campaigns/${item.id}`);
               }}
             >
               <Card>

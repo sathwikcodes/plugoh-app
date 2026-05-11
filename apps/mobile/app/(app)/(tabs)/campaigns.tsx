@@ -20,7 +20,9 @@ export default function CampaignsScreen() {
 
   const visible = (campaigns.data?.items ?? []).filter((item) => {
     const filter = filters.find((entry) => entry.label === activeFilter);
-    const matchesFilter = filter ? filter.statuses.includes(item.status as never) : true;
+    const matchesFilter = filter
+      ? (filter.statuses as readonly string[]).includes(item.status)
+      : true;
     const searchText = search.toLowerCase();
     const matchesSearch =
       searchText.length === 0 ||
@@ -87,7 +89,7 @@ export default function CampaignsScreen() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => {
-                router.push(`/(app)/campaigns/${item.id}` as never);
+                router.push(`/(app)/campaigns/${item.id}`);
               }}
             >
               <Card>

@@ -31,7 +31,7 @@ export default function CreatorDetailScreen() {
       <PrimaryButton
         label="Book creator"
         onPress={() => {
-          router.push(`/(app)/booking/${id}` as never);
+          router.push(`/(app)/booking/${id}`);
         }}
       />
     </Screen>

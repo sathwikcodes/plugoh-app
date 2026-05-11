@@ -90,7 +90,7 @@ export default function CampaignDetailScreen() {
         <PrimaryButton
           label="Submit delivery"
           onPress={() => {
-            router.push(`/(app)/delivery/${id}` as never);
+            router.push(`/(app)/delivery/${id}`);
           }}
         />
       ) : null}
