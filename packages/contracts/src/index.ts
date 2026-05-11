@@ -1,91 +1,99 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-export const USER_ROLES = ["business", "influencer"] as const;
+export const USER_ROLES = ['business', 'influencer'] as const;
 export const INFLUENCER_CATEGORIES = [
-  "Food",
-  "Fitness",
-  "Beauty",
-  "Lifestyle",
-  "Travel",
-  "Education",
-  "Tech",
-  "Fashion",
-  "Other",
+  'Food',
+  'Fitness',
+  'Beauty',
+  'Lifestyle',
+  'Travel',
+  'Education',
+  'Tech',
+  'Fashion',
+  'Other',
 ] as const;
 export const BUSINESS_TYPES = [
-  "Restaurant/Cafe",
-  "D2C Brand",
-  "Local Business",
-  "E-commerce",
-  "SaaS/Tech",
-  "Agency",
-  "Personal Brand",
-  "Other",
+  'Restaurant/Cafe',
+  'D2C Brand',
+  'Local Business',
+  'E-commerce',
+  'SaaS/Tech',
+  'Agency',
+  'Personal Brand',
+  'Other',
 ] as const;
-export const PACKAGE_TYPES = ["reel", "post", "story", "reel+story", "reel+post"] as const;
+export const PACKAGE_TYPES = ['reel', 'post', 'story', 'reel+story', 'reel+post'] as const;
 export const BOOKING_OBJECTIVES = [
-  "visit_place",
-  "feature_product",
-  "showcase_service",
-  "promote_offer",
-  "brand_shoutout",
+  'visit_place',
+  'feature_product',
+  'showcase_service',
+  'promote_offer',
+  'brand_shoutout',
 ] as const;
-export const TURNAROUND_TIMES = ["24_hours", "2_3_days", "1_week", "2_weeks"] as const;
+export const TURNAROUND_TIMES = ['24_hours', '2_3_days', '1_week', '2_weeks'] as const;
 export const LANGUAGES = [
-  "English",
-  "Hindi",
-  "Telugu",
-  "Tamil",
-  "Kannada",
-  "Malayalam",
-  "Marathi",
-  "Bengali",
-  "Gujarati",
-  "Punjabi",
-  "Urdu",
-  "Other",
+  'English',
+  'Hindi',
+  'Telugu',
+  'Tamil',
+  'Kannada',
+  'Malayalam',
+  'Marathi',
+  'Bengali',
+  'Gujarati',
+  'Punjabi',
+  'Urdu',
+  'Other',
 ] as const;
 export const CONTENT_TYPES = [
-  "Product Reviews",
-  "Tutorials",
-  "Vlogs",
-  "Reels/Shorts",
-  "Stories",
-  "Unboxing",
-  "Recipe",
-  "Before/After",
-  "Day in Life",
-  "Brand Integration",
+  'Product Reviews',
+  'Tutorials',
+  'Vlogs',
+  'Reels/Shorts',
+  'Stories',
+  'Unboxing',
+  'Recipe',
+  'Before/After',
+  'Day in Life',
+  'Brand Integration',
 ] as const;
 export const CAMPAIGN_STATUSES = [
-  "requested",
-  "payment_pending",
-  "pre_authorized",
-  "in_escrow",
-  "delivery_submitted",
-  "completed",
-  "disputed",
-  "declined",
-  "expired",
-  "cancelled",
-  "refunded",
+  'requested',
+  'payment_pending',
+  'pre_authorized',
+  'in_escrow',
+  'delivery_submitted',
+  'completed',
+  'disputed',
+  'declined',
+  'expired',
+  'cancelled',
+  'refunded',
 ] as const;
-export const PAYMENT_STATUSES = ["unpaid", "authorized", "paid"] as const;
-export const PAYMENT_METHODS = ["card", "upi", "other"] as const;
+export const PAYMENT_STATUSES = ['unpaid', 'authorized', 'paid'] as const;
+export const PAYMENT_METHODS = ['card', 'upi', 'other'] as const;
 export const NOTIFICATION_TYPES = [
-  "new_booking",
-  "booking_accepted",
-  "payment_confirmed",
-  "payment_secured",
-  "delivery_submitted",
-  "booking_completed",
-  "booking_rejected",
-  "booking_expired",
-  "delivery_disputed",
+  'new_booking',
+  'booking_accepted',
+  'payment_confirmed',
+  'payment_secured',
+  'delivery_submitted',
+  'booking_completed',
+  'booking_rejected',
+  'booking_expired',
+  'delivery_disputed',
 ] as const;
-export const ONBOARDING_STAGES = ["needs_basics", "needs_instagram", "ai_pending", "ready"] as const;
-export const APP_PLATFORMS = ["web", "mobile"] as const;
-export const MESSAGE_TYPES = ["text", "booking_card", "system", "attachment"] as const;
+export const ONBOARDING_STAGES = [
+  'needs_role',
+  'needs_basics',
+  'needs_brand_choice',
+  'needs_brand_details',
+  'needs_instagram',
+  'ai_pending',
+  'ready',
+] as const;
+export const APP_PLATFORMS = ['web', 'mobile'] as const;
+export const MESSAGE_TYPES = ['text', 'booking_card', 'system', 'attachment'] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
@@ -125,6 +133,12 @@ export interface MeBootstrapResponse {
   };
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  nextOffset: number | null;
+  total: number;
+}
+
 export interface BusinessProfileSummary {
   id?: string;
   user_id?: string;
@@ -132,6 +146,9 @@ export interface BusinessProfileSummary {
   brand_type?: string;
   brand_location?: string;
   brand_summary?: string;
+  tagline?: string;
+  ig_username?: string;
+  instagram_connected?: boolean;
 }
 
 export interface InfluencerProfileResponse extends Influencer {
@@ -195,8 +212,14 @@ export interface EarningsSummary {
   last_month: number;
   month_over_month_change: number;
   monthly_breakdown: { month: string; amount: number }[];
-  transactions: { campaignId: string; title: string; amount: number; status: CampaignStatus; date?: string }[];
-  tier: "nano" | "micro" | "mid" | "macro";
+  transactions: {
+    campaignId: string;
+    title: string;
+    amount: number;
+    status: CampaignStatus;
+    date?: string;
+  }[];
+  tier: 'nano' | 'micro' | 'mid' | 'macro';
   tier_progress: number;
 }
 
@@ -207,7 +230,7 @@ export interface DeliveryPreviewResponse {
 
 export interface PushRegisterResponse {
   expo_push_token: string;
-  platform: "ios" | "android" | "web";
+  platform: 'ios' | 'android' | 'web';
 }
 
 export interface PushUnregisterResponse {
@@ -216,7 +239,7 @@ export interface PushUnregisterResponse {
 
 export interface HealthResponse {
   service: string;
-  status: "ok";
+  status: 'ok';
 }
 
 export type ApiSuccess<T> = {
@@ -244,14 +267,19 @@ const optionalText = z.string().trim().min(1).optional();
 export const roleSchema = z.enum(USER_ROLES);
 export const idParamSchema = z.object({ id: uuid });
 
-export const influencerListQuerySchema = z.object({
-  search: z.string().optional(),
-  place: z.string().optional(),
-  category: z.string().optional(),
+export const paginationQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(50).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const influencerListQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().optional(),
+  place: z.string().trim().optional(),
+  category: z.string().trim().optional(),
   price_min: numeric.optional(),
   price_max: numeric.optional(),
   sort: z
-    .enum(["followers_desc", "engagement_asc", "engagement_desc", "price_asc", "price_desc"])
+    .enum(['followers_desc', 'engagement_asc', 'engagement_desc', 'price_asc', 'price_desc'])
     .optional(),
 });
 
@@ -281,11 +309,15 @@ export const payoutUpsertSchema = z
     bank_account_no: optionalText,
     bank_ifsc: optionalText,
     bank_account_name: optionalText,
-    preferred_method: z.enum(["upi", "bank"]).default("upi"),
+    preferred_method: z.enum(['upi', 'bank']).default('upi'),
   })
-  .refine((value) => value.upi_id || (value.bank_account_no && value.bank_ifsc && value.bank_account_name), {
-    message: "Provide UPI ID or complete bank details",
-  });
+  .refine(
+    (value) =>
+      value.upi_id || (value.bank_account_no && value.bank_ifsc && value.bank_account_name),
+    {
+      message: 'Provide UPI ID or complete bank details',
+    },
+  );
 
 export const businessProfilePatchSchema = z.object({
   brand_name: optionalText,
@@ -295,36 +327,57 @@ export const businessProfilePatchSchema = z.object({
   tagline: optionalText,
 });
 
-export const influencerOnboardingSchema = z.object({
+export const roleUpsertSchema = z.object({
+  role: roleSchema,
+});
+
+export const commonProfilePatchSchema = z.object({
   full_name: z.string().trim().min(1),
   phone: z.string().trim().min(5),
   location: z.string().trim().min(1),
 });
 
+export const influencerOnboardingSchema = commonProfilePatchSchema;
+
+export const businessOnboardingSchema = commonProfilePatchSchema.merge(
+  z.object({
+    brand_name: z.string().trim().min(1),
+    brand_type: z.enum(BUSINESS_TYPES),
+    brand_location: optionalText,
+    brand_summary: optionalText,
+    tagline: optionalText,
+  }),
+);
+
 export const createCampaignSchema = z
   .object({
-    influencer_id: uuid,
+    influencer_id: uuid.optional(),
     influencer_profile_id: uuid,
-    package_type: z.enum(["reel", "post", "story"]),
-    price_offered: numeric.positive(),
+    package_type: z.enum(PACKAGE_TYPES),
+    price_offered: numeric.positive().optional(),
     objective: z.enum(BOOKING_OBJECTIVES),
-    timing_mode: z.enum(["asap", "choose_date"]),
+    timing_mode: z.enum(['asap', 'choose_date']),
     due_date: z.string().date().optional(),
     event_name: optionalText,
     contact_email: z.string().email(),
     contact_phone: z.string().min(5),
   })
-  .refine((value) => value.timing_mode !== "choose_date" || value.due_date, {
-    path: ["due_date"],
-    message: "due_date is required when timing_mode is choose_date",
+  .refine((value) => value.timing_mode !== 'choose_date' || value.due_date, {
+    path: ['due_date'],
+    message: 'due_date is required when timing_mode is choose_date',
   })
-  .refine((value) => value.objective !== "visit_place" || value.event_name, {
-    path: ["event_name"],
-    message: "event_name is required when objective is visit_place",
+  .refine((value) => value.objective !== 'visit_place' || value.event_name, {
+    path: ['event_name'],
+    message: 'event_name is required when objective is visit_place',
   });
 
-export const campaignListQuerySchema = z.object({
+export const campaignListQuerySchema = paginationQuerySchema.extend({
   role: roleSchema,
+  status: z.enum(CAMPAIGN_STATUSES).optional(),
+  search: z.string().trim().optional(),
+  sort: z
+    .enum(['created_desc', 'created_asc', 'amount_desc', 'amount_asc'])
+    .default('created_desc'),
 });
 
 export const disputeSchema = z.object({
@@ -343,8 +396,8 @@ export const verifyEscrowSchema = z.object({
 });
 
 export const createBookingOrderSchema = z.object({
-  price_offered: numeric.positive(),
   influencer_profile_id: uuid,
+  package_type: z.enum(PACKAGE_TYPES),
 });
 
 export const verifyBookingPaymentSchema = createCampaignSchema.extend({
@@ -364,7 +417,7 @@ export const deliverySubmitSchema = z.object({
 
 export const messageCreateSchema = z.object({
   content: z.string().trim().min(1),
-  message_type: z.literal("text").default("text"),
+  message_type: z.literal('text').default('text'),
 });
 
 export const messageAttachmentCreateSchema = z.object({
@@ -377,7 +430,7 @@ export const notificationsReadSchema = z
     all: z.boolean().optional(),
   })
   .refine((value) => value.all || (value.ids && value.ids.length > 0), {
-    message: "Provide ids or all=true",
+    message: 'Provide ids or all=true',
   });
 
 export const requestCallSchema = z.object({
@@ -387,7 +440,7 @@ export const requestCallSchema = z.object({
 export const instagramConnectQuerySchema = z.object({
   userId: uuid,
   role: roleSchema,
-  platform: z.enum(APP_PLATFORMS).default("web"),
+  platform: z.enum(APP_PLATFORMS).default('web'),
 });
 
 export const instagramCallbackQuerySchema = z.object({
@@ -401,14 +454,17 @@ export const aiGenerateSchema = z.object({
 
 export const pushRegisterSchema = z.object({
   expo_push_token: z.string().trim().min(1),
-  platform: z.enum(["ios", "android", "web"]).default("ios"),
+  platform: z.enum(['ios', 'android', 'web']).default('ios'),
 });
 
 export type InfluencerListQuery = z.infer<typeof influencerListQuerySchema>;
+export type RoleUpsertRequest = z.infer<typeof roleUpsertSchema>;
+export type CommonProfilePatchRequest = z.infer<typeof commonProfilePatchSchema>;
 export type InfluencerProfilePatch = z.infer<typeof influencerProfilePatchSchema>;
 export type InfluencerPricingPatch = z.infer<typeof influencerPricingPatchSchema>;
 export type InfluencerActivePatch = z.infer<typeof influencerActivePatchSchema>;
 export type InfluencerOnboardingRequest = z.infer<typeof influencerOnboardingSchema>;
+export type BusinessOnboardingRequest = z.infer<typeof businessOnboardingSchema>;
 export type PayoutUpsert = z.infer<typeof payoutUpsertSchema>;
 export type BusinessProfilePatch = z.infer<typeof businessProfilePatchSchema>;
 export type CreateCampaignRequest = z.infer<typeof createCampaignSchema>;

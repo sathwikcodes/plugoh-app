@@ -1,6 +1,6 @@
-import NetInfo from "@react-native-community/netinfo";
-import { QueryClient, onlineManager } from "@tanstack/react-query";
-import { ApiError } from "@/lib/api/client";
+import NetInfo from '@react-native-community/netinfo';
+import { QueryClient, onlineManager } from '@tanstack/react-query';
+import { ApiError } from '@/lib/api/error';
 
 let onlineManagerConfigured = false;
 
@@ -18,7 +18,7 @@ function configureOnlineManager() {
 function shouldRetryQuery(error: unknown, failureCount: number) {
   if (failureCount >= 2) return false;
   if (error instanceof ApiError) {
-    if (error.code === "TIMEOUT" || error.code === "NETWORK_ERROR") return true;
+    if (error.code === 'TIMEOUT' || error.code === 'NETWORK_ERROR') return true;
     return error.status >= 500;
   }
   return true;

@@ -1,11 +1,17 @@
-import { router } from "expo-router";
-import { Text, View } from "react-native";
-import { PrimaryButton, Screen, SecondaryButton, SectionTitle } from "@/components/ui/primitives";
-import { theme } from "@/constants/theme";
-import { getApiBaseUrl } from "@/lib/api/client";
-import { supabase } from "@/lib/supabase/client";
+import { router } from 'expo-router';
+import { Text, View } from 'react-native';
+import { PrimaryButton, Screen, SecondaryButton, SectionTitle } from '@/components/ui/primitives';
+import { theme } from '@/constants/theme';
+import { getApiBaseUrl } from '@/lib/api/client';
+import { supabase } from '@/lib/supabase/client';
 
-export function BootstrapErrorScreen({ message, onRetry }: { message?: string; onRetry: () => void }) {
+export function BootstrapErrorScreen({
+  message,
+  onRetry,
+}: {
+  message?: string;
+  onRetry: () => void;
+}) {
   return (
     <Screen>
       <SectionTitle
@@ -24,11 +30,15 @@ export function BootstrapErrorScreen({ message, onRetry }: { message?: string; o
         }}
       >
         <Text style={{ ...theme.typography.label, color: theme.colors.muted }}>API base URL</Text>
-        <Text style={{ ...theme.typography.body, color: theme.colors.foreground }}>{getApiBaseUrl()}</Text>
+        <Text style={{ ...theme.typography.body, color: theme.colors.foreground }}>
+          {getApiBaseUrl()}
+        </Text>
         {message ? (
           <>
             <Text style={{ ...theme.typography.label, color: theme.colors.muted }}>Error</Text>
-            <Text style={{ ...theme.typography.body, color: theme.colors.foreground }}>{message}</Text>
+            <Text style={{ ...theme.typography.body, color: theme.colors.foreground }}>
+              {message}
+            </Text>
           </>
         ) : null}
       </View>
@@ -37,7 +47,7 @@ export function BootstrapErrorScreen({ message, onRetry }: { message?: string; o
         label="Sign out"
         onPress={() => {
           void supabase.auth.signOut().finally(() => {
-            router.replace("/(auth)/login");
+            router.replace('/(auth)/login');
           });
         }}
       />

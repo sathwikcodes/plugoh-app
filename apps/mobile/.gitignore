@@ -4,3 +4,7 @@
 
 expo-env.d.ts
 # @end expo-cli
+
+# Generated native folders (managed by EAS Build)
+ios/
+android/

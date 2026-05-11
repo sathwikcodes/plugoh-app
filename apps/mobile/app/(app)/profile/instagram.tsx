@@ -1,23 +1,50 @@
-import { Alert, Text } from "react-native";
-import { PrimaryButton, Screen, SectionTitle, SecondaryButton, StatusChip } from "@/components/ui/primitives";
-import { useInfluencerProfile, useMarketplaceMutations } from "@/hooks/use-marketplace";
+import { Alert, Text } from 'react-native';
+import {
+  PrimaryButton,
+  Screen,
+  SectionTitle,
+  SecondaryButton,
+  StatusChip,
+} from '@/components/ui/primitives';
+import {
+  useBootstrap,
+  useBusinessProfile,
+  useInfluencerProfile,
+  useMarketplaceMutations,
+} from '@/hooks/use-marketplace';
 
 export default function InstagramScreen() {
+  const bootstrap = useBootstrap();
+  const role = bootstrap.data?.role ?? 'influencer';
   const profile = useInfluencerProfile();
+  const business = useBusinessProfile();
   const mutations = useMarketplaceMutations();
+  const connected =
+    role === 'business' ? business.data?.instagram_connected : profile.data?.instagram_connected;
+  const username = role === 'business' ? business.data?.ig_username : profile.data?.ig_username;
 
   return (
     <Screen>
-      <SectionTitle title="Instagram" subtitle="Keep your creator signals synced and your availability accurate." />
-      <StatusChip label={profile.data?.instagram_connected ? "Connected" : "Disconnected"} status={profile.data?.instagram_connected ? "success" : "pending"} />
-      <Text>@{profile.data?.ig_username ?? "not-linked"}</Text>
+      <SectionTitle
+        title="Instagram"
+        subtitle={
+          role === 'business'
+            ? 'Sync brand profile signals and generated summary.'
+            : 'Keep your creator signals synced and your availability accurate.'
+        }
+      />
+      <StatusChip
+        label={connected ? 'Connected' : 'Disconnected'}
+        status={connected ? 'success' : 'pending'}
+      />
+      <Text>@{username ?? 'not-linked'}</Text>
       <PrimaryButton
-        label={mutations.instagramSync.isPending ? "Syncing..." : "Sync now"}
+        label={mutations.instagramSync.isPending ? 'Syncing...' : 'Sync now'}
         onPress={async () => {
           try {
             await mutations.instagramSync.mutateAsync();
           } catch (error) {
-            Alert.alert("Sync failed", error instanceof Error ? error.message : "Try again.");
+            Alert.alert('Sync failed', error instanceof Error ? error.message : 'Try again.');
           }
         }}
       />
@@ -27,7 +54,7 @@ export default function InstagramScreen() {
           try {
             await mutations.instagramDisconnect.mutateAsync();
           } catch (error) {
-            Alert.alert("Disconnect failed", error instanceof Error ? error.message : "Try again.");
+            Alert.alert('Disconnect failed', error instanceof Error ? error.message : 'Try again.');
           }
         }}
       />
