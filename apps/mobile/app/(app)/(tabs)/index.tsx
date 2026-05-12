@@ -1,3 +1,4 @@
+import { CalmMeshBackground } from '@/components/ui/calm-mesh-background';
 import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { Screen, SectionTitle, StatusChip } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
@@ -162,112 +163,118 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen>
-      {/* ── header ── */}
-      <View style={styles.header}>
-        <View style={styles.greetingBlock}>
-          <Text style={styles.greetingLine}>{getGreeting()}</Text>
-          <Text style={styles.nameLine}>{firstName}.</Text>
-          <Text style={styles.subtitle}>{contextualSubtitle()}</Text>
-        </View>
-        <NativeIconButton
-          symbol="person.circle"
-          fallbackIcon="person-circle-outline"
-          variant="glass"
-          haptic="light"
-          size={44}
-          symbolSize={20}
-          imageUri={profile.data?.profile_photo_url}
-          onPress={() => {
-            router.push('/(app)/profile');
-          }}
-        />
-      </View>
-
-      {/* ── earnings snapshot ── */}
-      <View style={styles.snapshotRow}>
-        <Pressable
-          style={({ pressed }) => [styles.snapshotTile, pressed && styles.tilePressed]}
-          onPress={() => {
-            router.push('/(app)/(tabs)/earnings');
-          }}
-        >
-          <Text style={styles.tileLabel}>This Month</Text>
-          <Text style={styles.tileValue}>{earnings.isLoading ? '—' : fmt(thisMonth)}</Text>
-        </Pressable>
-
-        {earnings.isLoading ? (
-          <View style={styles.snapshotTile}>
-            <Text style={styles.tileLabel}>Pending</Text>
-            <Text style={styles.tileValue}>—</Text>
+    <View style={styles.root}>
+      <CalmMeshBackground />
+      <Screen style={{ backgroundColor: 'transparent' }}>
+        {/* ── header ── */}
+        <View style={styles.header}>
+          <View style={styles.greetingBlock}>
+            <Text style={styles.greetingLine}>{getGreeting()}</Text>
+            <Text style={styles.nameLine}>{firstName}.</Text>
+            <Text style={styles.subtitle}>{contextualSubtitle()}</Text>
           </View>
-        ) : (
-          <PendingTile amount={pendingEarnings} />
-        )}
-      </View>
+          <NativeIconButton
+            symbol="person.circle"
+            fallbackIcon="person-circle-outline"
+            variant="glass"
+            haptic="light"
+            size={44}
+            symbolSize={20}
+            imageUri={profile.data?.profile_photo_url}
+            onPress={() => {
+              router.push('/(app)/profile');
+            }}
+          />
+        </View>
 
-      {/* ── needs attention ── */}
-      {hasActionItems && (
-        <>
-          <SectionTitle eyebrow="Needs Attention" title="" />
-          {deliveryPending && (
-            <ActionCard
-              icon="time-outline"
-              title="Delivery pending review"
-              subtitle={truncate(deliveryPending.title, 36)}
+        {/* ── earnings snapshot ── */}
+        <View style={styles.snapshotRow}>
+          <Pressable
+            style={({ pressed }) => [styles.snapshotTile, pressed && styles.tilePressed]}
+            onPress={() => {
+              router.push('/(app)/(tabs)/earnings');
+            }}
+          >
+            <Text style={styles.tileLabel}>This Month</Text>
+            <Text style={styles.tileValue}>{earnings.isLoading ? '—' : fmt(thisMonth)}</Text>
+          </Pressable>
+
+          {earnings.isLoading ? (
+            <View style={styles.snapshotTile}>
+              <Text style={styles.tileLabel}>Pending</Text>
+              <Text style={styles.tileValue}>—</Text>
+            </View>
+          ) : (
+            <PendingTile amount={pendingEarnings} />
+          )}
+        </View>
+
+        {/* ── needs attention ── */}
+        {hasActionItems && (
+          <>
+            <SectionTitle eyebrow="Needs Attention" title="" />
+            {deliveryPending && (
+              <ActionCard
+                icon="time-outline"
+                title="Delivery pending review"
+                subtitle={truncate(deliveryPending.title, 36)}
+                onPress={() => {
+                  router.push('/(app)/(tabs)/campaigns');
+                }}
+              />
+            )}
+            {showInstagramNudge && (
+              <ActionCard
+                icon="logo-instagram"
+                title="Connect Instagram"
+                subtitle="Boost your discovery rate"
+                onPress={() => {
+                  router.push('/(app)/profile/instagram');
+                }}
+              />
+            )}
+            {showPricingNudge && (
+              <ActionCard
+                icon="pricetag-outline"
+                title="Set your rates"
+                subtitle="Brands want to know your price"
+                onPress={() => {
+                  router.push('/(app)/profile/pricing');
+                }}
+              />
+            )}
+          </>
+        )}
+
+        {/* ── in progress ── */}
+        {activeCampaigns.length > 0 && (
+          <>
+            <SectionTitle eyebrow="In Progress" title="" />
+            {activeCampaigns.slice(0, 2).map((c) => (
+              <CampaignSpotlightCard key={c.id} campaign={c} />
+            ))}
+            <Pressable
               onPress={() => {
                 router.push('/(app)/(tabs)/campaigns');
               }}
-            />
-          )}
-          {showInstagramNudge && (
-            <ActionCard
-              icon="logo-instagram"
-              title="Connect Instagram"
-              subtitle="Boost your discovery rate"
-              onPress={() => {
-                router.push('/(app)/profile/instagram');
-              }}
-            />
-          )}
-          {showPricingNudge && (
-            <ActionCard
-              icon="pricetag-outline"
-              title="Set your rates"
-              subtitle="Brands want to know your price"
-              onPress={() => {
-                router.push('/(app)/profile/pricing');
-              }}
-            />
-          )}
-        </>
-      )}
-
-      {/* ── in progress ── */}
-      {activeCampaigns.length > 0 && (
-        <>
-          <SectionTitle eyebrow="In Progress" title="" />
-          {activeCampaigns.slice(0, 2).map((c) => (
-            <CampaignSpotlightCard key={c.id} campaign={c} />
-          ))}
-          <Pressable
-            onPress={() => {
-              router.push('/(app)/(tabs)/campaigns');
-            }}
-            style={styles.viewAllRow}
-          >
-            <Text style={styles.viewAllText}>View all campaigns</Text>
-            <Ionicons name="arrow-forward" size={14} color={theme.colors.rose} />
-          </Pressable>
-        </>
-      )}
-    </Screen>
+              style={styles.viewAllRow}
+            >
+              <Text style={styles.viewAllText}>View all campaigns</Text>
+              <Ionicons name="arrow-forward" size={14} color={theme.colors.rose} />
+            </Pressable>
+          </>
+        )}
+      </Screen>
+    </View>
   );
 }
 
 // ─── styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
