@@ -105,6 +105,10 @@ export type MessageType = (typeof MESSAGE_TYPES)[number];
 export interface Influencer {
   id: string;
   user_id: string;
+  /** Resolved display photo URL (influencer_profiles or fallback from profiles.avatar_url) */
+  profile_photo_url?: string;
+  /** Common profile avatar when set separately */
+  avatar_url?: string;
   display_name?: string;
   ig_username?: string;
   instagram_handle?: string;

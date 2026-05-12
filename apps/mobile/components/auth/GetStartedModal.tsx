@@ -53,7 +53,7 @@ export function GetStartedModal({ visible, onClose, onEmail, onGoogle }: Props) 
               <View style={styles.logoDiamond} />
             </View>
             <Pressable onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={18} color="#999999" />
+              <Ionicons name="close" size={18} color="#666666" />
             </Pressable>
           </View>
 
@@ -68,12 +68,12 @@ export function GetStartedModal({ visible, onClose, onEmail, onGoogle }: Props) 
 
           <View style={styles.socialRow}>
             <Pressable style={styles.socialButton}>
-              <Ionicons name="logo-apple" size={22} color="#111111" />
+              <Ionicons name="logo-apple" size={22} color="#F2EDE8" />
               <Text style={styles.socialText}>Apple</Text>
             </Pressable>
 
             <Pressable style={styles.socialButton} onPress={onGoogle}>
-              <Ionicons name="logo-google" size={20} color="#111111" />
+              <Ionicons name="logo-google" size={20} color="#F2EDE8" />
               <Text style={styles.socialText}>Google</Text>
             </Pressable>
           </View>
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   sheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#181818',
     borderRadius: 34,
     borderBottomLeftRadius: 60,
     borderBottomRightRadius: 60,
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.6,
     shadowRadius: 24,
     elevation: 10,
   },
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 5,
     borderRadius: 999,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#333333',
     alignSelf: 'center',
     marginBottom: 14,
   },
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#252525',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -137,14 +137,14 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 4,
-    backgroundColor: '#111111',
+    backgroundColor: '#E76A92',
     transform: [{ rotate: '45deg' }],
   },
   closeButton: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#F3F3F3',
+    backgroundColor: '#252525',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -152,14 +152,14 @@ const styles = StyleSheet.create({
     ...authTypography.displaySm,
     fontSize: 22,
     lineHeight: 30,
-    color: '#000000',
+    color: '#F2EDE8',
     marginBottom: 8,
   },
   body: {
     ...authTypography.body,
     fontSize: 14,
     lineHeight: 21,
-    color: '#666666',
+    color: '#9A8A83',
     marginBottom: 20,
   },
   button: {
@@ -170,11 +170,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   emailButton: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#252525',
   },
   emailButtonText: {
     ...authTypography.bodyStrong,
-    color: '#000000',
+    color: '#F2EDE8',
     fontSize: 17,
   },
   socialRow: {
@@ -188,8 +188,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#2E2E2E',
+    backgroundColor: '#181818',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -199,13 +199,13 @@ const styles = StyleSheet.create({
     ...authTypography.bodyStrong,
     fontSize: 16,
     lineHeight: 20,
-    color: '#000000',
+    color: '#F2EDE8',
   },
   footnote: {
     ...authTypography.fine,
     textAlign: 'center',
     fontSize: 11.5,
     lineHeight: 16,
-    color: '#999999',
+    color: '#5A5A5A',
   },
 });

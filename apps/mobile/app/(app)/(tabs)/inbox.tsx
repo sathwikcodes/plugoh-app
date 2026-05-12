@@ -1,60 +1,51 @@
-import { FlashList } from '@shopify/flash-list';
-import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
-import { Card, EmptyState, Screen, SectionTitle, StatusChip } from '@/components/ui/primitives';
+import { GlassSearchField } from '@/components/ui/glass-search-field';
+import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { Screen } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
-import { useInbox } from '@/hooks/use-marketplace';
+import { useInfluencerProfile } from '@/hooks/use-marketplace';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Text, View } from 'react-native';
 
 export default function InboxScreen() {
-  const inbox = useInbox();
+  const [query, setQuery] = useState('');
+  const influencerProfile = useInfluencerProfile();
 
   return (
     <Screen>
-      <SectionTitle
-        title="Inbox"
-        subtitle="Compact, operational threads for bookings, revisions, and approvals."
-      />
-      {(inbox.data ?? []).length === 0 ? (
-        <EmptyState
-          title="No active conversations"
-          subtitle="Threads appear once a campaign is created or a message is sent."
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: theme.spacing.md,
+        }}
+      >
+        <Text
+          style={{
+            ...theme.typography.title,
+            color: theme.colors.foreground,
+            flex: 1,
+          }}
+          numberOfLines={1}
+        >
+          Inbox
+        </Text>
+        <NativeIconButton
+          symbol="person.circle"
+          fallbackIcon="person-circle-outline"
+          variant="glass"
+          haptic="light"
+          size={44}
+          symbolSize={20}
+          imageUri={influencerProfile.data?.profile_photo_url}
+          onPress={() => {
+            router.push('/(app)/profile');
+          }}
         />
-      ) : (
-        <FlashList
-          data={inbox.data ?? []}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => {
-                router.push(`/(app)/inbox/${item.campaign.id}`);
-              }}
-            >
-              <Card>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ ...theme.typography.cardTitle, color: theme.colors.foreground }}>
-                      {item.campaign.title}
-                    </Text>
-                    <Text style={{ ...theme.typography.body, color: theme.colors.muted }}>
-                      {item.latestMessage?.content ?? 'No messages yet'}
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end', gap: 8 }}>
-                    <StatusChip
-                      label={item.campaign.status.replaceAll('_', ' ')}
-                      status={item.campaign.status}
-                    />
-                    {item.unreadCount > 0 ? (
-                      <Text style={{ ...theme.typography.label, color: theme.colors.accentStrong }}>
-                        {item.unreadCount} unread
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              </Card>
-            </Pressable>
-          )}
-        />
-      )}
+      </View>
+
+      <GlassSearchField value={query} onChangeText={setQuery} placeholder="Search inbox" />
     </Screen>
   );
 }

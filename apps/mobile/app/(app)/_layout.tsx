@@ -53,6 +53,8 @@ export default function AppLayout() {
       <Stack.Screen name="inbox/[id]" />
       <Stack.Screen name="delivery/[campaignId]" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="profile/index" />
+      <Stack.Screen name="brand-profile" />
       <Stack.Screen name="profile/edit" />
       <Stack.Screen name="profile/pricing" />
       <Stack.Screen name="profile/instagram" />

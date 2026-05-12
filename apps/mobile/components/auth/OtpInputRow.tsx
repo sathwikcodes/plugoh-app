@@ -48,7 +48,7 @@ export function OtpInputRow({ value, length = 6, onChange }: Props) {
 const styles = StyleSheet.create({
   wrapper: {
     borderRadius: 12,
-    backgroundColor: '#ECECEC',
+    backgroundColor: '#1A1A1A',
     padding: 16,
   },
   hiddenInput: {
@@ -66,25 +66,25 @@ const styles = StyleSheet.create({
     width: 46,
     height: 52,
     borderRadius: 10,
-    backgroundColor: '#ECECEC',
+    backgroundColor: '#252525',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
   activeBox: {
-    borderColor: '#000000',
+    borderColor: '#F2EDE8',
   },
   placeholder: {
     ...authTypography.mono,
     fontSize: 24,
     lineHeight: 28,
-    color: '#CCCCCC',
+    color: '#444444',
   },
   digit: {
     ...authTypography.mono,
     fontSize: 24,
     lineHeight: 28,
-    color: '#000000',
+    color: '#F2EDE8',
   },
 });

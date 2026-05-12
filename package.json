@@ -36,8 +36,8 @@
     "pre-commit": "npx --no-install lint-staged"
   },
   "devDependencies": {
-    "@types/react": "~19.1.10",
     "@eslint/js": "^9.39.1",
+    "@types/react": "~19.1.10",
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",
     "eslint": "^9.39.1",
@@ -45,5 +45,10 @@
     "prettier": "^3.6.2",
     "simple-git-hooks": "^2.13.1",
     "typescript-eslint": "^8.46.2"
+  },
+  "dependencies": {
+    "expo": "~54.0.34",
+    "react": "19.1.0",
+    "react-native": "0.81.5"
   }
 }

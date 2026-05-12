@@ -41,7 +41,7 @@ export default function EmailScreen() {
       >
         <View style={[styles.content, { paddingTop: headerHeight + 20 }]}>
           <View style={styles.iconCircle}>
-            <Feather name="mail" size={28} color="#666666" />
+            <Feather name="mail" size={28} color="#9A8A83" />
           </View>
 
           <Text style={styles.heading}>Continue with Email</Text>
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#000000',
   },
   content: {
     paddingHorizontal: 24,
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#1A1A1A',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
@@ -96,13 +96,13 @@ const styles = StyleSheet.create({
     ...authTypography.displayMd,
     fontSize: 26,
     lineHeight: 34,
-    color: '#000000',
+    color: '#F2EDE8',
   },
   subheading: {
     ...authTypography.body,
     fontSize: 15,
     lineHeight: 22,
-    color: '#666666',
+    color: '#9A8A83',
     marginBottom: 8,
   },
   footer: {

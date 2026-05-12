@@ -1,4 +1,4 @@
-import { LinearGradient } from "expo-linear-gradient";
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
   Pressable,
@@ -14,15 +14,15 @@ import {
   type TextInputProps,
   type ViewProps,
   type ViewStyle,
-} from "react-native";
-import { theme, statusTone } from "@/constants/theme";
+} from 'react-native';
+import { theme, statusTone } from '@/constants/theme';
 
 function mergePressableStyle(
   baseStyle: StyleProp<ViewStyle>,
-  style: PressableProps["style"],
-): PressableProps["style"] {
+  style: PressableProps['style'],
+): PressableProps['style'] {
   if (!style) return baseStyle;
-  if (typeof style === "function") {
+  if (typeof style === 'function') {
     return (state: PressableStateCallbackType) => [baseStyle, style(state)];
   }
   return [baseStyle, style];
@@ -75,7 +75,15 @@ export function Card({ children, style, ...props }: ViewProps) {
   );
 }
 
-export function SectionTitle({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) {
+export function SectionTitle({
+  eyebrow,
+  title,
+  subtitle,
+}: {
+  eyebrow?: string;
+  title: string;
+  subtitle?: string;
+}) {
   return (
     <View style={styles.sectionHeader}>
       {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
@@ -119,7 +127,11 @@ export function LabeledField({ label, ...props }: TextInputProps & { label: stri
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput {...props} style={[styles.field, props.style]} placeholderTextColor={theme.colors.muted} />
+      <TextInput
+        {...props}
+        style={[styles.field, props.style]}
+        placeholderTextColor={theme.colors.muted}
+      />
     </View>
   );
 }
@@ -178,7 +190,7 @@ export function StatusChip({ label, status }: { label: string; status?: string }
   );
 }
 
-export function LoadingState({ label = "Loading..." }: { label?: string }) {
+export function LoadingState({ label = 'Loading...' }: { label?: string }) {
   return (
     <Card style={styles.centerCard}>
       <ActivityIndicator color={theme.colors.accentStrong} />
@@ -227,9 +239,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
   },
   shellHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     gap: theme.spacing.md,
   },
   shellTitleWrap: {
@@ -259,7 +271,7 @@ const styles = StyleSheet.create({
   eyebrow: {
     ...theme.typography.label,
     color: theme.colors.accentStrong,
-    textTransform: "uppercase",
+    textTransform: 'uppercase',
   },
   sectionTitle: {
     ...theme.typography.section,
@@ -285,20 +297,20 @@ const styles = StyleSheet.create({
   button: {
     minHeight: 50,
     borderRadius: theme.radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.foreground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.buttonPrimary,
     paddingHorizontal: theme.spacing.xxl,
   },
   buttonLabel: {
-    color: theme.colors.white,
+    color: theme.colors.buttonPrimaryText,
     ...theme.typography.cardTitle,
   },
   secondaryButton: {
     minHeight: 48,
     borderRadius: theme.radius.pill,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,
     backgroundColor: theme.colors.surface,
@@ -333,9 +345,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: theme.spacing.md,
   },
   listRowPressed: {
@@ -365,7 +377,7 @@ const styles = StyleSheet.create({
     color: theme.colors.foreground,
   },
   chip: {
-    alignSelf: "flex-start",
+    alignSelf: 'flex-start',
     borderRadius: theme.radius.chip,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
@@ -374,14 +386,14 @@ const styles = StyleSheet.create({
     ...theme.typography.label,
   },
   centerCard: {
-    alignItems: "center",
+    alignItems: 'center',
   },
   stateText: {
     ...theme.typography.body,
     color: theme.colors.muted,
   },
   emptyCard: {
-    alignItems: "flex-start",
+    alignItems: 'flex-start',
     backgroundColor: theme.colors.surfaceBlush,
   },
   emptyTitle: {

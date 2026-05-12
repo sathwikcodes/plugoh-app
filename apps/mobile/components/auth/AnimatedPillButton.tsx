@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { authTypography } from '@/components/auth/typography';
 
 type Props = {
@@ -23,16 +23,21 @@ export function AnimatedPillButton({ label, onPress, active, loading = false, st
 
   const backgroundColor = animatedValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#A8A8A8', '#000000'],
+    outputRange: ['#2D2D2D', '#FFFFFF'],
+  });
+
+  const textColor = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#555555', '#0D0D0D'],
   });
 
   return (
     <Animated.View style={[styles.button, style, { backgroundColor }]}>
       <Pressable style={styles.pressable} onPress={onPress} disabled={!active || loading}>
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color="#0D0D0D" />
         ) : (
-          <Text style={styles.label}>{label}</Text>
+          <Animated.Text style={[styles.label, { color: textColor }]}>{label}</Animated.Text>
         )}
       </Pressable>
     </Animated.View>
@@ -52,7 +57,6 @@ const styles = StyleSheet.create({
   },
   label: {
     ...authTypography.bodyStrong,
-    color: '#FFFFFF',
     fontSize: 17,
   },
 });

@@ -1,26 +1,31 @@
-import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { usePathname, useRouter } from 'expo-router';
+import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { useRouter, useSegments } from 'expo-router';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '@/constants/theme';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const pathname = usePathname();
   const router = useRouter();
-  const isProfileRoute = pathname.endsWith('/profile');
-  //deploy test
+  const segments = useSegments();
+  const segmentPath = segments as unknown as string[];
+  const leaf = segmentPath[segmentPath.length - 1] ?? '';
+  const hideFloatingProfile =
+    segmentPath.includes('(tabs)') &&
+    (leaf === 'index' ||
+      leaf === '(tabs)' ||
+      leaf === 'campaigns' ||
+      leaf === 'inbox' ||
+      leaf === 'earnings');
 
   return (
     <View style={styles.root}>
       <NativeTabs
-        blurEffect="systemMaterialLight"
-        backgroundColor="rgba(255,255,255,0.72)"
-        iconColor={{ default: '#9E7218', selected: '#D7A323' }}
-        tintColor="#D7A323"
-        labelStyle={{ color: '#7D6A63', fontSize: 11, fontWeight: '600' }}
+        blurEffect="systemUltraThinMaterialDark"
+        backgroundColor="rgba(0,0,0,0.85)"
+        iconColor={{ default: '#8A7040', selected: '#FFFFFF' }}
+        tintColor="#FFFFFF"
+        labelStyle={{ color: '#9A8A83', fontSize: 11, fontWeight: '600' }}
         disableTransparentOnScrollEdge
       >
         <NativeTabs.Trigger name="index">
@@ -47,24 +52,21 @@ export default function TabsLayout() {
           <Icon sf={{ default: 'dollarsign.circle', selected: 'dollarsign.circle.fill' }} />
           <Label>Earn</Label>
         </NativeTabs.Trigger>
-
-        <NativeTabs.Trigger name="profile" hidden>
-          <Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} />
-          <Label>Me</Label>
-        </NativeTabs.Trigger>
       </NativeTabs>
 
-      {!isProfileRoute ? (
-        <Pressable
-          style={[styles.headerProfileButton, { top: insets.top + 6 }]}
+      {!hideFloatingProfile ? (
+        <NativeIconButton
+          symbol="person.circle"
+          fallbackIcon="person-circle-outline"
+          variant="glass"
+          haptic="light"
+          size={44}
+          symbolSize={20}
           onPress={() => {
-            router.push('/(app)/(tabs)/profile');
+            router.push('/(app)/profile');
           }}
-        >
-          <BlurView intensity={50} tint="systemMaterialLight" style={styles.headerGlass}>
-            <Ionicons name="person-circle-outline" size={22} color={theme.colors.foreground} />
-          </BlurView>
-        </Pressable>
+          style={{ position: 'absolute', right: 16, top: insets.top + 14, zIndex: 50 }}
+        />
       ) : null}
     </View>
   );
@@ -73,23 +75,6 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  headerProfileButton: {
-    position: 'absolute',
-    right: 14,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    overflow: 'hidden',
-    zIndex: 50,
-  },
-  headerGlass: {
-    flex: 1,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.58)',
-    backgroundColor: 'rgba(255,255,255,0.36)',
+    backgroundColor: '#000000',
   },
 });

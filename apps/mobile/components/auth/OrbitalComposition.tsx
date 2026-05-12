@@ -18,12 +18,12 @@ const ITEM_SIZE = 56;
 const ITEM_HALF = ITEM_SIZE / 2;
 
 const orbitItems = [
-  { angle: 0, type: 'avatar', label: 'A', bg: '#E8DFFB' },
-  { angle: 60, type: 'icon', icon: 'calendar', bg: '#E8F3FF' },
-  { angle: 120, type: 'avatar', label: 'K', bg: '#EFEFEF' },
-  { angle: 180, type: 'icon', icon: 'star', bg: '#FFE5EE' },
-  { angle: 240, type: 'avatar', label: 'R', bg: '#DFF6E8' },
-  { angle: 300, type: 'icon', icon: 'musical-notes', bg: '#FFEFD7' },
+  { angle: 0, type: 'avatar', label: 'A', bg: '#1E1530' },
+  { angle: 60, type: 'icon', icon: 'calendar', bg: '#0F1E2E' },
+  { angle: 120, type: 'avatar', label: 'K', bg: '#1E1E1E' },
+  { angle: 180, type: 'icon', icon: 'star', bg: '#2A0F1A' },
+  { angle: 240, type: 'avatar', label: 'R', bg: '#0F2018' },
+  { angle: 300, type: 'icon', icon: 'musical-notes', bg: '#25180A' },
 ] as const;
 
 function OrbitItem({ item, index }: { item: (typeof orbitItems)[number]; index: number }) {
@@ -38,7 +38,7 @@ function OrbitItem({ item, index }: { item: (typeof orbitItems)[number]; index: 
     >
       <View style={[styles.outerItemInner, { backgroundColor: item.bg }]}>
         {item.type === 'icon' ? (
-          <Ionicons name={item.icon} size={26} color="#1A1A1A" />
+          <Ionicons name={item.icon} size={26} color="#F2EDE8" />
         ) : (
           <Text style={styles.avatarText}>{item.label}</Text>
         )}
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     height: 264,
     borderRadius: 132,
     borderWidth: 1.2,
-    borderColor: 'rgba(255,255,255,0.65)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   ringSmall: {
     position: 'absolute',
@@ -124,13 +124,13 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: 80,
     borderWidth: 1.2,
-    borderColor: 'rgba(255,255,255,0.65)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   connectionLine: {
     position: 'absolute',
     width: OUTER_RADIUS - 18,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.45)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   centerDiamondWrapper: {
     position: 'absolute',
@@ -157,11 +157,11 @@ const styles = StyleSheet.create({
     width: ITEM_SIZE,
     height: ITEM_SIZE,
     borderRadius: ITEM_HALF,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E1E1E',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.5,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 5 },
     elevation: 3,
@@ -176,6 +176,6 @@ const styles = StyleSheet.create({
   avatarText: {
     ...authTypography.bodyStrong,
     fontSize: 18,
-    color: '#1A1A1A',
+    color: '#F2EDE8',
   },
 });

@@ -5,7 +5,7 @@ import { authTypography } from '@/components/auth/typography';
 type Props = TextInputProps;
 
 export const LumaTextField = forwardRef<TextInput, Props>(function LumaTextField(props, ref) {
-  return <TextInput ref={ref} placeholderTextColor="#CCCCCC" style={styles.input} {...props} />;
+  return <TextInput ref={ref} placeholderTextColor="#444444" style={styles.input} {...props} />;
 });
 
 const styles = StyleSheet.create({
@@ -13,11 +13,11 @@ const styles = StyleSheet.create({
     ...authTypography.body,
     height: 52,
     borderRadius: 10,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#1A1A1A',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#2E2E2E',
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#000000',
+    color: '#F2EDE8',
   },
 });

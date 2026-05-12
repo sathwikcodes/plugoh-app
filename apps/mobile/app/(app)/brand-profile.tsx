@@ -1,12 +1,16 @@
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { theme } from '@/constants/theme';
 import { useBootstrap, useBusinessProfile, useCampaigns } from '@/hooks/use-marketplace';
 import { logout } from '@/lib/auth/logout';
+import { Ionicons } from '@expo/vector-icons';
+import { impactAsync, ImpactFeedbackStyle } from 'expo-haptics';
+import { router, type Href } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
+import { useMemo } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import type { SFSymbol } from 'sf-symbols-typescript';
 
 function formatAmount(n?: number) {
   if (!n) return '0';
@@ -104,11 +108,31 @@ const BRAND_BADGES = [
   },
 ] as const;
 
-const actions = [
-  { label: 'Edit Brand', icon: 'create-outline', href: '/(app)/profile/edit' },
-  { label: 'Instagram', icon: 'logo-instagram', href: '/(app)/profile/instagram' },
-  { label: 'Settings', icon: 'settings-outline', href: '/(app)/profile/settings' },
-] as const;
+const actions: ReadonlyArray<{
+  label: string;
+  symbol: SFSymbol;
+  fallback: React.ComponentProps<typeof Ionicons>['name'];
+  href: Href;
+}> = [
+  {
+    label: 'Edit Brand',
+    symbol: 'pencil',
+    fallback: 'create-outline',
+    href: '/(app)/profile/edit',
+  },
+  {
+    label: 'Instagram',
+    symbol: 'camera',
+    fallback: 'logo-instagram',
+    href: '/(app)/profile/instagram',
+  },
+  {
+    label: 'Settings',
+    symbol: 'gearshape',
+    fallback: 'settings-outline',
+    href: '/(app)/profile/settings',
+  },
+];
 
 export default function BrandProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -135,6 +159,18 @@ export default function BrandProfileScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.topBar}>
+          <NativeIconButton
+            symbol="chevron.left"
+            fallbackIcon="chevron-back"
+            variant="surface"
+            haptic="light"
+            onPress={() => {
+              router.back();
+            }}
+          />
+        </View>
+
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{profile.data?.brand_name ?? 'Brand Profile'}</Text>
           <Text style={styles.headerSub}>
@@ -161,7 +197,7 @@ export default function BrandProfileScreen() {
                 <Ionicons
                   name={badge.icon}
                   size={24}
-                  color={unlocked ? theme.colors.accentStrong : '#C9BAB5'}
+                  color={unlocked ? theme.colors.accentStrong : theme.colors.border}
                 />
                 <Text
                   style={[
@@ -214,22 +250,46 @@ export default function BrandProfileScreen() {
         <View style={styles.actionGrid}>
           {actions.map((action) => (
             <Pressable
-              key={action.href}
-              style={styles.actionTile}
+              key={action.label}
+              style={({ pressed }) => [styles.actionTile, pressed && { opacity: 0.75 }]}
               onPress={() => {
+                if (Platform.OS === 'ios') void impactAsync(ImpactFeedbackStyle.Light);
                 router.push(action.href);
               }}
             >
               <View style={styles.actionIconCircle}>
-                <Ionicons name={action.icon} size={20} color={theme.colors.accentStrong} />
+                <SymbolView
+                  name={action.symbol}
+                  size={20}
+                  tintColor={theme.colors.accentStrong}
+                  type="monochrome"
+                  fallback={
+                    <Ionicons name={action.fallback} size={20} color={theme.colors.accentStrong} />
+                  }
+                />
               </View>
               <Text style={styles.actionLabel}>{action.label}</Text>
             </Pressable>
           ))}
         </View>
 
-        <Pressable style={styles.logoutButton} onPress={logout}>
-          <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
+        <Pressable
+          style={({ pressed }) => [
+            styles.logoutButton,
+            pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          ]}
+          onPress={() => {
+            if (Platform.OS === 'ios') void impactAsync(ImpactFeedbackStyle.Medium);
+            void logout();
+          }}
+        >
+          <SymbolView
+            name="rectangle.portrait.and.arrow.right"
+            size={18}
+            tintColor="#FFFFFF"
+            type="monochrome"
+            fallback={<Ionicons name="log-out-outline" size={18} color="#FFFFFF" />}
+          />
           <Text style={styles.logoutText}>Sign out</Text>
         </Pressable>
       </ScrollView>
@@ -243,7 +303,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   scrollContent: {
-    paddingTop: 10,
+    paddingTop: 8,
+  },
+  topBar: {
+    paddingHorizontal: 24,
+    marginBottom: 8,
   },
   header: {
     paddingHorizontal: 24,
@@ -290,7 +354,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.pink,
   },
   badgeCardLocked: {
-    backgroundColor: '#F4EFED',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -375,7 +439,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderStyle: 'dashed',
-    backgroundColor: '#FFFFFFAA',
+    backgroundColor: 'rgba(20,18,16,0.8)',
   },
   emptyChartText: {
     color: theme.colors.muted,
@@ -425,6 +489,7 @@ const styles = StyleSheet.create({
     flexBasis: '47%',
     backgroundColor: theme.colors.surfaceWarm,
     borderRadius: 12,
+    borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: 16,
@@ -435,6 +500,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    borderCurve: 'continuous',
     backgroundColor: theme.colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -449,6 +515,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 24,
     height: 48,
     borderRadius: 12,
+    borderCurve: 'continuous',
     backgroundColor: theme.colors.accentStrong,
     alignItems: 'center',
     justifyContent: 'center',

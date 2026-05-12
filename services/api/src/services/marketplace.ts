@@ -4,15 +4,6 @@ import type {
   OnboardingStage,
   UserRole,
 } from '@plugoh/contracts';
-import {
-  badRequest,
-  conflict,
-  forbidden,
-  notFound,
-  tooManyRequests,
-  unauthorized,
-} from '../core/errors.js';
-import { logger } from '../core/logger.js';
 import type {
   AiProvider,
   EmailProvider,
@@ -23,6 +14,15 @@ import type {
 } from '../clients/providers.js';
 import { verifyHmacSha256 } from '../clients/providers.js';
 import type { EnvConfig } from '../config/env.js';
+import {
+  badRequest,
+  conflict,
+  forbidden,
+  notFound,
+  tooManyRequests,
+  unauthorized,
+} from '../core/errors.js';
+import { logger } from '../core/logger.js';
 import type { DataStore } from '../repositories/data-store.js';
 import type { AuthUser } from '../types.js';
 
@@ -517,12 +517,21 @@ export class ProfileService {
   }
 
   async getInfluencer(user: AuthUser) {
-    const profile = await this.store.findOne<Row>('influencer_profiles', {
-      eq: { user_id: user.id },
-    });
+    const [profile, account] = await Promise.all([
+      this.store.findOne<Row>('influencer_profiles', {
+        eq: { user_id: user.id },
+      }),
+      this.store.findOne<Row>('profiles', { eq: { id: user.id } }),
+    ]);
     if (!profile) throw notFound('Influencer profile');
+    const profilePhoto =
+      (typeof profile.profile_photo_url === 'string' && profile.profile_photo_url.trim()) ||
+      (typeof account?.avatar_url === 'string' && account.avatar_url.trim()) ||
+      undefined;
     return {
       ...profile,
+      profile_photo_url: profilePhoto,
+      avatar_url: typeof account?.avatar_url === 'string' ? account.avatar_url : undefined,
       instagram_connected: hasInstagramConnection(profile),
     };
   }

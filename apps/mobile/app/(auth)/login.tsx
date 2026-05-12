@@ -30,7 +30,7 @@ export default function LoginScreen() {
 
   return (
     <LinearGradient
-      colors={['#D4E8F7', '#F5E8E8']}
+      colors={['#060610', '#100608']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     ...authTypography.displaySm,
     fontSize: 26,
     lineHeight: 30,
-    color: '#A6A6AC',
+    color: '#4A4A52',
     textAlign: 'center',
   },
   brandLockup: {
@@ -122,14 +122,14 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontSize: 12,
     lineHeight: 14,
-    color: '#A6A6AC',
+    color: '#4A4A52',
     letterSpacing: -0.2,
   },
   title: {
     ...authTypography.displayLg,
     fontSize: 32,
     lineHeight: 40,
-    color: '#000000',
+    color: '#F2EDE8',
     textAlign: 'center',
   },
   subtitleMask: {
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   },
   ctaButton: {
     marginTop: 14,
-    backgroundColor: '#000000',
+    backgroundColor: '#FFFFFF',
     height: 52,
     borderRadius: 26,
     alignItems: 'center',
@@ -153,6 +153,6 @@ const styles = StyleSheet.create({
     ...authTypography.bodyStrong,
     fontSize: 17,
     lineHeight: 22,
-    color: '#FFFFFF',
+    color: '#0D0D0D',
   },
 });

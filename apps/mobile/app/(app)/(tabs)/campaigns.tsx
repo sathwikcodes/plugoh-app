@@ -1,117 +1,119 @@
-import { FlashList } from '@shopify/flash-list';
-import { router } from 'expo-router';
-import { Pressable, Text, TextInput, View } from 'react-native';
-import { Card, EmptyState, Screen, SectionTitle, StatusChip } from '@/components/ui/primitives';
+import { CampaignDeckSwiper } from '@/components/ui/campaign-deck-swiper';
+import { GlassSearchField } from '@/components/ui/glass-search-field';
+import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { Screen } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
-import { useCampaigns } from '@/hooks/use-marketplace';
+import { useCampaigns, useInfluencerProfile } from '@/hooks/use-marketplace';
+import { router } from 'expo-router';
 import { useState } from 'react';
+import { Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const filters = [
-  { label: 'Requested', statuses: ['requested', 'payment_pending', 'pre_authorized'] },
-  { label: 'Active', statuses: ['in_escrow', 'delivery_submitted', 'disputed'] },
-  { label: 'Completed', statuses: ['completed'] },
-  { label: 'Closed', statuses: ['declined', 'expired', 'cancelled', 'refunded'] },
-] as const;
+/** Extra space so the swipe card stops short of the tab dock (card was extending too low). */
+const DECK_BOTTOM_INSET = theme.spacing.xl + theme.spacing.sm;
+
+/** Breathing room above the native tab bar (bar height varies; this stays clear of the dock). */
+const TAB_BAR_CLEARANCE = 12;
 
 export default function CampaignsScreen() {
-  const campaigns = useCampaigns();
-  const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<(typeof filters)[number]['label']>('Requested');
+  const insets = useSafeAreaInsets();
+  const influencerProfile = useInfluencerProfile();
+  const campaigns = useCampaigns({ sort: 'created_desc' });
 
-  const visible = (campaigns.data?.items ?? []).filter((item) => {
-    const filter = filters.find((entry) => entry.label === activeFilter);
-    const matchesFilter = filter
-      ? (filter.statuses as readonly string[]).includes(item.status)
-      : true;
-    const searchText = search.toLowerCase();
+  const [search, setSearch] = useState('');
+
+  const allItems = campaigns.data?.items ?? [];
+  const filtered = allItems.filter((item) => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      searchText.length === 0 ||
-      item.title.toLowerCase().includes(searchText) ||
-      item.business_profile?.brand_name?.toLowerCase().includes(searchText);
-    return matchesFilter && matchesSearch;
+      q.length === 0 ||
+      item.title.toLowerCase().includes(q) ||
+      item.business_profile?.brand_name?.toLowerCase().includes(q);
+    return matchesSearch;
   });
 
   return (
-    <Screen>
-      <SectionTitle
-        title="Campaigns"
-        subtitle="Track requests, funded work, delivery, and completion without losing context."
-      />
-      <TextInput
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search by campaign or brand"
-        placeholderTextColor={theme.colors.muted}
-        style={{
-          minHeight: 50,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-          borderRadius: theme.radius.card,
-          paddingHorizontal: theme.spacing.lg,
-          color: theme.colors.foreground,
-        }}
-      />
-      <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-        {filters.map((filter) => (
-          <Pressable
-            key={filter.label}
-            onPress={() => {
-              setActiveFilter(filter.label);
-            }}
+    <Screen
+      scrollEnabled={false}
+      contentInsetAdjustmentBehavior="never"
+      contentContainerStyle={{
+        flexGrow: 1,
+        paddingTop: insets.top + theme.spacing.lg,
+        paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE,
+        gap: theme.spacing.lg,
+      }}
+    >
+      <View style={{ gap: theme.spacing.md }}>
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: theme.spacing.md,
+          }}
+        >
+          <Text
             style={{
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              borderRadius: theme.radius.chip,
-              backgroundColor:
-                activeFilter === filter.label ? theme.colors.accentSoft : theme.colors.surfaceWarm,
+              ...theme.typography.title,
+              color: theme.colors.foreground,
+              flex: 1,
+              minWidth: 0,
             }}
+            numberOfLines={1}
           >
-            <Text
-              style={{
-                ...theme.typography.label,
-                color:
-                  activeFilter === filter.label ? theme.colors.accentStrong : theme.colors.muted,
-              }}
-            >
-              {filter.label}
-            </Text>
-          </Pressable>
-        ))}
+            Campaigns
+          </Text>
+          <NativeIconButton
+            symbol="person.circle"
+            fallbackIcon="person-circle-outline"
+            variant="glass"
+            haptic="light"
+            size={44}
+            symbolSize={20}
+            imageUri={influencerProfile.data?.profile_photo_url}
+            onPress={() => {
+              router.push('/(app)/profile');
+            }}
+          />
+        </View>
+
+        {/* Search + filter affordance */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+          <View style={{ flex: 1 }}>
+            <GlassSearchField
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search campaigns or brands"
+            />
+          </View>
+          <NativeIconButton
+            symbol="line.3.horizontal.decrease.circle"
+            fallbackIcon="options-outline"
+            variant="glass"
+            haptic="light"
+            size={44}
+            symbolSize={20}
+            onPress={() => {}}
+          />
+        </View>
       </View>
-      {visible.length === 0 ? (
-        <EmptyState
-          title="No campaigns in this view"
-          subtitle="Change the status filter or wait for a new request to land."
+
+      {/* Fill space below search; bottom inset keeps the card from running into the dock */}
+      <View
+        style={{
+          flex: 1,
+          minHeight: 0,
+          marginTop: theme.spacing.sm,
+          marginBottom: DECK_BOTTOM_INSET,
+        }}
+      >
+        <CampaignDeckSwiper
+          campaigns={filtered}
+          isLoading={campaigns.isLoading}
+          onRefresh={campaigns.refetch}
         />
-      ) : (
-        <FlashList
-          data={visible}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => {
-                router.push(`/(app)/campaigns/${item.id}`);
-              }}
-            >
-              <Card>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ ...theme.typography.cardTitle, color: theme.colors.foreground }}>
-                      {item.title}
-                    </Text>
-                    <Text style={{ ...theme.typography.body, color: theme.colors.muted }}>
-                      {item.business_profile?.brand_name ?? 'Brand'}
-                    </Text>
-                  </View>
-                  <StatusChip label={item.status.replaceAll('_', ' ')} status={item.status} />
-                </View>
-                <Text style={{ ...theme.typography.mono, color: theme.colors.foreground }}>
-                  ₹{Math.round(item.price_offered ?? 0).toLocaleString('en-IN')}
-                </Text>
-              </Card>
-            </Pressable>
-          )}
-        />
-      )}
+      </View>
     </Screen>
   );
 }

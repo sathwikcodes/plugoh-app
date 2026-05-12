@@ -1,12 +1,3 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type {
-  BusinessOnboardingRequest,
-  InfluencerOnboardingRequest,
-  InfluencerPricingPatch,
-  NotificationsReadRequest,
-  PayoutUpsert,
-  UserRole,
-} from '@plugoh/contracts';
 import {
   acceptCampaign,
   approveCampaignDelivery,
@@ -35,6 +26,15 @@ import {
 import { invalidateQueryKeys } from '@/lib/query/invalidation';
 import { coreInvalidationKeys, queryKeys } from '@/lib/query/keys';
 import { useAuthStore } from '@/store/auth';
+import type {
+  BusinessOnboardingRequest,
+  InfluencerOnboardingRequest,
+  InfluencerPricingPatch,
+  NotificationsReadRequest,
+  PayoutUpsert,
+  UserRole,
+} from '@plugoh/contracts';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type CampaignListParams = {
   limit?: number;
@@ -65,10 +65,11 @@ export function useBootstrap() {
 
 export function useInfluencerProfile() {
   const session = useAuthStore((state) => state.session);
+  const bootstrap = useBootstrap();
   return useQuery({
     queryKey: queryKeys.profile('influencer'),
     queryFn: endpoints.influencerProfile,
-    enabled: Boolean(session),
+    enabled: Boolean(session && bootstrap.data?.role === 'influencer'),
   });
 }
 

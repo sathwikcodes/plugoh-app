@@ -1,25 +1,21 @@
-import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { usePathname, useRouter } from 'expo-router';
+import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { useRouter } from 'expo-router';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '@/constants/theme';
 
 export default function BrandTabsLayout() {
   const insets = useSafeAreaInsets();
-  const pathname = usePathname();
   const router = useRouter();
-  const isProfileRoute = pathname.endsWith('/profile');
 
   return (
     <View style={styles.root}>
       <NativeTabs
-        blurEffect="systemMaterialLight"
-        backgroundColor="rgba(255,255,255,0.72)"
-        iconColor={{ default: '#9E7218', selected: '#D7A323' }}
-        tintColor="#D7A323"
-        labelStyle={{ color: '#7D6A63', fontSize: 11, fontWeight: '600' }}
+        blurEffect="systemUltraThinMaterialDark"
+        backgroundColor="rgba(0,0,0,0.85)"
+        iconColor={{ default: '#8A7040', selected: '#FFFFFF' }}
+        tintColor="#FFFFFF"
+        labelStyle={{ color: '#9A8A83', fontSize: 11, fontWeight: '600' }}
         disableTransparentOnScrollEdge
       >
         <NativeTabs.Trigger name="index">
@@ -48,25 +44,18 @@ export default function BrandTabsLayout() {
           />
           <Label>Inbox</Label>
         </NativeTabs.Trigger>
-
-        <NativeTabs.Trigger name="profile" hidden>
-          <Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} />
-          <Label>Me</Label>
-        </NativeTabs.Trigger>
       </NativeTabs>
 
-      {!isProfileRoute ? (
-        <Pressable
-          style={[styles.headerProfileButton, { top: insets.top + 6 }]}
-          onPress={() => {
-            router.push('/(app)/(tabs)/profile');
-          }}
-        >
-          <BlurView intensity={50} tint="systemMaterialLight" style={styles.headerGlass}>
-            <Ionicons name="storefront-outline" size={20} color={theme.colors.foreground} />
-          </BlurView>
-        </Pressable>
-      ) : null}
+      <NativeIconButton
+        symbol="storefront"
+        fallbackIcon="storefront-outline"
+        variant="glass"
+        haptic="light"
+        onPress={() => {
+          router.push('/(app)/brand-profile');
+        }}
+        style={{ position: 'absolute', right: 16, top: insets.top + 20, zIndex: 50 }}
+      />
     </View>
   );
 }
@@ -74,23 +63,6 @@ export default function BrandTabsLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  headerProfileButton: {
-    position: 'absolute',
-    right: 14,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    overflow: 'hidden',
-    zIndex: 50,
-  },
-  headerGlass: {
-    flex: 1,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.58)',
-    backgroundColor: 'rgba(255,255,255,0.36)',
+    backgroundColor: '#000000',
   },
 });
