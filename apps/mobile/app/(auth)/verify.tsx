@@ -1,14 +1,22 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Feather } from '@expo/vector-icons';
-import { useHeaderHeight } from '@react-navigation/elements';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedPillButton } from '@/components/auth/AnimatedPillButton';
 import { OtpInputRow } from '@/components/auth/OtpInputRow';
 import { authTypography } from '@/components/auth/typography';
+import { theme } from '@/constants/theme';
 import { supabase } from '@/lib/supabase/client';
-import { Alert } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useMemo, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const CODE_LENGTH = 6;
 
@@ -51,7 +59,7 @@ export default function VerifyScreen() {
       >
         <View style={[styles.content, { paddingTop: headerHeight + 20 }]}>
           <View style={styles.iconCircle}>
-            <Feather name="message-circle" size={28} color="#9A8A83" />
+            <Feather name="message-circle" size={28} color={theme.colors.foreground} />
           </View>
 
           <Text style={styles.heading}>Enter Code</Text>
@@ -85,7 +93,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: theme.colors.background,
   },
   content: {
     paddingHorizontal: 24,
@@ -104,17 +112,17 @@ const styles = StyleSheet.create({
     ...authTypography.displayMd,
     fontSize: 26,
     lineHeight: 34,
-    color: '#F2EDE8',
+    color: theme.colors.foreground,
   },
   subheading: {
     ...authTypography.body,
     fontSize: 15,
     lineHeight: 22,
-    color: '#9A8A83',
+    color: theme.colors.muted,
     marginBottom: 8,
   },
   emailText: {
-    color: '#F2EDE8',
+    color: theme.colors.foreground,
     ...authTypography.bodyStrong,
   },
   resendButton: {
@@ -123,7 +131,7 @@ const styles = StyleSheet.create({
   },
   resendText: {
     ...authTypography.body,
-    color: '#9A8A83',
+    color: theme.colors.muted,
     fontSize: 14,
     lineHeight: 18,
   },

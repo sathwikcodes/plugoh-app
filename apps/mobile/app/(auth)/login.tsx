@@ -1,14 +1,14 @@
-import { router } from 'expo-router';
-import MaskedView from '@react-native-masked-view/masked-view';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { GetStartedModal } from '@/components/auth/GetStartedModal';
 import { OrbitalComposition } from '@/components/auth/OrbitalComposition';
 import { authTypography } from '@/components/auth/typography';
 import { supabase } from '@/lib/supabase/client';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -30,7 +30,7 @@ export default function LoginScreen() {
 
   return (
     <LinearGradient
-      colors={['#060610', '#100608']}
+      colors={['#050509', '#0a0a12']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     ...authTypography.displaySm,
     fontSize: 26,
     lineHeight: 30,
-    color: '#4A4A52',
+    color: '#FFFFFF',
     textAlign: 'center',
   },
   brandLockup: {
@@ -122,14 +122,14 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontSize: 12,
     lineHeight: 14,
-    color: '#4A4A52',
+    color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   title: {
     ...authTypography.displayLg,
     fontSize: 32,
     lineHeight: 40,
-    color: '#F2EDE8',
+    color: '#FFFFFF',
     textAlign: 'center',
   },
   subtitleMask: {

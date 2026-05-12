@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { authTypography } from '@/components/auth/typography';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -10,7 +11,6 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { authTypography } from '@/components/auth/typography';
 
 const OUTER_RADIUS = 122;
 const CENTER = 150;
@@ -38,7 +38,7 @@ function OrbitItem({ item, index }: { item: (typeof orbitItems)[number]; index: 
     >
       <View style={[styles.outerItemInner, { backgroundColor: item.bg }]}>
         {item.type === 'icon' ? (
-          <Ionicons name={item.icon} size={26} color="#F2EDE8" />
+          <Ionicons name={item.icon} size={26} color="#FFFFFF" />
         ) : (
           <Text style={styles.avatarText}>{item.label}</Text>
         )}
@@ -176,6 +176,6 @@ const styles = StyleSheet.create({
   avatarText: {
     ...authTypography.bodyStrong,
     fontSize: 18,
-    color: '#F2EDE8',
+    color: '#FFFFFF',
   },
 });

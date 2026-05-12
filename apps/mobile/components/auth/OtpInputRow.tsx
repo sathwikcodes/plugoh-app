@@ -1,6 +1,6 @@
+import { authTypography } from '@/components/auth/typography';
 import { useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { authTypography } from '@/components/auth/typography';
 
 type Props = {
   value: string;
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   activeBox: {
-    borderColor: '#F2EDE8',
+    borderColor: '#FFFFFF',
   },
   placeholder: {
     ...authTypography.mono,
@@ -85,6 +85,6 @@ const styles = StyleSheet.create({
     ...authTypography.mono,
     fontSize: 24,
     lineHeight: 28,
-    color: '#F2EDE8',
+    color: '#FFFFFF',
   },
 });

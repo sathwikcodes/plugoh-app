@@ -1,15 +1,16 @@
 import type { TextStyle } from 'react-native';
+import { fontBody, fontDisplay, fontMono } from './app-fonts';
 
 const tabularNums: NonNullable<TextStyle['fontVariant']> = ['tabular-nums'];
 
 export const theme = {
   colors: {
-    background: '#000000',
+    background: '#050509',
     surface: '#111111',
     surfaceWarm: '#131110',
     surfaceBlush: '#120F12',
-    foreground: '#F2EDE8',
-    muted: '#9A8A83',
+    foreground: '#FFFFFF',
+    muted: '#FFFFFF',
     border: '#1E1C1A',
     borderStrong: '#2E2A27',
     rose: '#E76A92',
@@ -50,42 +51,49 @@ export const theme = {
   },
   typography: {
     display: {
+      fontFamily: fontDisplay,
       fontSize: 34,
       lineHeight: 36,
       fontWeight: '700' as const,
       letterSpacing: 0,
     },
     title: {
+      fontFamily: fontDisplay,
       fontSize: 28,
       lineHeight: 30,
       fontWeight: '700' as const,
       letterSpacing: 0,
     },
     section: {
+      fontFamily: fontDisplay,
       fontSize: 20,
       lineHeight: 24,
       fontWeight: '700' as const,
       letterSpacing: 0,
     },
     cardTitle: {
+      fontFamily: fontBody,
       fontSize: 16,
       lineHeight: 20,
       fontWeight: '700' as const,
       letterSpacing: 0,
     },
     body: {
+      fontFamily: fontBody,
       fontSize: 15,
       lineHeight: 22,
       fontWeight: '400' as const,
       letterSpacing: 0,
     },
     label: {
+      fontFamily: fontBody,
       fontSize: 12,
       lineHeight: 16,
       fontWeight: '600' as const,
       letterSpacing: 0,
     },
     mono: {
+      fontFamily: fontMono,
       fontSize: 15,
       lineHeight: 20,
       fontWeight: '600' as const,
@@ -124,12 +132,14 @@ export const Colors = {
   },
 };
 
+/** Mirrors `app-fonts` for ad-hoc `Text` styles; prefer spreading `theme.typography.*`. */
 export const Fonts = {
-  sans: 'System',
-  serif: 'System',
-  rounded: 'System',
-  mono: 'Courier',
+  display: fontDisplay,
+  body: fontBody,
+  mono: fontMono,
 };
+
+export { fontBody, fontDisplay, fontMono } from './app-fonts';
 
 export function statusTone(status?: string) {
   switch (status) {

@@ -1,4 +1,5 @@
 import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { theme } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import { StyleSheet, View } from 'react-native';
@@ -10,14 +11,7 @@ export default function BrandTabsLayout() {
 
   return (
     <View style={styles.root}>
-      <NativeTabs
-        blurEffect="systemUltraThinMaterialDark"
-        backgroundColor="rgba(0,0,0,0.85)"
-        iconColor={{ default: '#8A7040', selected: '#FFFFFF' }}
-        tintColor="#FFFFFF"
-        labelStyle={{ color: '#9A8A83', fontSize: 11, fontWeight: '600' }}
-        disableTransparentOnScrollEdge
-      >
+      <NativeTabs blurEffect="systemUltraThinMaterialDark" disableTransparentOnScrollEdge>
         <NativeTabs.Trigger name="index">
           <Icon sf={{ default: 'house', selected: 'house.fill' }} />
           <Label>Home</Label>
@@ -63,6 +57,6 @@ export default function BrandTabsLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: theme.colors.background,
   },
 });

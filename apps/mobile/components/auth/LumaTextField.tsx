@@ -1,6 +1,6 @@
+import { authTypography } from '@/components/auth/typography';
 import { forwardRef } from 'react';
 import { StyleSheet, TextInput, TextInputProps } from 'react-native';
-import { authTypography } from '@/components/auth/typography';
 
 type Props = TextInputProps;
 
@@ -18,6 +18,6 @@ const styles = StyleSheet.create({
     borderColor: '#2E2E2E',
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#F2EDE8',
+    color: '#FFFFFF',
   },
 });

@@ -1,14 +1,14 @@
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Feather } from '@expo/vector-icons';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { AnimatedPillButton } from '@/components/auth/AnimatedPillButton';
 import { LumaTextField } from '@/components/auth/LumaTextField';
 import { authTypography } from '@/components/auth/typography';
+import { theme } from '@/constants/theme';
 import { supabase } from '@/lib/supabase/client';
-import { Alert } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function EmailScreen() {
   const headerHeight = useHeaderHeight();
@@ -41,7 +41,7 @@ export default function EmailScreen() {
       >
         <View style={[styles.content, { paddingTop: headerHeight + 20 }]}>
           <View style={styles.iconCircle}>
-            <Feather name="mail" size={28} color="#9A8A83" />
+            <Feather name="mail" size={28} color={theme.colors.foreground} />
           </View>
 
           <Text style={styles.heading}>Continue with Email</Text>
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: theme.colors.background,
   },
   content: {
     paddingHorizontal: 24,
@@ -96,13 +96,13 @@ const styles = StyleSheet.create({
     ...authTypography.displayMd,
     fontSize: 26,
     lineHeight: 34,
-    color: '#F2EDE8',
+    color: theme.colors.foreground,
   },
   subheading: {
     ...authTypography.body,
     fontSize: 15,
     lineHeight: 22,
-    color: '#9A8A83',
+    color: theme.colors.muted,
     marginBottom: 8,
   },
   footer: {

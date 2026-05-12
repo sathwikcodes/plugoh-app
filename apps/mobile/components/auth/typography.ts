@@ -1,19 +1,5 @@
-import { Platform, TextStyle } from 'react-native';
-
-const fontDisplay = Platform.select({
-  ios: 'SF Pro Display',
-  default: undefined,
-});
-
-const fontBody = Platform.select({
-  ios: 'SF Pro Text',
-  default: undefined,
-});
-
-const fontMono = Platform.select({
-  ios: 'SF Mono',
-  default: 'monospace',
-});
+import { fontBody, fontDisplay, fontMono } from '@/constants/app-fonts';
+import { TextStyle } from 'react-native';
 
 const displayTracking = (size: number) => -(size * 0.06);
 

@@ -1,9 +1,9 @@
+import { authTypography } from '@/components/auth/typography';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useRef } from 'react';
 import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { authTypography } from '@/components/auth/typography';
 
 type Props = {
   visible: boolean;
@@ -68,12 +68,12 @@ export function GetStartedModal({ visible, onClose, onEmail, onGoogle }: Props) 
 
           <View style={styles.socialRow}>
             <Pressable style={styles.socialButton}>
-              <Ionicons name="logo-apple" size={22} color="#F2EDE8" />
+              <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
               <Text style={styles.socialText}>Apple</Text>
             </Pressable>
 
             <Pressable style={styles.socialButton} onPress={onGoogle}>
-              <Ionicons name="logo-google" size={20} color="#F2EDE8" />
+              <Ionicons name="logo-google" size={20} color="#FFFFFF" />
               <Text style={styles.socialText}>Google</Text>
             </Pressable>
           </View>
@@ -152,14 +152,14 @@ const styles = StyleSheet.create({
     ...authTypography.displaySm,
     fontSize: 22,
     lineHeight: 30,
-    color: '#F2EDE8',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   body: {
     ...authTypography.body,
     fontSize: 14,
     lineHeight: 21,
-    color: '#9A8A83',
+    color: '#FFFFFF',
     marginBottom: 20,
   },
   button: {
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   emailButtonText: {
     ...authTypography.bodyStrong,
-    color: '#F2EDE8',
+    color: '#FFFFFF',
     fontSize: 17,
   },
   socialRow: {
@@ -199,13 +199,13 @@ const styles = StyleSheet.create({
     ...authTypography.bodyStrong,
     fontSize: 16,
     lineHeight: 20,
-    color: '#F2EDE8',
+    color: '#FFFFFF',
   },
   footnote: {
     ...authTypography.fine,
     textAlign: 'center',
     fontSize: 11.5,
     lineHeight: 16,
-    color: '#5A5A5A',
+    color: '#FFFFFF',
   },
 });
