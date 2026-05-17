@@ -218,6 +218,10 @@ export async function sendAttachment(
   });
 }
 
+export async function markMessagesRead(id: string) {
+  return api<{ ok: boolean }>(`/campaigns/${id}/messages/read`, { method: 'PATCH' });
+}
+
 export async function uploadDelivery(
   campaignId: string,
   file: { uri: string; name: string; mimeType?: string },

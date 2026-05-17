@@ -1,7 +1,7 @@
+import { registerPush } from '@/lib/api/endpoints';
 import Constants, { AppOwnership } from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { registerPush } from '@/lib/api/endpoints';
 
 // Push notifications are not supported in Expo Go (SDK 53+); only set up in real builds
 const isExpoGo = Constants.appOwnership === AppOwnership.Expo;
@@ -18,8 +18,12 @@ if (!isExpoGo) {
   });
 }
 
+export function isPushRegistrationSupported(): boolean {
+  return Device.isDevice && !isExpoGo;
+}
+
 export async function registerForPushNotificationsAsync() {
-  if (!Device.isDevice || isExpoGo) return null;
+  if (!isPushRegistrationSupported()) return null;
 
   type PermStatus = { granted: boolean };
   const existing = (await Notifications.getPermissionsAsync()) as unknown as PermStatus;

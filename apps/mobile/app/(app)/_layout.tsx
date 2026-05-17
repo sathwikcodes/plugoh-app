@@ -1,11 +1,13 @@
-import { Redirect, Stack } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
 import { BootstrapErrorScreen } from '@/components/ui/bootstrap-error';
 import { theme } from '@/constants/theme';
 import { useGate } from '@/hooks/use-gate';
+import { Redirect, Stack, useSegments } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 
 export default function AppLayout() {
   const gate = useGate();
+  const segments = useSegments();
+  const segmentPath = segments as unknown as string[];
   if (gate.status === 'loading') {
     return (
       <View
@@ -42,10 +44,17 @@ export default function AppLayout() {
   if (gate.status === 'needs_instagram') return <Redirect href="/(onboarding)/instagram-connect" />;
   if (gate.status === 'ai_pending') return <Redirect href="/(onboarding)/ai-generating" />;
 
+  const role = gate.bootstrap.data?.role;
+  if (role === 'business' && segmentPath.includes('(tabs)')) {
+    return <Redirect href="/(app)/(brand-tabs)" />;
+  }
+  if (role === 'influencer' && segmentPath.includes('(brand-tabs)')) {
+    return <Redirect href="/(app)/(tabs)" />;
+  }
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="(brand-tabs)" />
+      {role === 'business' ? <Stack.Screen name="(brand-tabs)" /> : <Stack.Screen name="(tabs)" />}
       <Stack.Screen name="campaigns/[id]" />
       <Stack.Screen name="creator/[id]" />
       <Stack.Screen name="booking/[id]" />

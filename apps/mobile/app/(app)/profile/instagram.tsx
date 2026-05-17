@@ -6,38 +6,27 @@ import {
   SecondaryButton,
   StatusChip,
 } from '@/components/ui/primitives';
-import {
-  useBootstrap,
-  useBusinessProfile,
-  useInfluencerProfile,
-  useMarketplaceMutations,
-} from '@/hooks/use-marketplace';
+import { useInfluencerProfile, useMarketplaceMutations } from '@/hooks/use-marketplace';
 
 export default function InstagramScreen() {
-  const bootstrap = useBootstrap();
-  const role = bootstrap.data?.role ?? 'influencer';
   const profile = useInfluencerProfile();
-  const business = useBusinessProfile();
   const mutations = useMarketplaceMutations();
-  const connected =
-    role === 'business' ? business.data?.instagram_connected : profile.data?.instagram_connected;
-  const username = role === 'business' ? business.data?.ig_username : profile.data?.ig_username;
+  const connected = profile.data?.instagram_connected;
+  const username = profile.data?.ig_username;
 
   return (
     <Screen>
       <SectionTitle
         title="Instagram"
-        subtitle={
-          role === 'business'
-            ? 'Sync brand profile signals and generated summary.'
-            : 'Keep your creator signals synced and your availability accurate.'
-        }
+        subtitle="Keep your creator signals synced and your reach data accurate."
       />
       <StatusChip
-        label={connected ? 'Connected' : 'Disconnected'}
+        label={connected ? 'Connected' : 'Not connected'}
         status={connected ? 'success' : 'pending'}
       />
-      <Text>@{username ?? 'not-linked'}</Text>
+      <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>
+        @{username ?? 'not linked'}
+      </Text>
       <PrimaryButton
         label={mutations.instagramSync.isPending ? 'Syncing...' : 'Sync now'}
         onPress={async () => {
@@ -48,16 +37,21 @@ export default function InstagramScreen() {
           }
         }}
       />
-      <SecondaryButton
-        label="Disconnect Instagram"
-        onPress={async () => {
-          try {
-            await mutations.instagramDisconnect.mutateAsync();
-          } catch (error) {
-            Alert.alert('Disconnect failed', error instanceof Error ? error.message : 'Try again.');
-          }
-        }}
-      />
+      {connected ? (
+        <SecondaryButton
+          label="Disconnect"
+          onPress={async () => {
+            try {
+              await mutations.instagramDisconnect.mutateAsync();
+            } catch (error) {
+              Alert.alert(
+                'Disconnect failed',
+                error instanceof Error ? error.message : 'Try again.',
+              );
+            }
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }

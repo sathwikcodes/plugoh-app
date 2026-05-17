@@ -1,4 +1,5 @@
 import { theme } from '@/constants/theme';
+import { getPushNotificationsPreference } from '@/lib/notifications/preference';
 import { registerForPushNotificationsAsync } from '@/lib/notifications/register';
 import { recoverPendingBookingVerify } from '@/lib/payments/booking-flow';
 import { createQueryClient } from '@/lib/query/client';
@@ -8,7 +9,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Appearance } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -34,6 +35,15 @@ const navigationTheme: NavigationTheme = {
 export default function RootLayout() {
   const [queryClient] = useState(() => createQueryClient());
   const session = useAuthStore((state) => state.session);
+  const sessionUserId = session?.user.id ?? null;
+  const previousSessionUserId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (previousSessionUserId.current !== sessionUserId) {
+      queryClient.clear();
+      previousSessionUserId.current = sessionUserId;
+    }
+  }, [queryClient, sessionUserId]);
 
   useEffect(() => {
     initializeAuth();
@@ -45,6 +55,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!session) return;
+    if (!getPushNotificationsPreference()) return;
     void registerForPushNotificationsAsync();
     void recoverPendingBookingVerify().catch(() => undefined);
   }, [session]);

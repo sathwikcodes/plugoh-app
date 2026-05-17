@@ -44,8 +44,8 @@ export default function PayoutScreen() {
   return (
     <Screen>
       <SectionTitle
-        title="Payout setup"
-        subtitle="Choose UPI or bank details so completed campaigns are payout-ready."
+        title="Payout Setup"
+        subtitle="Add your UPI ID or bank account to receive payouts."
       />
       <LabeledField
         label="UPI ID"

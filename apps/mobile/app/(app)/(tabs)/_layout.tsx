@@ -1,10 +1,11 @@
 import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { theme } from '@/constants/theme';
+import { useBootstrap } from '@/hooks/use-marketplace';
 import Entypo from '@expo/vector-icons/Entypo';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Octicons from '@expo/vector-icons/Octicons';
-import { useRouter, useSegments } from 'expo-router';
+import { Redirect, useRouter, useSegments } from 'expo-router';
 import {
   Icon,
   Label,
@@ -28,9 +29,14 @@ const TAB_LABEL_STYLE = {
 const FONT_AWESOME_6_FAMILY = FontAwesome6 as unknown as VectorIconProps<string>['family'];
 
 export default function TabsLayout() {
+  const bootstrap = useBootstrap();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const segments = useSegments();
+
+  if (bootstrap.data?.role === 'business') {
+    return <Redirect href="/(app)/(brand-tabs)" />;
+  }
   const segmentPath = segments as unknown as string[];
   const leaf = segmentPath[segmentPath.length - 1] ?? '';
   const hideFloatingProfile =
@@ -44,7 +50,7 @@ export default function TabsLayout() {
   return (
     <View style={styles.root}>
       <NativeTabs
-        blurEffect="systemUltraThinMaterialDark"
+        blurEffect="systemChromeMaterialDark"
         disableTransparentOnScrollEdge
         iconColor={{ default: TAB_BAR_ICON_DEFAULT, selected: TAB_BAR_SELECTED }}
         labelStyle={{

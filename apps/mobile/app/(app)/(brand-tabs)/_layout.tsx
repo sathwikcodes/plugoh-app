@@ -1,17 +1,23 @@
 import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { theme } from '@/constants/theme';
-import { useRouter } from 'expo-router';
+import { useBootstrap } from '@/hooks/use-marketplace';
+import { Redirect, useRouter } from 'expo-router';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function BrandTabsLayout() {
+  const bootstrap = useBootstrap();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  if (bootstrap.data?.role === 'influencer') {
+    return <Redirect href="/(app)/(tabs)" />;
+  }
+
   return (
     <View style={styles.root}>
-      <NativeTabs blurEffect="systemUltraThinMaterialDark" disableTransparentOnScrollEdge>
+      <NativeTabs blurEffect="systemChromeMaterialDark" disableTransparentOnScrollEdge>
         <NativeTabs.Trigger name="index">
           <Icon sf={{ default: 'house', selected: 'house.fill' }} />
           <Label>Home</Label>

@@ -12,6 +12,7 @@ import {
   inbox,
   instagramDisconnect,
   instagramSync,
+  markMessagesRead,
   markNotificationsRead,
   messages,
   notifications,
@@ -32,7 +33,6 @@ import type {
   InfluencerPricingPatch,
   NotificationsReadRequest,
   PayoutUpsert,
-  UserRole,
 } from '@plugoh/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -84,19 +84,20 @@ export function useBusinessProfile() {
 
 export function useCampaigns(params?: CampaignListParams) {
   const { role, session } = useRoleFromBootstrap();
-  const resolvedRole: UserRole = role ?? 'influencer';
   return useQuery({
-    queryKey: queryKeys.campaigns(resolvedRole, params),
-    queryFn: async () => endpoints.campaigns(resolvedRole, params),
+    queryKey: queryKeys.campaigns(role ?? 'influencer', params),
+    queryFn: async () => {
+      if (!role) throw new Error('Role is required to fetch campaigns');
+      return endpoints.campaigns(role, params);
+    },
     enabled: Boolean(session && role),
   });
 }
 
 export function useCampaign(id: string) {
   const { role, session } = useRoleFromBootstrap();
-  const resolvedRole: UserRole = role ?? 'influencer';
   return useQuery({
-    queryKey: queryKeys.campaign(resolvedRole, id),
+    queryKey: queryKeys.campaign(role ?? 'influencer', id),
     queryFn: () => getCampaign(id),
     enabled: Boolean(session && id && role),
   });
@@ -104,10 +105,12 @@ export function useCampaign(id: string) {
 
 export function useInbox() {
   const { role, session } = useRoleFromBootstrap();
-  const resolvedRole: UserRole = role ?? 'influencer';
   return useQuery({
-    queryKey: queryKeys.inbox(resolvedRole),
-    queryFn: () => inbox(resolvedRole),
+    queryKey: queryKeys.inbox(role ?? 'influencer'),
+    queryFn: () => {
+      if (!role) throw new Error('Role is required to fetch inbox');
+      return inbox(role);
+    },
     enabled: Boolean(session && role),
   });
 }
@@ -133,9 +136,8 @@ export function useEarnings() {
 
 export function useNotifications() {
   const { role, session } = useRoleFromBootstrap();
-  const resolvedRole: UserRole = role ?? 'influencer';
   return useQuery({
-    queryKey: queryKeys.notifications(resolvedRole),
+    queryKey: queryKeys.notifications(role ?? 'influencer'),
     queryFn: notifications,
     enabled: Boolean(session && role),
   });
@@ -314,6 +316,16 @@ export function useMarketplaceMutations() {
     }),
     deliveryUrl: useMutation({
       mutationFn: (campaignId: string) => deliveryUrl(campaignId),
+    }),
+    markMessagesRead: useMutation({
+      mutationFn: (id: string) => markMessagesRead(id),
+      onSuccess: (_data, id) => {
+        void invalidateKeys([
+          queryKeys.messages(id),
+          queryKeys.inbox('influencer'),
+          queryKeys.inbox('business'),
+        ]);
+      },
     }),
     markNotificationsRead: useMutation({
       mutationFn: (input: NotificationsReadRequest) => markNotificationsRead(input),

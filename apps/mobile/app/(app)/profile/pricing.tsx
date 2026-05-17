@@ -43,34 +43,37 @@ export default function PricingScreen() {
   return (
     <Screen>
       <SectionTitle
-        title="Pricing"
-        subtitle="Expose starting rates that help brands decide quickly and confidently."
+        title="Your Rates"
+        subtitle="Set what you charge brands per content type. Amounts in ₹ (INR)."
       />
       <LabeledField
-        label="Reel rate"
-        value={String(watch('price_per_reel'))}
+        label="Reel rate (₹)"
+        placeholder="e.g. 5000"
+        value={watch('price_per_reel') === 0 ? '' : String(watch('price_per_reel'))}
         onChangeText={(value) => {
           setValue('price_per_reel', Number(value) || 0, { shouldValidate: true });
         }}
         keyboardType="numeric"
       />
       <LabeledField
-        label="Post rate"
-        value={String(watch('price_per_post'))}
+        label="Post rate (₹)"
+        placeholder="e.g. 3000"
+        value={watch('price_per_post') === 0 ? '' : String(watch('price_per_post'))}
         onChangeText={(value) => {
           setValue('price_per_post', Number(value) || 0, { shouldValidate: true });
         }}
         keyboardType="numeric"
       />
       <LabeledField
-        label="Story rate"
-        value={String(watch('price_per_story'))}
+        label="Story rate (₹)"
+        placeholder="e.g. 1500"
+        value={watch('price_per_story') === 0 ? '' : String(watch('price_per_story'))}
         onChangeText={(value) => {
           setValue('price_per_story', Number(value) || 0, { shouldValidate: true });
         }}
         keyboardType="numeric"
       />
-      <PrimaryButton label="Save pricing" onPress={onSubmit} />
+      <PrimaryButton label="Save rates" onPress={onSubmit} />
     </Screen>
   );
 }

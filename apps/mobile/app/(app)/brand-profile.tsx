@@ -1,22 +1,63 @@
-import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { GlassCard } from '@/components/ui/glass-card';
+import { GlassCircleButton } from '@/components/ui/glass-circle-button';
 import { theme } from '@/constants/theme';
 import { useBootstrap, useBusinessProfile, useCampaigns } from '@/hooks/use-marketplace';
 import { logout } from '@/lib/auth/logout';
+import {
+  getPushNotificationsPreference,
+  setPushNotificationsPreference,
+} from '@/lib/notifications/preference';
+import {
+  isPushRegistrationSupported,
+  registerForPushNotificationsAsync,
+} from '@/lib/notifications/register';
 import { Ionicons } from '@expo/vector-icons';
-import { impactAsync, ImpactFeedbackStyle } from 'expo-haptics';
-import { router, type Href } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
+import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
-import type { SFSymbol } from 'sf-symbols-typescript';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  AppState,
+  type AppStateStatus,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, {
+  Circle,
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Path,
+  Stop,
+} from 'react-native-svg';
+
+const SETTINGS_GROUP_RADIUS = 28;
+const SIGN_OUT_GLASS_TINT = 'rgba(211, 83, 83, 0.28)';
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function formatAmount(n?: number) {
-  if (!n) return '0';
-  if (n >= 100000) return `${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return String(Math.round(n));
+  if (!n) return '₹0';
+  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
+  return `₹${String(Math.round(n))}`;
+}
+
+function initials(name?: string | null): string {
+  if (!name) return 'B';
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 function groupMonthlySpend(items: Array<{ created_at?: string; price_offered?: number }>) {
@@ -33,47 +74,56 @@ function groupMonthlySpend(items: Array<{ created_at?: string; price_offered?: n
 function buildPath(points: Array<{ x: number; y: number }>) {
   if (!points.length) return '';
   if (points.length === 1) return `M ${points[0]?.x ?? 0} ${points[0]?.y ?? 0}`;
-  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 }
+
+// ─── SpendChart ───────────────────────────────────────────────────────────────
 
 function SpendChart({ data }: { data: Array<{ month: string; amount: number }> }) {
   if (data.length < 2) {
     return (
       <View style={styles.emptyChart}>
-        <Text style={styles.emptyChartText}>Spend trend appears after campaigns are launched.</Text>
+        <SymbolView
+          name="chart.line.uptrend.xyaxis"
+          size={28}
+          tintColor="rgba(255,255,255,0.18)"
+          type="monochrome"
+          fallback={<Ionicons name="analytics-outline" size={28} color="rgba(255,255,255,0.18)" />}
+        />
+        <Text style={styles.emptyChartText}>Trend appears after campaigns launch.</Text>
       </View>
     );
   }
   const chartW = 320;
   const chartH = 102;
-  const maxVal = Math.max(...data.map((item) => item.amount), 1);
+  const maxVal = Math.max(...data.map((d) => d.amount), 1);
   const stepX = chartW / (data.length - 1);
-  const points = data.map((item, index) => ({
-    x: index * stepX,
-    y: chartH - (item.amount / maxVal) * (chartH - 12),
+  const points = data.map((d, i) => ({
+    x: i * stepX,
+    y: chartH - (d.amount / maxVal) * (chartH - 12),
   }));
   const linePath = buildPath(points);
   const areaPath = `${linePath} L ${chartW} ${chartH} L 0 ${chartH} Z`;
 
   return (
-    <View style={styles.chartArea}>
+    <View>
       <Svg width="100%" height={140} viewBox={`0 0 ${chartW} 140`}>
         <Defs>
-          <LinearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
+          <SvgLinearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={theme.colors.accentSoft} stopOpacity={0.9} />
             <Stop offset="1" stopColor={theme.colors.accentSoft} stopOpacity={0.08} />
-          </LinearGradient>
+          </SvgLinearGradient>
         </Defs>
         <Path d={areaPath} fill="url(#spendFill)" />
         <Path d={linePath} stroke={theme.colors.accentStrong} strokeWidth={3} fill="none" />
-        {points.map((point) => (
-          <Circle key={point.x} cx={point.x} cy={point.y} r={4} fill={theme.colors.accentStrong} />
+        {points.map((p) => (
+          <Circle key={p.x} cx={p.x} cy={p.y} r={4} fill={theme.colors.accentStrong} />
         ))}
       </Svg>
       <View style={styles.monthLabels}>
-        {data.map((item) => (
-          <Text key={item.month} style={styles.monthLabel}>
-            {item.month}
+        {data.map((d) => (
+          <Text key={d.month} style={styles.monthLabel}>
+            {d.month}
           </Text>
         ))}
       </View>
@@ -81,58 +131,164 @@ function SpendChart({ data }: { data: Array<{ month: string; amount: number }> }
   );
 }
 
+// ─── SettingRow ───────────────────────────────────────────────────────────────
+
+function SettingRow({
+  iconName,
+  iconBg,
+  title,
+  subtitle,
+  onPress,
+  first,
+}: {
+  iconName: string;
+  iconBg: string;
+  title: string;
+  subtitle?: string;
+  onPress: () => void;
+  first?: boolean;
+}) {
+  return (
+    <>
+      {!first && <View style={styles.insetDivider} />}
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.settingRow, pressed && styles.rowPressed]}
+      >
+        <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
+          <Ionicons name={iconName as never} size={17} color="#fff" />
+        </View>
+        <View style={styles.settingBody}>
+          <Text style={styles.settingTitle}>{title}</Text>
+          {subtitle ? (
+            <Text style={styles.settingSubtitle} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.35)" />
+      </Pressable>
+    </>
+  );
+}
+
+// ─── NotificationToggleRow ────────────────────────────────────────────────────
+
+function NotificationToggleRow({ first }: { first?: boolean }) {
+  const supported = isPushRegistrationSupported();
+  const [preference, setPreferenceState] = useState(() => getPushNotificationsPreference());
+  const [permGranted, setPermGranted] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const refreshPermission = useCallback(async () => {
+    try {
+      const res = await Notifications.getPermissionsAsync();
+      setPermGranted(Boolean((res as { granted?: boolean }).granted));
+    } catch {
+      setPermGranted(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setPreferenceState(getPushNotificationsPreference());
+      void refreshPermission();
+    }, [refreshPermission]),
+  );
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') void refreshPermission();
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [refreshPermission]);
+
+  const switchOn = preference && permGranted;
+
+  const handleToggle = async (next: boolean) => {
+    if (!supported || busy) return;
+    setBusy(true);
+    try {
+      if (next) {
+        setPushNotificationsPreference(true);
+        setPreferenceState(true);
+        await registerForPushNotificationsAsync();
+        await refreshPermission();
+      } else {
+        setPushNotificationsPreference(false);
+        setPreferenceState(false);
+        await refreshPermission();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      {!first && <View style={styles.insetDivider} />}
+      <View style={styles.settingRow}>
+        <View style={[styles.iconBox, { backgroundColor: theme.colors.pending }]}>
+          <Ionicons name="notifications-outline" size={17} color="#fff" />
+        </View>
+        <View style={styles.settingBody}>
+          <Text style={styles.settingTitle}>Notifications</Text>
+          {supported ? (
+            <Text style={styles.settingSubtitle} numberOfLines={1}>
+              Campaign updates and messages
+            </Text>
+          ) : null}
+        </View>
+        <Switch
+          value={switchOn}
+          onValueChange={handleToggle}
+          disabled={!supported || busy}
+          trackColor={{
+            false: 'rgba(255,255,255,0.14)',
+            true: 'rgba(231, 106, 146, 0.55)',
+          }}
+          thumbColor={
+            Platform.OS === 'android' ? (switchOn ? theme.colors.rose : '#f4f3f4') : undefined
+          }
+          ios_backgroundColor="rgba(255,255,255,0.12)"
+        />
+      </View>
+    </>
+  );
+}
+
+// ─── Badges ───────────────────────────────────────────────────────────────────
+
 const BRAND_BADGES = [
   {
     id: 'first_campaign',
     name: 'First Campaign',
     icon: 'flag-outline',
-    unlocked: (campaigns: number) => campaigns >= 1,
+    unlocked: (c: number) => c >= 1,
   },
   {
     id: 'five_campaigns',
     name: '5 Campaigns',
     icon: 'briefcase-outline',
-    unlocked: (campaigns: number) => campaigns >= 5,
+    unlocked: (c: number) => c >= 5,
   },
   {
     id: 'connected',
     name: 'Connected',
     icon: 'logo-instagram',
-    unlocked: (_campaigns: number, connected: boolean) => connected,
+    unlocked: (_c: number, ig: boolean) => ig,
   },
   {
     id: 'profile_complete',
     name: 'Profile Complete',
     icon: 'shield-checkmark-outline',
-    unlocked: (_campaigns: number, _connected: boolean, complete: boolean) => complete,
+    unlocked: (_c: number, _ig: boolean, complete: boolean) => complete,
   },
 ] as const;
 
-const actions: ReadonlyArray<{
-  label: string;
-  symbol: SFSymbol;
-  fallback: React.ComponentProps<typeof Ionicons>['name'];
-  href: Href;
-}> = [
-  {
-    label: 'Edit Brand',
-    symbol: 'pencil',
-    fallback: 'create-outline',
-    href: '/(app)/profile/edit',
-  },
-  {
-    label: 'Instagram',
-    symbol: 'camera',
-    fallback: 'logo-instagram',
-    href: '/(app)/profile/instagram',
-  },
-  {
-    label: 'Settings',
-    symbol: 'gearshape',
-    fallback: 'settings-outline',
-    href: '/(app)/profile/settings',
-  },
-];
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BrandProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -153,272 +309,431 @@ export default function BrandProfileScreen() {
     profile.data?.brand_name && profile.data.brand_type && profile.data.brand_summary,
   );
 
+  const igConnected = Boolean(profile.data?.instagram_connected);
+  const brandName = profile.data?.brand_name ?? 'Brand Profile';
+
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            await logout();
+            router.replace('/(auth)/login');
+          })();
+        },
+      },
+    ]);
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.topBar}>
-          <NativeIconButton
-            symbol="chevron.left"
-            fallbackIcon="chevron-back"
-            variant="surface"
-            haptic="light"
-            onPress={() => {
-              router.back();
-            }}
-          />
-        </View>
-
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{profile.data?.brand_name ?? 'Brand Profile'}</Text>
-          <Text style={styles.headerSub}>
-            {profile.data?.brand_summary ?? 'Track campaigns, spend and team readiness.'}
-          </Text>
-        </View>
-
-        <Text style={styles.sectionLabel}>Brand Achievements</Text>
-        <View style={styles.badgeRow}>
-          {BRAND_BADGES.map((badge) => {
-            const unlocked = badge.unlocked(
-              launchedCampaigns,
-              Boolean(profile.data?.instagram_connected),
-              profileComplete,
-            );
-            return (
-              <View
-                key={badge.id}
-                style={[
-                  styles.badgeCard,
-                  unlocked ? styles.badgeCardUnlocked : styles.badgeCardLocked,
-                ]}
-              >
-                <Ionicons
-                  name={badge.icon}
-                  size={24}
-                  color={unlocked ? theme.colors.accentStrong : theme.colors.border}
-                />
-                <Text
-                  style={[
-                    styles.badgeName,
-                    { color: unlocked ? theme.colors.accentStrong : theme.colors.muted },
-                  ]}
-                  numberOfLines={2}
-                >
-                  {badge.name}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-
-        <View style={styles.statsCard}>
-          <View style={styles.statsRow}>
-            <View style={styles.statBlock}>
-              <Ionicons name="briefcase-outline" size={28} color={theme.colors.accentStrong} />
-              <Text style={styles.statValue}>{launchedCampaigns}</Text>
-              <Text style={styles.statLabel}>CAMPAIGNS LAUNCHED</Text>
-            </View>
-            <View style={styles.vertDivider} />
-            <View style={styles.statBlock}>
-              <Ionicons name="wallet-outline" size={28} color={theme.colors.success} />
-              <Text style={[styles.statValue, { color: theme.colors.success }]}>
-                ₹{formatAmount(totalSpent)}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.colors.success }]}>TOTAL SPENT</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.chartCard}>
-          <Text style={styles.chartTitle}>Monthly Spend Trend</Text>
-          <SpendChart data={monthlySpend} />
-        </View>
-
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Type</Text>
-            <Text style={styles.infoValue}>{profile.data?.brand_type ?? '—'}</Text>
-          </View>
-          <View style={[styles.infoRow, styles.infoDivider]}>
-            <Text style={styles.infoLabel}>Location</Text>
-            <Text style={styles.infoValue}>{profile.data?.brand_location ?? '—'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.actionGrid}>
-          {actions.map((action) => (
-            <Pressable
-              key={action.label}
-              style={({ pressed }) => [styles.actionTile, pressed && { opacity: 0.75 }]}
-              onPress={() => {
-                if (Platform.OS === 'ios') void impactAsync(ImpactFeedbackStyle.Light);
-                router.push(action.href);
-              }}
-            >
-              <View style={styles.actionIconCircle}>
-                <SymbolView
-                  name={action.symbol}
-                  size={20}
-                  tintColor={theme.colors.accentStrong}
-                  type="monochrome"
-                  fallback={
-                    <Ionicons name={action.fallback} size={20} color={theme.colors.accentStrong} />
-                  }
-                />
-              </View>
-              <Text style={styles.actionLabel}>{action.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.logoutButton,
-            pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-          ]}
+    <ScrollView
+      style={[styles.root, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Page header */}
+      <View style={[styles.pageHeaderRow, { paddingTop: insets.top + theme.spacing.md }]}>
+        <GlassCircleButton
+          symbol="chevron.left"
+          fallbackIcon="chevron-back"
+          tintColor="#FFFFFF"
+          size={38}
+          symbolSize={17}
+          accessibilityLabel="Go back"
           onPress={() => {
-            if (Platform.OS === 'ios') void impactAsync(ImpactFeedbackStyle.Medium);
-            void logout();
+            router.back();
           }}
+        />
+        <Text style={styles.pageTitle}>Brand Profile</Text>
+      </View>
+
+      {/* ── Profile hero row ── */}
+      <Pressable
+        onPress={() => {
+          router.push('/(app)/profile/edit');
+        }}
+        style={({ pressed }) => [styles.profileRow, pressed && styles.rowPressed]}
+      >
+        <LinearGradient
+          colors={['#EC4899', '#A855F7']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatarWrap}
         >
-          <SymbolView
-            name="rectangle.portrait.and.arrow.right"
-            size={18}
-            tintColor="#FFFFFF"
-            type="monochrome"
-            fallback={<Ionicons name="log-out-outline" size={18} color="#FFFFFF" />}
-          />
-          <Text style={styles.logoutText}>Sign out</Text>
+          <Text style={styles.avatarInitials}>{initials(brandName)}</Text>
+        </LinearGradient>
+
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName} numberOfLines={1}>
+            {brandName}
+          </Text>
+          {profile.data?.brand_type ? (
+            <Text style={styles.profileSub} numberOfLines={1}>
+              {profile.data.brand_type}
+            </Text>
+          ) : null}
+          {profile.data?.brand_location ? (
+            <Text style={styles.profileLocation} numberOfLines={1}>
+              {profile.data.brand_location}
+            </Text>
+          ) : null}
+        </View>
+
+        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
+      </Pressable>
+
+      <View style={styles.sectionDivider} />
+
+      {/* ── Instagram card ── */}
+      {igConnected ? (
+        <GlassCard style={styles.igConnectedCard} contentStyle={styles.igConnectedInner}>
+          <View style={[styles.iconBox, { backgroundColor: theme.colors.success }]}>
+            <Ionicons name="logo-instagram" size={17} color="#fff" />
+          </View>
+          <View style={styles.settingBody}>
+            <Text style={styles.settingTitle}>Instagram Connected</Text>
+            <Text style={styles.settingSubtitle}>Your account is linked</Text>
+          </View>
+          <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+        </GlassCard>
+      ) : (
+        <Pressable
+          onPress={() => {
+            router.push('/(app)/profile/instagram');
+          }}
+          style={({ pressed }) => [styles.igCtaCard, pressed && { opacity: 0.88 }]}
+        >
+          <LinearGradient
+            colors={['#EC4899', '#A855F7']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.igCtaGradient}
+          >
+            <View style={styles.igCtaLeft}>
+              <Text style={styles.igCtaTitle}>Connect Instagram</Text>
+              <Text style={styles.igCtaBody}>
+                Link your account to{'\n'}unlock full campaign features.
+              </Text>
+              <View style={styles.igCtaBtn}>
+                <Text style={styles.igCtaBtnText}>Connect now →</Text>
+              </View>
+            </View>
+            <Ionicons
+              name="logo-instagram"
+              size={72}
+              color="rgba(255,255,255,0.12)"
+              style={styles.igCtaDecor}
+            />
+          </LinearGradient>
         </Pressable>
-      </ScrollView>
-    </SafeAreaView>
+      )}
+
+      {/* ── Stats row ── */}
+      <View style={styles.statsRow}>
+        <GlassCard style={styles.statCard} contentStyle={styles.statInner}>
+          <Text style={styles.statValue}>{launchedCampaigns}</Text>
+          <Text style={styles.statLabel}>Campaigns Launched</Text>
+        </GlassCard>
+        <GlassCard style={styles.statCard} contentStyle={styles.statInner}>
+          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+            {formatAmount(totalSpent)}
+          </Text>
+          <Text style={styles.statLabel}>Total Spent</Text>
+        </GlassCard>
+      </View>
+
+      {/* ── Badges ── */}
+      <Text style={styles.sectionHeader}>Achievements</Text>
+      <View style={styles.badgeRow}>
+        {BRAND_BADGES.map((badge) => {
+          const unlocked = badge.unlocked(launchedCampaigns, igConnected, profileComplete);
+          return (
+            <View
+              key={badge.id}
+              style={[styles.badgeCard, unlocked ? styles.badgeUnlocked : styles.badgeLocked]}
+            >
+              <Ionicons
+                name={badge.icon}
+                size={22}
+                color={unlocked ? theme.colors.accentStrong : 'rgba(255,255,255,0.2)'}
+              />
+              <Text
+                style={[
+                  styles.badgeName,
+                  { color: unlocked ? theme.colors.accentStrong : 'rgba(255,255,255,0.2)' },
+                ]}
+                numberOfLines={2}
+              >
+                {badge.name}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* ── Monthly Spend chart ── */}
+      <Text style={styles.sectionHeader}>Monthly Spend</Text>
+      <GlassCard style={styles.chartCard} contentStyle={styles.chartInner}>
+        <SpendChart data={monthlySpend} />
+      </GlassCard>
+
+      {/* ── Account settings group ── */}
+      <Text style={styles.sectionHeader}>Account</Text>
+      <GlassCard
+        style={styles.settingsShell}
+        contentStyle={{ borderRadius: SETTINGS_GROUP_RADIUS, overflow: 'hidden' }}
+      >
+        <SettingRow
+          first
+          iconName="person-outline"
+          iconBg={theme.colors.info}
+          title="Edit Profile"
+          subtitle={brandName}
+          onPress={() => {
+            router.push('/(app)/profile/edit');
+          }}
+        />
+        <SettingRow
+          iconName="logo-instagram"
+          iconBg="#C13584"
+          title="Instagram"
+          subtitle={igConnected ? 'Connected' : 'Not connected'}
+          onPress={() => {
+            router.push('/(app)/profile/instagram');
+          }}
+        />
+        <SettingRow
+          iconName="settings-outline"
+          iconBg={theme.colors.muted}
+          title="Settings"
+          onPress={() => {
+            router.push('/(app)/profile/settings');
+          }}
+        />
+      </GlassCard>
+
+      {/* ── Preferences group ── */}
+      <Text style={styles.sectionHeader}>Preferences</Text>
+      <GlassCard
+        style={styles.settingsShell}
+        contentStyle={{ borderRadius: SETTINGS_GROUP_RADIUS, overflow: 'hidden' }}
+      >
+        <NotificationToggleRow first />
+      </GlassCard>
+
+      {/* ── Sign out ── */}
+      <GlassCard
+        style={StyleSheet.flatten([styles.settingsShell, styles.signOutShell])}
+        contentStyle={{ borderRadius: SETTINGS_GROUP_RADIUS, overflow: 'hidden' }}
+        tintOverlayColor={SIGN_OUT_GLASS_TINT}
+      >
+        <Pressable
+          onPress={handleSignOut}
+          style={({ pressed }) => [styles.signOutRow, pressed && styles.rowPressed]}
+        >
+          <View style={[styles.iconBox, { backgroundColor: theme.colors.danger }]}>
+            <SymbolView
+              name="rectangle.portrait.and.arrow.right"
+              size={17}
+              tintColor="#fff"
+              type="monochrome"
+              fallback={<Ionicons name="log-out-outline" size={17} color="#fff" />}
+            />
+          </View>
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </Pressable>
+      </GlassCard>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
+  root: { flex: 1 },
   scrollContent: {
-    paddingTop: 8,
+    paddingHorizontal: theme.spacing.xxl,
+    gap: theme.spacing.sm,
   },
-  topBar: {
-    paddingHorizontal: 24,
-    marginBottom: 8,
-  },
-  header: {
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  headerTitle: {
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '800',
-    color: theme.colors.foreground,
-  },
-  headerSub: {
-    marginTop: 6,
-    fontSize: 14,
-    lineHeight: 20,
-    color: theme.colors.muted,
-  },
-  sectionLabel: {
-    paddingHorizontal: 24,
-    marginBottom: 10,
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '700',
-    color: theme.colors.foreground,
-  },
-  badgeRow: {
+
+  // Page header
+  pageHeaderRow: {
     flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 24,
-    marginBottom: 16,
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
+  pageTitle: {
+    ...theme.typography.display,
+    color: theme.colors.foreground,
+  },
+
+  // Profile row
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  rowPressed: { backgroundColor: 'rgba(255,255,255,0.04)' },
+  avatarWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  avatarInitials: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  profileInfo: { flex: 1, gap: 2 },
+  profileName: {
+    ...theme.typography.section,
+    color: theme.colors.foreground,
+  },
+  profileSub: {
+    ...theme.typography.body,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  profileLocation: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.38)',
+    fontSize: 12,
+  },
+  sectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: theme.spacing.xs,
+  },
+
+  // Instagram card
+  igConnectedCard: {},
+  igConnectedInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 14,
+  },
+  igCtaCard: { borderRadius: 24, overflow: 'hidden' },
+  igCtaGradient: {
+    borderRadius: 24,
+    paddingHorizontal: theme.spacing.xxl,
+    paddingVertical: theme.spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  igCtaLeft: { flex: 1, gap: 8 },
+  igCtaTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  igCtaBody: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.72)',
+  },
+  igCtaBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 4,
+  },
+  igCtaBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  igCtaDecor: {
+    position: 'absolute',
+    right: -8,
+    bottom: -8,
+  },
+
+  // Stats
+  statsRow: { flexDirection: 'row', gap: theme.spacing.sm },
+  statCard: { flex: 1 },
+  statInner: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+  },
+  statValue: {
+    ...theme.typography.section,
+    color: theme.colors.foreground,
+    fontVariant: ['tabular-nums'],
+  },
+  statLabel: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    fontSize: 11,
+  },
+
+  // Badges
+  sectionHeader: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    paddingLeft: 4,
+    marginTop: theme.spacing.xs,
+  },
+  badgeRow: { flexDirection: 'row', gap: 10 },
   badgeCard: {
     flex: 1,
-    height: 84,
-    borderRadius: 14,
+    height: 80,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     paddingHorizontal: 8,
   },
-  badgeCardUnlocked: {
+  badgeUnlocked: {
     backgroundColor: theme.colors.accentSoft,
     borderWidth: 1.5,
     borderColor: theme.colors.pink,
   },
-  badgeCardLocked: {
-    backgroundColor: theme.colors.surface,
+  badgeLocked: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   badgeName: {
-    fontSize: 10,
+    fontSize: 9,
     lineHeight: 12,
     fontWeight: '700',
     textAlign: 'center',
   },
-  statsCard: {
-    marginHorizontal: 24,
-    borderRadius: 16,
-    backgroundColor: theme.colors.surfaceWarm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: 16,
+
+  // Chart
+  chartCard: {},
+  chartInner: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+    gap: theme.spacing.sm,
   },
-  statsRow: {
-    flexDirection: 'row',
-    minHeight: 150,
-  },
-  statBlock: {
-    flex: 1,
-    padding: 16,
+  emptyChart: {
+    height: 100,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
   },
-  vertDivider: {
-    width: 1,
-    backgroundColor: theme.colors.borderStrong,
-    marginVertical: 16,
-  },
-  statValue: {
-    fontSize: 32,
-    lineHeight: 36,
-    fontWeight: '800',
-    color: theme.colors.accentStrong,
-  },
-  statLabel: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '800',
-    letterSpacing: 1,
-    color: theme.colors.accentStrong,
-  },
-  chartCard: {
-    marginHorizontal: 24,
-    borderRadius: 16,
-    backgroundColor: theme.colors.surfaceWarm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginBottom: 16,
-  },
-  chartTitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '700',
-    color: theme.colors.foreground,
-    marginBottom: 8,
-  },
-  chartArea: {
-    height: 142,
+  emptyChartText: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.3)',
+    textAlign: 'center',
   },
   monthLabels: {
     flexDirection: 'row',
@@ -429,103 +744,57 @@ const styles = StyleSheet.create({
   monthLabel: {
     fontSize: 10,
     lineHeight: 12,
-    color: theme.colors.muted,
+    color: 'rgba(255,255,255,0.28)',
   },
-  emptyChart: {
-    height: 120,
+
+  // Settings groups
+  settingsShell: { borderRadius: SETTINGS_GROUP_RADIUS },
+  signOutShell: { marginTop: theme.spacing.xs },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 13,
+    gap: theme.spacing.md,
+    minHeight: 54,
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderStyle: 'dashed',
-    backgroundColor: 'rgba(20,18,16,0.8)',
+    flexShrink: 0,
   },
-  emptyChartText: {
-    color: theme.colors.muted,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  infoCard: {
-    marginHorizontal: 24,
-    borderRadius: 16,
-    backgroundColor: theme.colors.surfaceWarm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  infoRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoDivider: {
-    borderTopWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  infoLabel: {
-    fontSize: 14,
-    lineHeight: 18,
-    color: theme.colors.muted,
-  },
-  infoValue: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '700',
+  settingBody: { flex: 1 },
+  settingTitle: {
+    ...theme.typography.body,
     color: theme.colors.foreground,
+    fontWeight: '500',
   },
-  actionGrid: {
-    marginHorizontal: 24,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 18,
-  },
-  actionTile: {
-    flexGrow: 1,
-    flexBasis: '47%',
-    backgroundColor: theme.colors.surfaceWarm,
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    backgroundColor: theme.colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionLabel: {
+  settingSubtitle: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.4)',
     fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    color: theme.colors.foreground,
+    marginTop: 1,
   },
-  logoutButton: {
-    marginHorizontal: 24,
-    height: 48,
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    backgroundColor: theme.colors.accentStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
+  insetDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginLeft: 66,
+  },
+  signOutRow: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 13,
+    gap: theme.spacing.md,
+    minHeight: 54,
   },
-  logoutText: {
-    fontSize: 15,
-    lineHeight: 19,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  signOutText: {
+    ...theme.typography.body,
+    color: theme.colors.danger,
+    fontWeight: '600',
   },
 });

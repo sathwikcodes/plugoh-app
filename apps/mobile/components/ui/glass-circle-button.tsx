@@ -15,6 +15,8 @@ export type GlassCircleButtonProps = {
   /** Defaults to 48 to align with `GlassSearchField` row height */
   size?: number;
   symbolSize?: number;
+  /** SF Symbol / fallback vector tint */
+  tintColor?: string;
   accessibilityLabel?: string;
 };
 
@@ -24,6 +26,7 @@ export function GlassCircleButton({
   onPress,
   size = 48,
   symbolSize = 22,
+  tintColor = ICON_TONE,
   accessibilityLabel,
 }: GlassCircleButtonProps) {
   const radius = size / 2;
@@ -32,9 +35,9 @@ export function GlassCircleButton({
     <SymbolView
       name={symbol}
       size={symbolSize}
-      tintColor={ICON_TONE}
+      tintColor={tintColor}
       type="monochrome"
-      fallback={<Ionicons name={fallbackIcon} size={symbolSize} color={ICON_TONE} />}
+      fallback={<Ionicons name={fallbackIcon} size={symbolSize} color={tintColor} />}
     />
   );
 
