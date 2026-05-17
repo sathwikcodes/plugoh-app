@@ -363,6 +363,54 @@ describe('Plugoh API', () => {
     expect(store.tables.get('notifications')?.[0].type).toBe('new_booking');
   });
 
+  it('hydrates campaign business profile images from Instagram and common profile data', async () => {
+    const { app } = makeApp({
+      profiles: [
+        {
+          id: businessId,
+          email: 'brand@test.dev',
+          full_name: 'Brand Owner',
+          avatar_url: 'https://cdn.test/brand-avatar.jpg',
+        },
+        { id: influencerId, email: 'creator@test.dev', full_name: 'Creator' },
+      ],
+      business_profiles: [
+        {
+          id: 'bp-1',
+          user_id: businessId,
+          brand_name: 'Plugoh Cafe',
+          brand_type: 'Restaurant/Cafe',
+          brand_location: 'Hyderabad',
+          ig_profile_picture_url: 'https://cdn.test/brand-instagram.jpg',
+        },
+      ],
+      campaigns: [
+        {
+          id: campaignId,
+          business_id: businessId,
+          influencer_id: influencerId,
+          title: 'Booking',
+          status: 'requested',
+          price_offered: 10000,
+          package_type: 'reel',
+        },
+      ],
+    });
+
+    const res = await app.request('/campaigns?role=influencer', {
+      headers: { authorization: 'Bearer influencer' },
+    });
+    const body = await json(res);
+
+    expect(res.status).toBe(200);
+    expect(body.data.items[0].business_profile.profile_photo_url).toBe(
+      'https://cdn.test/brand-instagram.jpg',
+    );
+    expect(body.data.items[0].business_profile.avatar_url).toBe(
+      'https://cdn.test/brand-avatar.jpg',
+    );
+  });
+
   it('validates campaign booking requirements', async () => {
     const { app } = makeApp();
     const res = await app.request('/campaigns', {

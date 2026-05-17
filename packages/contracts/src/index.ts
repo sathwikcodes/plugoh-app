@@ -152,6 +152,11 @@ export interface BusinessProfileSummary {
   brand_summary?: string;
   tagline?: string;
   ig_username?: string;
+  ig_profile_picture_url?: string;
+  /** Resolved brand owner / Instagram image for campaign cards. */
+  profile_photo_url?: string;
+  /** Common profile avatar when set separately. */
+  avatar_url?: string;
   instagram_connected?: boolean;
 }
 

@@ -5,22 +5,26 @@ import { Screen } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
 import { useCampaigns, useInfluencerProfile } from '@/hooks/use-marketplace';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-/** Extra space so the swipe card stops short of the tab dock (card was extending too low). */
-const DECK_BOTTOM_INSET = theme.spacing.xl + theme.spacing.sm;
-
-/** Breathing room above the native tab bar (bar height varies; this stays clear of the dock). */
-const TAB_BAR_CLEARANCE = 12;
+/** NativeTabs draws as an overlay, so this screen must reserve its visual dock height. */
+const NATIVE_TAB_DOCK_HEIGHT = 72;
+const TAB_DOCK_GAP = theme.spacing.lg;
+const PAGE_HORIZONTAL_INSET = theme.spacing.lg;
+const MAX_CARD_WIDTH = 390;
+const CARD_VIEWPORT_RATIO = 0.84;
+const DECK_FRAME_CLEARANCE = theme.spacing.section;
 
 export default function CampaignsScreen() {
   const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
   const influencerProfile = useInfluencerProfile();
   const campaigns = useCampaigns({ sort: 'created_desc' });
 
   const [search, setSearch] = useState('');
+  const [deckSlotHeight, setDeckSlotHeight] = useState(0);
 
   const allItems = campaigns.data?.items ?? [];
   const filtered = allItems.filter((item) => {
@@ -32,15 +36,36 @@ export default function CampaignsScreen() {
     return matchesSearch;
   });
 
+  const frame = useMemo(() => {
+    const viewportWidth = window.width;
+    const maxWidth = Math.min(viewportWidth * CARD_VIEWPORT_RATIO, MAX_CARD_WIDTH);
+    const fallbackHeight = window.height * 0.58;
+    const availableHeight =
+      deckSlotHeight > 0 ? Math.max(0, deckSlotHeight - DECK_FRAME_CLEARANCE) : fallbackHeight;
+    const cardHeight = Math.max(360, availableHeight);
+
+    return {
+      width: Math.max(260, Math.round(maxWidth)),
+      height: Math.round(cardHeight),
+      viewportWidth: Math.round(viewportWidth),
+    };
+  }, [deckSlotHeight, window.height, window.width]);
+
+  function handleDeckLayout(event: LayoutChangeEvent) {
+    setDeckSlotHeight(event.nativeEvent.layout.height);
+  }
+
   return (
     <Screen
       scrollEnabled={false}
       contentInsetAdjustmentBehavior="never"
       contentContainerStyle={{
         flexGrow: 1,
+        paddingHorizontal: PAGE_HORIZONTAL_INSET,
         paddingTop: insets.top + theme.spacing.lg,
-        paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE,
-        gap: theme.spacing.lg,
+        paddingBottom:
+          Math.max(insets.bottom, theme.spacing.sm) + NATIVE_TAB_DOCK_HEIGHT + TAB_DOCK_GAP,
+        gap: theme.spacing.md,
       }}
     >
       <View style={{ gap: theme.spacing.md }}>
@@ -99,19 +124,26 @@ export default function CampaignsScreen() {
         </View>
       </View>
 
-      {/* Fill space below search; bottom inset keeps the card from running into the dock */}
+      {/* The measured slot keeps the card centered between search and the native tab dock. */}
       <View
+        onLayout={handleDeckLayout}
         style={{
           flex: 1,
           minHeight: 0,
-          marginTop: theme.spacing.sm,
-          marginBottom: DECK_BOTTOM_INSET,
+          marginHorizontal: -PAGE_HORIZONTAL_INSET,
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
         <CampaignDeckSwiper
           campaigns={filtered}
           isLoading={campaigns.isLoading}
-          onRefresh={campaigns.refetch}
+          cardWidth={frame.width}
+          cardHeight={frame.height}
+          viewportWidth={frame.viewportWidth}
+          onViewCampaign={(id) => {
+            router.push(`/(app)/campaigns/${id}`);
+          }}
         />
       </View>
     </Screen>

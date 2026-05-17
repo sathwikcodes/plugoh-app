@@ -1,5 +1,5 @@
-import type { Session, Subscription } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase/client";
+import type { Session, Subscription } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase/client';
 
 type SessionHandler = (session: Session | null) => void;
 
@@ -13,12 +13,14 @@ export async function bootstrapSession(onSession: SessionHandler): Promise<Sessi
   });
 
   try {
-    const { error } = await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getSession();
     if (error) {
-      console.warn("Supabase getSession failed", error);
+      console.warn('Supabase getSession failed', error);
     }
+    onSession(data.session ?? null);
   } catch (error) {
-    console.warn("Supabase getSession threw unexpectedly", error);
+    console.warn('Supabase getSession threw unexpectedly', error);
+    onSession(null);
   }
 
   return {

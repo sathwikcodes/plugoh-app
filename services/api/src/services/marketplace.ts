@@ -176,6 +176,21 @@ function hasInstagramConnection(profile?: Row | null) {
   return Boolean(profile?.access_token || profile?.ig_username || profile?.instagram_connected_at);
 }
 
+function withBusinessProfileImage(profile?: Row | null, account?: Row | null) {
+  if (!profile) return null;
+  const instagramPhoto =
+    typeof profile.ig_profile_picture_url === 'string' ? profile.ig_profile_picture_url.trim() : '';
+  const accountAvatar = typeof account?.avatar_url === 'string' ? account.avatar_url.trim() : '';
+  const profilePhoto = instagramPhoto || accountAvatar || undefined;
+
+  return {
+    ...profile,
+    profile_photo_url: profilePhoto,
+    avatar_url: accountAvatar || undefined,
+    instagram_connected: hasInstagramConnection(profile),
+  };
+}
+
 function hasGeneratedInfluencerFields(profile?: Row | null) {
   return Boolean(
     profile?.category &&
@@ -614,11 +629,14 @@ export class ProfileService {
   }
 
   async getBusiness(user: AuthUser) {
-    const profile = await this.store.findOne<Row>('business_profiles', {
-      eq: { user_id: user.id },
-    });
+    const [profile, account] = await Promise.all([
+      this.store.findOne<Row>('business_profiles', {
+        eq: { user_id: user.id },
+      }),
+      this.store.findOne<Row>('profiles', { eq: { id: user.id } }),
+    ]);
     if (!profile) throw notFound('Business profile');
-    return { ...profile, instagram_connected: hasInstagramConnection(profile) };
+    return withBusinessProfileImage(profile, account);
   }
 
   async updateBusiness(user: AuthUser, input: Row) {
@@ -882,11 +900,16 @@ export class CampaignService {
   }
 
   async withProfiles(campaign: Row) {
-    const [business, influencer] = await Promise.all([
+    const [business, businessAccount, influencer] = await Promise.all([
       this.store.findOne<Row>('business_profiles', { eq: { user_id: campaign.business_id } }),
+      this.store.findOne<Row>('profiles', { eq: { id: campaign.business_id } }),
       this.store.findOne<Row>('influencer_profiles', { eq: { user_id: campaign.influencer_id } }),
     ]);
-    return { ...campaign, business_profile: business, influencer_profile: influencer };
+    return {
+      ...campaign,
+      business_profile: withBusinessProfileImage(business, businessAccount),
+      influencer_profile: influencer,
+    };
   }
 
   async withProfilesMany(campaigns: Row[]) {
@@ -897,21 +920,26 @@ export class CampaignService {
     const influencerIds = [
       ...new Set(campaigns.map((campaign) => campaign.influencer_id).filter(Boolean)),
     ];
-    const [businessProfiles, influencerProfiles] = await Promise.all([
+    const [businessProfiles, businessAccounts, influencerProfiles] = await Promise.all([
       businessIds.length
         ? this.store.list<Row>('business_profiles', { in: { user_id: businessIds } })
         : [],
+      businessIds.length ? this.store.list<Row>('profiles', { in: { id: businessIds } }) : [],
       influencerIds.length
         ? this.store.list<Row>('influencer_profiles', { in: { user_id: influencerIds } })
         : [],
     ]);
     const businessByUserId = new Map(businessProfiles.map((profile) => [profile.user_id, profile]));
+    const accountByUserId = new Map(businessAccounts.map((account) => [account.id, account]));
     const influencerByUserId = new Map(
       influencerProfiles.map((profile) => [profile.user_id, profile]),
     );
     return campaigns.map((campaign) => ({
       ...campaign,
-      business_profile: businessByUserId.get(campaign.business_id) ?? null,
+      business_profile: withBusinessProfileImage(
+        businessByUserId.get(campaign.business_id),
+        accountByUserId.get(campaign.business_id),
+      ),
       influencer_profile: influencerByUserId.get(campaign.influencer_id) ?? null,
     }));
   }
