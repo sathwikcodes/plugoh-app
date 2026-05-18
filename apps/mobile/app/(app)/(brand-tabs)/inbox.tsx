@@ -1,14 +1,16 @@
 import { ConversationRow } from '@/components/inbox/conversation-row';
 import { GlassSearchField } from '@/components/ui/glass-search-field';
 import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useInbox, useMarketplaceMutations } from '@/hooks/use-marketplace';
+import { useBootstrap, useInbox, useMarketplaceMutations } from '@/hooks/use-marketplace';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import type { InboxItem } from '@plugoh/contracts';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, FlatList, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TAB_BAR_CLEARANCE = 12;
@@ -16,25 +18,15 @@ const TAB_BAR_CLEARANCE = 12;
 type InboxFilter = 'all' | 'unread';
 
 function SkeletonRow() {
-  const opacity = useRef(new Animated.Value(0.3)).current;
-  useMemo(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.6, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.3, duration: 700, useNativeDriver: true }),
-      ]),
-    ).start();
-  }, [opacity]);
-
   return (
-    <Animated.View style={[styles.skeletonRow, { opacity }]}>
-      <View style={styles.skeletonAvatar} />
+    <View style={styles.skeletonRow}>
+      <ShimmerCircle size={44} />
       <View style={styles.skeletonBody}>
-        <View style={[styles.skeletonLine, { width: '60%', height: 14 }]} />
-        <View style={[styles.skeletonLine, { width: '35%', height: 11, marginTop: 5 }]} />
-        <View style={[styles.skeletonLine, { width: '80%', height: 11, marginTop: 4 }]} />
+        <ShimmerText width="60%" height={14} />
+        <ShimmerText width="35%" height={11} />
+        <ShimmerText width="80%" height={11} />
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -56,6 +48,7 @@ function EmptyInboxState() {
 
 export default function BrandInboxScreen() {
   const insets = useSafeAreaInsets();
+  const bootstrap = useBootstrap();
   const inbox = useInbox();
   const mutations = useMarketplaceMutations();
   const [query, setQuery] = useState('');
@@ -190,7 +183,7 @@ export default function BrandInboxScreen() {
         </View>
       </View>
 
-      {inbox.isLoading ? (
+      {shouldShowInitialLoader(bootstrap) || shouldShowInitialLoader(inbox) ? (
         <View style={styles.skeletonList}>
           {Array.from({ length: 5 }).map((_, i) => (
             <SkeletonRow key={i} />
@@ -270,16 +263,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  skeletonAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    flexShrink: 0,
-  },
-  skeletonBody: { flex: 1 },
-  skeletonLine: {
-    borderRadius: 7,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
+  skeletonBody: { flex: 1, gap: theme.spacing.xs },
 });

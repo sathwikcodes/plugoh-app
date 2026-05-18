@@ -191,6 +191,21 @@ function withBusinessProfileImage(profile?: Row | null, account?: Row | null) {
   };
 }
 
+function withInfluencerProfileImage(profile?: Row | null, account?: Row | null) {
+  if (!profile) return null;
+  const profilePhoto =
+    (typeof profile.profile_photo_url === 'string' && profile.profile_photo_url.trim()) ||
+    (typeof account?.avatar_url === 'string' && account.avatar_url.trim()) ||
+    undefined;
+
+  return {
+    ...profile,
+    profile_photo_url: profilePhoto,
+    avatar_url: typeof account?.avatar_url === 'string' ? account.avatar_url : undefined,
+    instagram_connected: hasInstagramConnection(profile),
+  };
+}
+
 function hasGeneratedInfluencerFields(profile?: Row | null) {
   return Boolean(
     profile?.category &&
@@ -539,16 +554,7 @@ export class ProfileService {
       this.store.findOne<Row>('profiles', { eq: { id: user.id } }),
     ]);
     if (!profile) throw notFound('Influencer profile');
-    const profilePhoto =
-      (typeof profile.profile_photo_url === 'string' && profile.profile_photo_url.trim()) ||
-      (typeof account?.avatar_url === 'string' && account.avatar_url.trim()) ||
-      undefined;
-    return {
-      ...profile,
-      profile_photo_url: profilePhoto,
-      avatar_url: typeof account?.avatar_url === 'string' ? account.avatar_url : undefined,
-      instagram_connected: hasInstagramConnection(profile),
-    };
+    return withInfluencerProfileImage(profile, account);
   }
 
   async upsertInfluencerOnboarding(
@@ -900,15 +906,16 @@ export class CampaignService {
   }
 
   async withProfiles(campaign: Row) {
-    const [business, businessAccount, influencer] = await Promise.all([
+    const [business, businessAccount, influencer, influencerAccount] = await Promise.all([
       this.store.findOne<Row>('business_profiles', { eq: { user_id: campaign.business_id } }),
       this.store.findOne<Row>('profiles', { eq: { id: campaign.business_id } }),
       this.store.findOne<Row>('influencer_profiles', { eq: { user_id: campaign.influencer_id } }),
+      this.store.findOne<Row>('profiles', { eq: { id: campaign.influencer_id } }),
     ]);
     return {
       ...campaign,
       business_profile: withBusinessProfileImage(business, businessAccount),
-      influencer_profile: influencer,
+      influencer_profile: withInfluencerProfileImage(influencer, influencerAccount),
     };
   }
 
@@ -920,19 +927,24 @@ export class CampaignService {
     const influencerIds = [
       ...new Set(campaigns.map((campaign) => campaign.influencer_id).filter(Boolean)),
     ];
-    const [businessProfiles, businessAccounts, influencerProfiles] = await Promise.all([
-      businessIds.length
-        ? this.store.list<Row>('business_profiles', { in: { user_id: businessIds } })
-        : [],
-      businessIds.length ? this.store.list<Row>('profiles', { in: { id: businessIds } }) : [],
-      influencerIds.length
-        ? this.store.list<Row>('influencer_profiles', { in: { user_id: influencerIds } })
-        : [],
-    ]);
+    const [businessProfiles, businessAccounts, influencerProfiles, influencerAccounts] =
+      await Promise.all([
+        businessIds.length
+          ? this.store.list<Row>('business_profiles', { in: { user_id: businessIds } })
+          : [],
+        businessIds.length ? this.store.list<Row>('profiles', { in: { id: businessIds } }) : [],
+        influencerIds.length
+          ? this.store.list<Row>('influencer_profiles', { in: { user_id: influencerIds } })
+          : [],
+        influencerIds.length ? this.store.list<Row>('profiles', { in: { id: influencerIds } }) : [],
+      ]);
     const businessByUserId = new Map(businessProfiles.map((profile) => [profile.user_id, profile]));
     const accountByUserId = new Map(businessAccounts.map((account) => [account.id, account]));
     const influencerByUserId = new Map(
       influencerProfiles.map((profile) => [profile.user_id, profile]),
+    );
+    const influencerAccountByUserId = new Map(
+      influencerAccounts.map((account) => [account.id, account]),
     );
     return campaigns.map((campaign) => ({
       ...campaign,
@@ -940,7 +952,10 @@ export class CampaignService {
         businessByUserId.get(campaign.business_id),
         accountByUserId.get(campaign.business_id),
       ),
-      influencer_profile: influencerByUserId.get(campaign.influencer_id) ?? null,
+      influencer_profile: withInfluencerProfileImage(
+        influencerByUserId.get(campaign.influencer_id),
+        influencerAccountByUserId.get(campaign.influencer_id),
+      ),
     }));
   }
 
@@ -1235,26 +1250,66 @@ export class MessagingService {
     const key = role === 'business' ? 'business_id' : 'influencer_id';
     const campaigns = await this.store.list<Row>('campaigns', { eq: { [key]: user.id } });
     const campaignIds = campaigns.map((campaign) => campaign.id);
+    const businessIds = [
+      ...new Set(campaigns.map((campaign) => campaign.business_id).filter(Boolean)),
+    ];
+    const influencerIds = [
+      ...new Set(campaigns.map((campaign) => campaign.influencer_id).filter(Boolean)),
+    ];
     const messages = campaignIds.length
       ? await this.store.list<Row>('campaign_messages', {
           in: { campaign_id: campaignIds },
           order: { column: 'created_at', ascending: false },
         })
       : [];
+    const [businessProfiles, businessAccounts, influencerProfiles, influencerAccounts] =
+      await Promise.all([
+        businessIds.length
+          ? this.store.list<Row>('business_profiles', { in: { user_id: businessIds } })
+          : [],
+        businessIds.length ? this.store.list<Row>('profiles', { in: { id: businessIds } }) : [],
+        influencerIds.length
+          ? this.store.list<Row>('influencer_profiles', { in: { user_id: influencerIds } })
+          : [],
+        influencerIds.length ? this.store.list<Row>('profiles', { in: { id: influencerIds } }) : [],
+      ]);
+    const businessByUserId = new Map(businessProfiles.map((profile) => [profile.user_id, profile]));
+    const accountByUserId = new Map(businessAccounts.map((account) => [account.id, account]));
+    const influencerByUserId = new Map(
+      influencerProfiles.map((profile) => [profile.user_id, profile]),
+    );
+    const influencerAccountByUserId = new Map(
+      influencerAccounts.map((account) => [account.id, account]),
+    );
     const messagesByCampaignId = new Map<string, Row[]>();
     for (const message of messages) {
       const rows = messagesByCampaignId.get(message.campaign_id) ?? [];
       rows.push(message);
       messagesByCampaignId.set(message.campaign_id, rows);
     }
-    const rows = campaigns.map((campaign) => {
-      const campaignMessages = messagesByCampaignId.get(campaign.id) ?? [];
-      const latest = campaignMessages[0] ?? null;
-      const unread = campaignMessages.filter(
-        (message) => !Array.isArray(message.read_by) || !message.read_by.includes(user.id),
-      ).length;
-      return { campaign, latestMessage: latest, unreadCount: unread };
-    });
+    const rows: Array<{ campaign: Row; latestMessage: Row | null; unreadCount: number }> =
+      campaigns.map((campaign) => {
+        const campaignMessages = messagesByCampaignId.get(campaign.id) ?? [];
+        const latest = campaignMessages[0] ?? null;
+        const unread = campaignMessages.filter(
+          (message) => !Array.isArray(message.read_by) || !message.read_by.includes(user.id),
+        ).length;
+        return {
+          campaign: {
+            ...campaign,
+            business_profile: withBusinessProfileImage(
+              businessByUserId.get(campaign.business_id),
+              accountByUserId.get(campaign.business_id),
+            ),
+            influencer_profile: withInfluencerProfileImage(
+              influencerByUserId.get(campaign.influencer_id),
+              influencerAccountByUserId.get(campaign.influencer_id),
+            ),
+          },
+          latestMessage: latest,
+          unreadCount: unread,
+        };
+      });
     return rows.sort((a, b) =>
       String(b.latestMessage?.created_at ?? b.campaign.created_at).localeCompare(
         String(a.latestMessage?.created_at ?? a.campaign.created_at),

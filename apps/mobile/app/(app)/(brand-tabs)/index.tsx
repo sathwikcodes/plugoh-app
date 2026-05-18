@@ -1,20 +1,18 @@
 import { router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
-import {
-  Card,
-  EmptyState,
-  PrimaryButton,
-  Screen,
-  SectionTitle,
-  StatusChip,
-} from '@/components/ui/primitives';
+import { Card, EmptyState, PrimaryButton, Screen, StatusChip } from '@/components/ui/primitives';
+import { AsyncText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
 import { useBootstrap, useCampaigns, useNotifications } from '@/hooks/use-marketplace';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
 
 export default function BrandHomeScreen() {
   const bootstrap = useBootstrap();
   const campaigns = useCampaigns();
   const notifications = useNotifications();
+  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
+  const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
+  const notificationsLoading = bootstrapLoading || shouldShowInitialLoader(notifications);
   const campaignItems = campaigns.data?.items ?? [];
   const active = campaignItems.filter((item) =>
     [
@@ -30,30 +28,63 @@ export default function BrandHomeScreen() {
 
   return (
     <Screen>
-      <SectionTitle
-        eyebrow="Brand workspace"
-        title={`Hi${bootstrap.data?.user.email ? `, ${bootstrap.data.user.email.split('@')[0]}` : ''}`}
-        subtitle="Discovery, booking, and escrow delivery health."
-      />
+      <View style={{ gap: theme.spacing.sm }}>
+        <Text style={{ ...theme.typography.label, color: theme.colors.accentStrong }}>
+          BRAND WORKSPACE
+        </Text>
+        <AsyncText
+          loading={bootstrapLoading}
+          value={
+            bootstrap.data?.user.email ? `Hi, ${bootstrap.data.user.email.split('@')[0]}` : 'Hi'
+          }
+          style={{ ...theme.typography.section, color: theme.colors.foreground }}
+          shimmerWidth="54%"
+          shimmerHeight={24}
+        />
+        <Text style={{ ...theme.typography.body, color: theme.colors.muted }}>
+          Discovery, booking, and escrow delivery health.
+        </Text>
+      </View>
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <Card style={{ flex: 1 }}>
           <Text style={{ ...theme.typography.label, color: theme.colors.muted }}>
             Active campaigns
           </Text>
-          <Text style={{ ...theme.typography.title, color: theme.colors.foreground }}>
-            {active.length}
-          </Text>
+          <AsyncText
+            loading={campaignsLoading}
+            value={active.length}
+            style={{ ...theme.typography.title, color: theme.colors.foreground }}
+            shimmerWidth="44%"
+            shimmerHeight={30}
+          />
         </Card>
         <Card style={{ flex: 1 }}>
           <Text style={{ ...theme.typography.label, color: theme.colors.muted }}>
             Total campaigns
           </Text>
-          <Text style={{ ...theme.typography.title, color: theme.colors.foreground }}>
-            {campaigns.data?.total ?? 0}
-          </Text>
+          <AsyncText
+            loading={campaignsLoading}
+            value={campaigns.data?.total ?? 0}
+            style={{ ...theme.typography.title, color: theme.colors.foreground }}
+            shimmerWidth="44%"
+            shimmerHeight={30}
+          />
         </Card>
       </View>
-      {latestNotification ? (
+      {notificationsLoading ? (
+        <Card>
+          <Text style={{ ...theme.typography.label, color: theme.colors.muted }}>
+            Latest notification
+          </Text>
+          <AsyncText
+            loading
+            value={null}
+            style={{ ...theme.typography.cardTitle, color: theme.colors.foreground }}
+            shimmerWidth="68%"
+            shimmerHeight={20}
+          />
+        </Card>
+      ) : latestNotification ? (
         <Pressable
           onPress={() => {
             router.push('/(app)/notifications');

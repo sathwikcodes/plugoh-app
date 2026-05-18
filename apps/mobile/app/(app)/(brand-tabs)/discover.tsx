@@ -1,5 +1,6 @@
 import { GlassCard } from '@/components/ui/glass-card';
 import { GlassSearchField } from '@/components/ui/glass-search-field';
+import { ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
 import { useInfluencerDiscovery } from '@/hooks/use-marketplace';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,8 +8,8 @@ import { impactAsync, ImpactFeedbackStyle } from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Animated, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated2, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -48,25 +49,15 @@ function formatFollowers(n?: number): string {
 }
 
 function SkeletonRow() {
-  const opacity = useRef(new Animated.Value(0.3)).current;
-  useMemo(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.6, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.3, duration: 700, useNativeDriver: true }),
-      ]),
-    ).start();
-  }, [opacity]);
-
   return (
-    <Animated.View style={[styles.skeletonRow, { opacity }]}>
-      <View style={styles.skeletonAvatar} />
+    <View style={styles.skeletonRow}>
+      <ShimmerCircle size={44} />
       <View style={styles.skeletonBody}>
-        <View style={[styles.skeletonLine, { width: '55%', height: 14 }]} />
-        <View style={[styles.skeletonLine, { width: '40%', height: 11, marginTop: 5 }]} />
-        <View style={[styles.skeletonLine, { width: '70%', height: 11, marginTop: 4 }]} />
+        <ShimmerText width="55%" height={14} />
+        <ShimmerText width="40%" height={11} />
+        <ShimmerText width="70%" height={11} />
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -298,18 +289,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  skeletonAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    flexShrink: 0,
-  },
-  skeletonBody: { flex: 1 },
-  skeletonLine: {
-    borderRadius: 7,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
+  skeletonBody: { flex: 1, gap: theme.spacing.xs },
   emptyWrap: {
     flex: 1,
     alignItems: 'center',

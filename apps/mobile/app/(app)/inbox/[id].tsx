@@ -1,8 +1,16 @@
 import { DateSeparator } from '@/components/inbox/date-separator';
+import { BrandAvatar } from '@/components/inbox/brand-avatar';
 import { MessageBubble } from '@/components/inbox/message-bubble';
 import { GlassCircleButton } from '@/components/ui/glass-circle-button';
+import { ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useCampaign, useMarketplaceMutations, useMessages } from '@/hooks/use-marketplace';
+import {
+  useBootstrap,
+  useCampaign,
+  useMarketplaceMutations,
+  useMessages,
+} from '@/hooks/use-marketplace';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { useAuthStore } from '@/store/auth';
 import { Ionicons } from '@expo/vector-icons';
 import type { CampaignMessage } from '@plugoh/contracts';
@@ -10,14 +18,11 @@ import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator,
   Alert,
-  Animated,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -45,6 +50,8 @@ const IDENTITY_AVATAR_FLOAT_LEFT = theme.spacing.sm + 2;
 /** In-glass spacer so the label clears the floating avatar + gap */
 const IDENTITY_NAME_LEADING_RESERVE =
   IDENTITY_AVATAR_FLOAT_LEFT + IDENTITY_AVATAR_SIZE + theme.spacing.sm;
+const COMPOSER_CONTROL_HEIGHT = 44;
+const COMPOSER_INPUT_LINE_HEIGHT = 20;
 
 type ListItem =
   | { kind: 'message'; data: CampaignMessage; key: string }
@@ -66,16 +73,6 @@ function buildListItems(msgs: CampaignMessage[]): ListItem[] {
   }
 
   return result.reverse(); // newest first → inverted list shows newest at bottom
-}
-
-function initials(name?: string | null): string {
-  if (!name?.trim()) return '?';
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w.charAt(0).toUpperCase())
-    .join('');
 }
 
 function LiquidGlassShell({
@@ -139,34 +136,16 @@ function InvertedListCenter({ children }: { children: ReactNode }) {
 }
 
 function ThreadMessagesSkeleton() {
-  const opacity = useRef(new Animated.Value(0.35)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.65, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.35, duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => {
-      loop.stop();
-    };
-  }, [opacity]);
-
   return (
     <InvertedListCenter>
       <LiquidGlassShell style={styles.emptyStateShell}>
         <View style={styles.emptyStateInner}>
-          <Animated.View style={[styles.skeletonPulseWrap, { opacity }]}>
-            <View style={styles.skeletonBarWide} />
-            <View style={[styles.skeletonBarMid, { marginTop: theme.spacing.sm }]} />
-            <View style={[styles.skeletonBarNarrow, { marginTop: theme.spacing.sm }]} />
-          </Animated.View>
-          <ActivityIndicator
-            color="rgba(255,255,255,0.35)"
-            style={{ marginTop: theme.spacing.lg }}
-          />
-          <Text style={styles.emptyStateCaption}>Loading messages…</Text>
+          <View style={styles.skeletonPulseWrap}>
+            <ShimmerText width="100%" height={14} />
+            <ShimmerText width="78%" height={14} />
+            <ShimmerText width="48%" height={14} />
+          </View>
+          <ShimmerText width={128} height={15} style={{ marginTop: theme.spacing.lg }} />
         </View>
       </LiquidGlassShell>
     </InvertedListCenter>
@@ -222,50 +201,52 @@ function ComposeBar({
         symbol="paperclip"
         fallbackIcon="attach"
         onPress={onAttachment}
-        size={40}
+        size={COMPOSER_CONTROL_HEIGHT}
         symbolSize={18}
         accessibilityLabel="Attach file"
       />
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder="Message…"
-        placeholderTextColor="rgba(255,255,255,0.30)"
-        multiline
-        style={styles.input}
-        returnKeyType="default"
-        maxLength={4000}
-      />
+      <LiquidGlassShell style={styles.inputShell}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder="Message..."
+          placeholderTextColor="rgba(255,255,255,0.74)"
+          cursorColor="#FFFFFF"
+          selectionColor="rgba(255,255,255,0.32)"
+          multiline
+          style={styles.input}
+          returnKeyType="default"
+          maxLength={4000}
+        />
+      </LiquidGlassShell>
       <Pressable
         onPress={onSend}
         disabled={!canSend}
         accessibilityLabel="Send message"
         accessibilityRole="button"
+        hitSlop={8}
+        style={({ pressed }) => [
+          styles.sendPressable,
+          {
+            opacity: !canSend ? 0.46 : pressed ? 0.88 : 1,
+          },
+        ]}
       >
-        <LinearGradient
-          colors={
-            canSend
-              ? ['#FF3CAC', theme.colors.rose]
-              : [theme.colors.surface, theme.colors.surfaceWarm]
-          }
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.sendButton}
-        >
+        <LiquidGlassShell style={styles.sendButton}>
           <SymbolView
             name="arrow.up"
             size={16}
-            tintColor={canSend ? '#FFFFFF' : 'rgba(255,255,255,0.25)'}
+            tintColor={canSend ? '#FFFFFF' : 'rgba(255,255,255,0.42)'}
             type="monochrome"
             fallback={
               <Ionicons
                 name="arrow-up"
                 size={16}
-                color={canSend ? '#FFFFFF' : 'rgba(255,255,255,0.25)'}
+                color={canSend ? '#FFFFFF' : 'rgba(255,255,255,0.42)'}
               />
             }
           />
-        </LinearGradient>
+        </LiquidGlassShell>
       </Pressable>
     </View>
   );
@@ -281,9 +262,13 @@ export default function InboxThreadScreen() {
   const [draft, setDraft] = useState('');
   const [floatingHeaderHeight, setFloatingHeaderHeight] = useState(() => insets.top + 54);
 
+  const bootstrap = useBootstrap();
   const campaign = useCampaign(id);
   const messages = useMessages(id);
   const mutations = useMarketplaceMutations();
+  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
+  const campaignLoading = bootstrapLoading || shouldShowInitialLoader(campaign);
+  const messagesLoading = shouldShowInitialLoader(messages);
 
   const chatEnabled = CHAT_ENABLED_STATUSES.includes(campaign.data?.status ?? '');
 
@@ -299,6 +284,11 @@ export default function InboxThreadScreen() {
   const brandName = campaign.data?.business_profile?.brand_name;
   const headerDisplayName = brandName?.trim() || campaign.data?.title.trim() || 'Chat';
   const headerInitialsSource = brandName?.trim() || campaign.data?.title;
+  const headerAvatarUri =
+    campaign.data?.business_profile?.profile_photo_url ??
+    campaign.data?.business_profile?.ig_profile_picture_url ??
+    campaign.data?.business_profile?.avatar_url ??
+    null;
 
   const identityNameMaxWidth = useMemo(() => {
     const rowInner = windowWidth - theme.spacing.lg * 2;
@@ -311,14 +301,14 @@ export default function InboxThreadScreen() {
   }, [windowWidth]);
 
   const listEmpty = useMemo(() => {
-    if (messages.isPending) {
+    if (messagesLoading) {
       return <ThreadMessagesSkeleton />;
     }
     if ((messages.data?.length ?? 0) === 0) {
       return <EmptyMessagesPlaceholder />;
     }
     return null;
-  }, [messages.isPending, messages.data]);
+  }, [messagesLoading, messages.data]);
 
   // Find the other user ID for read receipts
   const otherUserId = useMemo(() => {
@@ -410,7 +400,10 @@ export default function InboxThreadScreen() {
           inverted
           contentContainerStyle={[
             styles.listContent,
-            { paddingTop: floatingHeaderHeight + theme.spacing.xs },
+            {
+              paddingTop: theme.spacing.sm,
+              paddingBottom: floatingHeaderHeight + theme.spacing.xs,
+            },
             listItems.length === 0 ? styles.listContentEmpty : null,
           ]}
           ListEmptyComponent={listEmpty}
@@ -469,29 +462,27 @@ export default function InboxThreadScreen() {
                   <View style={styles.identityPillInner}>
                     <View style={styles.identityNameLeadingSpacer} />
                     <View style={styles.identityNameWrap}>
-                      <Text
-                        style={[styles.identityName, { maxWidth: identityNameMaxWidth }]}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {campaign.isPending ? '…' : headerDisplayName}
-                      </Text>
+                      {campaignLoading ? (
+                        <ShimmerText width={identityNameMaxWidth * 0.72} height={16} />
+                      ) : (
+                        <Text
+                          style={[styles.identityName, { maxWidth: identityNameMaxWidth }]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {headerDisplayName}
+                        </Text>
+                      )}
                     </View>
                   </View>
                 </LiquidGlassShell>
-                <View
-                  style={[styles.identityAvatar, styles.identityAvatarFloating]}
-                  pointerEvents="none"
-                >
-                  <LinearGradient
-                    colors={['#FF3CAC', theme.colors.rose]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[StyleSheet.absoluteFillObject, styles.identityAvatarGradient]}
+                <View style={styles.identityAvatarFloating} pointerEvents="none">
+                  <BrandAvatar
+                    imageUri={headerAvatarUri}
+                    name={headerInitialsSource}
+                    size={IDENTITY_AVATAR_SIZE}
+                    textSize={11}
                   />
-                  <Text style={styles.identityAvatarInitials}>
-                    {initials(headerInitialsSource)}
-                  </Text>
                 </View>
               </View>
             </View>
@@ -590,38 +581,12 @@ const styles = StyleSheet.create({
     width: IDENTITY_NAME_LEADING_RESERVE,
     flexShrink: 0,
   },
-  identityAvatar: {
-    width: IDENTITY_AVATAR_SIZE,
-    height: IDENTITY_AVATAR_SIZE,
-    borderRadius: IDENTITY_AVATAR_RADIUS,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.28)',
-    ...Platform.select({
-      ios: {
-        borderCurve: 'circular' as const,
-      },
-      default: {},
-    }),
-  },
   identityAvatarFloating: {
     position: 'absolute',
     left: IDENTITY_AVATAR_FLOAT_LEFT,
     top: '50%',
     marginTop: -IDENTITY_AVATAR_RADIUS,
     zIndex: 2,
-  },
-  identityAvatarGradient: {
-    borderRadius: IDENTITY_AVATAR_RADIUS,
-  },
-  identityAvatarInitials: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    zIndex: 1,
   },
   identityNameWrap: {
     flexShrink: 1,
@@ -669,6 +634,7 @@ const styles = StyleSheet.create({
   skeletonPulseWrap: {
     width: '100%',
     alignItems: 'center',
+    gap: theme.spacing.sm,
   },
   emptyStateTitle: {
     ...theme.typography.section,
@@ -681,61 +647,43 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  emptyStateCaption: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.28)',
-    textAlign: 'center',
-    marginTop: theme.spacing.xs,
-  },
-  skeletonBarWide: {
-    height: 10,
-    width: '88%',
-    maxWidth: 260,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-  },
-  skeletonBarMid: {
-    height: 10,
-    width: '62%',
-    maxWidth: 200,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  skeletonBarNarrow: {
-    height: 10,
-    width: '42%',
-    maxWidth: 140,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
   compose: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    gap: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: theme.colors.background,
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.sm,
+    gap: theme.spacing.sm,
+  },
+  inputShell: {
+    flex: 1,
+    minHeight: COMPOSER_CONTROL_HEIGHT,
+    maxHeight: 120,
+    borderRadius: COMPOSER_CONTROL_HEIGHT / 2,
   },
   input: {
-    flex: 1,
-    minHeight: 40,
+    minHeight: COMPOSER_CONTROL_HEIGHT,
     maxHeight: 120,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 14,
-    paddingTop: 10,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: 11,
     paddingBottom: 10,
-    color: theme.colors.foreground,
     ...theme.typography.body,
+    lineHeight: COMPOSER_INPUT_LINE_HEIGHT,
+    color: '#FFFFFF',
+    backgroundColor: 'transparent',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  sendPressable: {
+    width: COMPOSER_CONTROL_HEIGHT,
+    height: COMPOSER_CONTROL_HEIGHT,
+    borderRadius: COMPOSER_CONTROL_HEIGHT / 2,
+    overflow: 'hidden',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    flex: 1,
+    width: COMPOSER_CONTROL_HEIGHT,
+    height: COMPOSER_CONTROL_HEIGHT,
+    borderRadius: COMPOSER_CONTROL_HEIGHT / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

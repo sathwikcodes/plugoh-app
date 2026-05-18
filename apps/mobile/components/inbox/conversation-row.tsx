@@ -1,3 +1,4 @@
+import { BrandAvatar } from '@/components/inbox/brand-avatar';
 import { theme } from '@/constants/theme';
 import type { InboxItem } from '@plugoh/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,15 +24,6 @@ function formatTimestamp(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
 
-function initials(name?: string | null): string {
-  if (!name) return '?';
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w.charAt(0).toUpperCase())
-    .join('');
-}
-
 function previewText(item: InboxItem): string {
   const msg = item.latestMessage;
   if (!msg) return 'No messages yet';
@@ -44,6 +36,12 @@ function previewText(item: InboxItem): string {
 export function ConversationRow({ item, index, onPress, onLongPress, nameLabel }: Props) {
   const brandName =
     nameLabel !== undefined ? nameLabel : item.campaign.business_profile?.brand_name;
+  const avatarName = item.campaign.business_profile?.brand_name ?? item.campaign.title;
+  const avatarImageUri =
+    item.campaign.business_profile?.profile_photo_url ??
+    item.campaign.business_profile?.ig_profile_picture_url ??
+    item.campaign.business_profile?.avatar_url ??
+    null;
   const timestamp = item.latestMessage?.created_at;
 
   return (
@@ -56,16 +54,7 @@ export function ConversationRow({ item, index, onPress, onLongPress, nameLabel }
         accessibilityLabel={`${item.campaign.title} conversation`}
       >
         {/* Avatar */}
-        <View style={styles.avatarShell}>
-          <LinearGradient
-            colors={['#FF3CAC', theme.colors.rose]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.avatarGradient}
-          >
-            <Text style={styles.avatarInitials}>{initials(brandName)}</Text>
-          </LinearGradient>
-        </View>
+        <BrandAvatar imageUri={avatarImageUri} name={avatarName} />
 
         {/* Body */}
         <View style={styles.body}>
@@ -116,31 +105,6 @@ const styles = StyleSheet.create({
   },
   rowPressed: {
     backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  avatarShell: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    flexShrink: 0,
-  },
-  avatarImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  avatarGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitials: {
-    ...theme.typography.cardTitle,
-    color: '#FFFFFF',
-    fontSize: 16,
   },
   body: {
     flex: 1,

@@ -1,5 +1,6 @@
 import { GlassCard } from '@/components/ui/glass-card';
 import { GlassCircleButton } from '@/components/ui/glass-circle-button';
+import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
 import { useBootstrap, useBusinessProfile, useCampaigns } from '@/hooks/use-marketplace';
 import { logout } from '@/lib/auth/logout';
@@ -11,6 +12,7 @@ import {
   isPushRegistrationSupported,
   registerForPushNotificationsAsync,
 } from '@/lib/notifications/register';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
@@ -138,6 +140,7 @@ function SettingRow({
   iconBg,
   title,
   subtitle,
+  subtitleLoading,
   onPress,
   first,
 }: {
@@ -145,6 +148,7 @@ function SettingRow({
   iconBg: string;
   title: string;
   subtitle?: string;
+  subtitleLoading?: boolean;
   onPress: () => void;
   first?: boolean;
 }) {
@@ -160,7 +164,9 @@ function SettingRow({
         </View>
         <View style={styles.settingBody}>
           <Text style={styles.settingTitle}>{title}</Text>
-          {subtitle ? (
+          {subtitleLoading ? (
+            <ShimmerText width="58%" height={13} />
+          ) : subtitle ? (
             <Text style={styles.settingSubtitle} numberOfLines={1}>
               {subtitle}
             </Text>
@@ -292,9 +298,12 @@ const BRAND_BADGES = [
 
 export default function BrandProfileScreen() {
   const insets = useSafeAreaInsets();
-  useBootstrap();
+  const bootstrap = useBootstrap();
   const profile = useBusinessProfile();
   const campaigns = useCampaigns();
+  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
+  const profileLoading = shouldShowInitialLoader(profile);
+  const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
 
   const launchedCampaigns = campaigns.data?.items.length ?? 0;
   const totalSpent = useMemo(
@@ -310,7 +319,7 @@ export default function BrandProfileScreen() {
   );
 
   const igConnected = Boolean(profile.data?.instagram_connected);
-  const brandName = profile.data?.brand_name ?? 'Brand Profile';
+  const brandName = profile.data?.brand_name;
 
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
@@ -357,28 +366,42 @@ export default function BrandProfileScreen() {
         }}
         style={({ pressed }) => [styles.profileRow, pressed && styles.rowPressed]}
       >
-        <LinearGradient
-          colors={['#EC4899', '#A855F7']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.avatarWrap}
-        >
-          <Text style={styles.avatarInitials}>{initials(brandName)}</Text>
-        </LinearGradient>
+        {profileLoading ? (
+          <ShimmerCircle size={72} />
+        ) : (
+          <LinearGradient
+            colors={['#EC4899', '#A855F7']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatarWrap}
+          >
+            <Text style={styles.avatarInitials}>{initials(brandName ?? 'Brand Profile')}</Text>
+          </LinearGradient>
+        )}
 
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName} numberOfLines={1}>
-            {brandName}
-          </Text>
+          <AsyncText
+            loading={profileLoading}
+            value={brandName}
+            fallback="Brand Profile"
+            style={styles.profileName}
+            numberOfLines={1}
+            shimmerWidth="62%"
+            shimmerHeight={24}
+          />
           {profile.data?.brand_type ? (
             <Text style={styles.profileSub} numberOfLines={1}>
               {profile.data.brand_type}
             </Text>
+          ) : profileLoading ? (
+            <ShimmerText width="42%" height={16} />
           ) : null}
           {profile.data?.brand_location ? (
             <Text style={styles.profileLocation} numberOfLines={1}>
               {profile.data.brand_location}
             </Text>
+          ) : profileLoading ? (
+            <ShimmerText width="34%" height={13} />
           ) : null}
         </View>
 
@@ -388,7 +411,15 @@ export default function BrandProfileScreen() {
       <View style={styles.sectionDivider} />
 
       {/* ── Instagram card ── */}
-      {igConnected ? (
+      {profileLoading ? (
+        <GlassCard style={styles.igConnectedCard} contentStyle={styles.igConnectedInner}>
+          <ShimmerCircle size={36} />
+          <View style={styles.settingBody}>
+            <ShimmerText width="58%" height={17} />
+            <ShimmerText width="38%" height={13} />
+          </View>
+        </GlassCard>
+      ) : igConnected ? (
         <GlassCard style={styles.igConnectedCard} contentStyle={styles.igConnectedInner}>
           <View style={[styles.iconBox, { backgroundColor: theme.colors.success }]}>
             <Ionicons name="logo-instagram" size={17} color="#fff" />
@@ -434,13 +465,24 @@ export default function BrandProfileScreen() {
       {/* ── Stats row ── */}
       <View style={styles.statsRow}>
         <GlassCard style={styles.statCard} contentStyle={styles.statInner}>
-          <Text style={styles.statValue}>{launchedCampaigns}</Text>
+          <AsyncText
+            loading={campaignsLoading}
+            value={launchedCampaigns}
+            style={styles.statValue}
+            shimmerWidth={38}
+            shimmerHeight={24}
+          />
           <Text style={styles.statLabel}>Campaigns Launched</Text>
         </GlassCard>
         <GlassCard style={styles.statCard} contentStyle={styles.statInner}>
-          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
-            {formatAmount(totalSpent)}
-          </Text>
+          <AsyncText
+            loading={campaignsLoading}
+            value={formatAmount(totalSpent)}
+            style={styles.statValue}
+            numberOfLines={1}
+            shimmerWidth={74}
+            shimmerHeight={24}
+          />
           <Text style={styles.statLabel}>Total Spent</Text>
         </GlassCard>
       </View>
@@ -448,36 +490,50 @@ export default function BrandProfileScreen() {
       {/* ── Badges ── */}
       <Text style={styles.sectionHeader}>Achievements</Text>
       <View style={styles.badgeRow}>
-        {BRAND_BADGES.map((badge) => {
-          const unlocked = badge.unlocked(launchedCampaigns, igConnected, profileComplete);
-          return (
-            <View
-              key={badge.id}
-              style={[styles.badgeCard, unlocked ? styles.badgeUnlocked : styles.badgeLocked]}
-            >
-              <Ionicons
-                name={badge.icon}
-                size={22}
-                color={unlocked ? theme.colors.accentStrong : 'rgba(255,255,255,0.2)'}
-              />
-              <Text
-                style={[
-                  styles.badgeName,
-                  { color: unlocked ? theme.colors.accentStrong : 'rgba(255,255,255,0.2)' },
-                ]}
-                numberOfLines={2}
-              >
-                {badge.name}
-              </Text>
-            </View>
-          );
-        })}
+        {profileLoading || campaignsLoading
+          ? BRAND_BADGES.map((badge) => (
+              <View key={badge.id} style={[styles.badgeCard, styles.badgeLocked]}>
+                <ShimmerCircle size={22} />
+                <ShimmerText width="70%" height={12} />
+              </View>
+            ))
+          : BRAND_BADGES.map((badge) => {
+              const unlocked = badge.unlocked(launchedCampaigns, igConnected, profileComplete);
+              return (
+                <View
+                  key={badge.id}
+                  style={[styles.badgeCard, unlocked ? styles.badgeUnlocked : styles.badgeLocked]}
+                >
+                  <Ionicons
+                    name={badge.icon}
+                    size={22}
+                    color={unlocked ? theme.colors.accentStrong : 'rgba(255,255,255,0.2)'}
+                  />
+                  <Text
+                    style={[
+                      styles.badgeName,
+                      { color: unlocked ? theme.colors.accentStrong : 'rgba(255,255,255,0.2)' },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {badge.name}
+                  </Text>
+                </View>
+              );
+            })}
       </View>
 
       {/* ── Monthly Spend chart ── */}
       <Text style={styles.sectionHeader}>Monthly Spend</Text>
       <GlassCard style={styles.chartCard} contentStyle={styles.chartInner}>
-        <SpendChart data={monthlySpend} />
+        {campaignsLoading ? (
+          <>
+            <ShimmerText width="44%" height={14} />
+            <ShimmerText width="100%" height={76} />
+          </>
+        ) : (
+          <SpendChart data={monthlySpend} />
+        )}
       </GlassCard>
 
       {/* ── Account settings group ── */}
@@ -491,7 +547,8 @@ export default function BrandProfileScreen() {
           iconName="person-outline"
           iconBg={theme.colors.info}
           title="Edit Profile"
-          subtitle={brandName}
+          subtitle={brandName ?? 'Brand Profile'}
+          subtitleLoading={profileLoading}
           onPress={() => {
             router.push('/(app)/profile/edit');
           }}
@@ -501,6 +558,7 @@ export default function BrandProfileScreen() {
           iconBg="#C13584"
           title="Instagram"
           subtitle={igConnected ? 'Connected' : 'Not connected'}
+          subtitleLoading={profileLoading}
           onPress={() => {
             router.push('/(app)/profile/instagram');
           }}

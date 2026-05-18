@@ -1,7 +1,9 @@
 import { GlassCard } from '@/components/ui/glass-card';
 import { StatusChip } from '@/components/ui/primitives';
+import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useBusinessProfile, useCampaigns } from '@/hooks/use-marketplace';
+import { useBootstrap, useBusinessProfile, useCampaigns } from '@/hooks/use-marketplace';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import { impactAsync, ImpactFeedbackStyle } from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -87,9 +89,13 @@ function matchesFilter(status: string, filter: StatusFilter): boolean {
 
 export default function BrandCampaignsScreen() {
   const insets = useSafeAreaInsets();
+  const bootstrap = useBootstrap();
   const campaigns = useCampaigns({ sort: 'created_desc', limit: 50, offset: 0 });
   const brandProfile = useBusinessProfile();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
+  const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
+  const brandLoading = shouldShowInitialLoader(brandProfile);
 
   const allItems = campaigns.data?.items ?? [];
 
@@ -108,7 +114,7 @@ export default function BrandCampaignsScreen() {
     [allItems],
   );
 
-  const brandName = brandProfile.data?.brand_name ?? 'Your Brand';
+  const brandName = brandProfile.data?.brand_name;
 
   const handlePress = useCallback(async (id: string) => {
     await impactAsync(ImpactFeedbackStyle.Light);
@@ -150,15 +156,32 @@ export default function BrandCampaignsScreen() {
                   </View>
 
                   <View style={styles.heroAmountRow}>
-                    <Text style={styles.heroCount}>{activeCount}</Text>
+                    <AsyncText
+                      loading={campaignsLoading}
+                      value={activeCount}
+                      style={styles.heroCount}
+                      shimmerWidth={54}
+                      shimmerHeight={44}
+                    />
                     <Text style={styles.heroCountLabel}>active campaigns</Text>
                   </View>
 
                   <View style={styles.heroBottom}>
-                    <Text style={styles.heroBrandName} numberOfLines={1}>
-                      {brandName.toUpperCase()}
-                    </Text>
-                    <Text style={styles.heroSpend}>{fmt(totalSpent)} total spend</Text>
+                    <AsyncText
+                      loading={brandLoading}
+                      value={(brandName ?? 'Your Brand').toUpperCase()}
+                      style={styles.heroBrandName}
+                      numberOfLines={1}
+                      shimmerWidth="50%"
+                      shimmerHeight={16}
+                    />
+                    <AsyncText
+                      loading={campaignsLoading}
+                      value={`${fmt(totalSpent)} total spend`}
+                      style={styles.heroSpend}
+                      shimmerWidth="42%"
+                      shimmerHeight={14}
+                    />
                   </View>
                 </LinearGradient>
               </View>
@@ -177,7 +200,13 @@ export default function BrandCampaignsScreen() {
                       <Ionicons name="briefcase-outline" size={18} color="rgba(255,255,255,0.55)" />
                     }
                   />
-                  <Text style={styles.statValue}>{allItems.length}</Text>
+                  <AsyncText
+                    loading={campaignsLoading}
+                    value={allItems.length}
+                    style={styles.statValue}
+                    shimmerWidth={38}
+                    shimmerHeight={22}
+                  />
                   <Text style={styles.statLabel}>Total Campaigns</Text>
                 </GlassCard>
 
@@ -191,9 +220,14 @@ export default function BrandCampaignsScreen() {
                       <Ionicons name="cash-outline" size={18} color="rgba(255,255,255,0.55)" />
                     }
                   />
-                  <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
-                    {fmt(totalSpent)}
-                  </Text>
+                  <AsyncText
+                    loading={campaignsLoading}
+                    value={fmt(totalSpent)}
+                    style={styles.statValue}
+                    numberOfLines={1}
+                    shimmerWidth={76}
+                    shimmerHeight={22}
+                  />
                   <Text style={styles.statLabel}>Total Spent</Text>
                 </GlassCard>
               </View>
@@ -239,7 +273,20 @@ export default function BrandCampaignsScreen() {
           </View>
         }
         ListEmptyComponent={
-          allItems.length === 0 ? (
+          campaignsLoading ? (
+            <View style={styles.skeletonWrap}>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <GlassCard key={index} contentStyle={styles.skeletonRow}>
+                  <ShimmerCircle size={44} />
+                  <View style={styles.skeletonBody}>
+                    <ShimmerText width="58%" height={16} />
+                    <ShimmerText width="42%" height={12} />
+                  </View>
+                  <ShimmerText width={54} height={18} />
+                </GlassCard>
+              ))}
+            </View>
+          ) : allItems.length === 0 ? (
             <View style={styles.emptyWrap}>
               <SymbolView
                 name="briefcase"
@@ -473,6 +520,20 @@ const styles = StyleSheet.create({
     ...theme.typography.mono,
     color: theme.colors.foreground,
     fontSize: 12,
+  },
+  skeletonWrap: {
+    gap: theme.spacing.sm,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: 14,
+  },
+  skeletonBody: {
+    flex: 1,
+    gap: theme.spacing.sm,
   },
 
   // Empty state

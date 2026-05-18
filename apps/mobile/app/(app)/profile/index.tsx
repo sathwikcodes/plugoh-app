@@ -1,8 +1,9 @@
 import { GlassCard } from '@/components/ui/glass-card';
 import { GlassCircleButton } from '@/components/ui/glass-circle-button';
 import { Screen } from '@/components/ui/primitives';
+import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useInfluencerProfile, usePayout } from '@/hooks/use-marketplace';
+import { useBootstrap, useInfluencerProfile, usePayout } from '@/hooks/use-marketplace';
 import { unregisterPush } from '@/lib/api/endpoints';
 import { logout } from '@/lib/auth/logout';
 import {
@@ -13,6 +14,7 @@ import {
   isPushRegistrationSupported,
   registerForPushNotificationsAsync,
 } from '@/lib/notifications/register';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import type { PayoutUpsert } from '@plugoh/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -59,7 +61,7 @@ function payoutSubtitle(data?: PayoutUpsert | null): string {
 }
 
 const fmtINR = (n?: number) =>
-  n
+  n != null
     ? new Intl.NumberFormat('en-IN', {
         style: 'currency',
         currency: 'INR',
@@ -105,6 +107,7 @@ function SettingRow({
   iconBg,
   title,
   subtitle,
+  subtitleLoading,
   onPress,
   first,
 }: {
@@ -112,6 +115,7 @@ function SettingRow({
   iconBg: string;
   title: string;
   subtitle?: string;
+  subtitleLoading?: boolean;
   onPress: () => void;
   first?: boolean;
 }) {
@@ -127,7 +131,9 @@ function SettingRow({
         </View>
         <View style={styles.settingBody}>
           <Text style={styles.settingTitle}>{title}</Text>
-          {subtitle ? (
+          {subtitleLoading ? (
+            <ShimmerText width="56%" height={13} />
+          ) : subtitle ? (
             <Text style={styles.settingSubtitle} numberOfLines={1}>
               {subtitle}
             </Text>
@@ -232,8 +238,12 @@ function NotificationToggleRow() {
 
 export default function ProfileScreen() {
   const profile = useInfluencerProfile();
+  const bootstrap = useBootstrap();
   const payout = usePayout();
   const data = profile.data;
+  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
+  const profileLoading = bootstrapLoading || shouldShowInitialLoader(profile);
+  const payoutLoading = bootstrapLoading || shouldShowInitialLoader(payout);
 
   const pricingSet = !!(data?.price_per_reel || data?.price_per_post || data?.price_per_story);
 
@@ -291,11 +301,20 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{data?.display_name ?? 'Your Name'}</Text>
+          <AsyncText
+            loading={profileLoading}
+            value={data?.display_name}
+            fallback="Your Name"
+            style={styles.profileName}
+            shimmerWidth="62%"
+            shimmerHeight={22}
+          />
           {data?.ig_username ? (
             <Text style={styles.profileSub} numberOfLines={1}>
               @{data.ig_username}
             </Text>
+          ) : profileLoading ? (
+            <ShimmerText width="38%" height={14} />
           ) : null}
         </View>
 
@@ -305,7 +324,20 @@ export default function ProfileScreen() {
       <View style={styles.sectionDivider} />
 
       {/* ── pricing hero card ── */}
-      {pricingSet ? (
+      {profileLoading ? (
+        <View style={styles.ratesCard}>
+          <View style={styles.ratesInner}>
+            <ShimmerText width={86} height={12} />
+            <View style={styles.ratesRow}>
+              <ShimmerText width={58} height={32} />
+              <View style={styles.rateDivider} />
+              <ShimmerText width={58} height={32} />
+              <View style={styles.rateDivider} />
+              <ShimmerText width={58} height={32} />
+            </View>
+          </View>
+        </View>
+      ) : pricingSet ? (
         <Pressable
           onPress={() => {
             router.push('/(app)/profile/pricing');
@@ -359,6 +391,7 @@ export default function ProfileScreen() {
           iconBg={theme.colors.info}
           title="Edit Profile"
           subtitle={data?.display_name ?? 'Add your name'}
+          subtitleLoading={profileLoading}
           onPress={() => {
             router.push('/(app)/profile/edit');
           }}
@@ -371,6 +404,7 @@ export default function ProfileScreen() {
           subtitle={
             data?.instagram_connected && data.ig_username ? `@${data.ig_username}` : 'Not connected'
           }
+          subtitleLoading={profileLoading}
           onPress={() => {
             router.push('/(app)/profile/instagram');
           }}
@@ -380,6 +414,7 @@ export default function ProfileScreen() {
           iconBg={theme.colors.success}
           title="Payout"
           subtitle={payoutSubtitle(payout.data)}
+          subtitleLoading={payoutLoading}
           onPress={() => {
             router.push('/(app)/profile/payout');
           }}

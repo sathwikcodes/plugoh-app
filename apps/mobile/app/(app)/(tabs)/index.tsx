@@ -1,7 +1,14 @@
 import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { Screen, SectionTitle, StatusChip } from '@/components/ui/primitives';
+import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useCampaigns, useEarnings, useInfluencerProfile } from '@/hooks/use-marketplace';
+import {
+  useBootstrap,
+  useCampaigns,
+  useEarnings,
+  useInfluencerProfile,
+} from '@/hooks/use-marketplace';
+import { shouldShowAnyInitialLoader, shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import type { CampaignListItem } from '@plugoh/contracts';
 import { router } from 'expo-router';
@@ -60,6 +67,15 @@ function PendingTile({ amount }: { amount: number }) {
       </View>
       <Text style={styles.tileValue}>{fmt(amount)}</Text>
     </Pressable>
+  );
+}
+
+function LoadingSnapshotTile({ label }: { label: string }) {
+  return (
+    <View style={styles.snapshotTile}>
+      <Text style={styles.tileLabel}>{label}</Text>
+      <ShimmerText width="72%" height={24} style={{ marginTop: 2 }} />
+    </View>
   );
 }
 
@@ -133,10 +149,17 @@ function CampaignSpotlightCard({ campaign }: { campaign: CampaignListItem }) {
 
 export default function HomeScreen() {
   const profile = useInfluencerProfile();
+  const bootstrap = useBootstrap();
   const earnings = useEarnings();
   const campaigns = useCampaigns({ sort: 'created_desc' });
 
-  const firstName = profile.data?.display_name?.split(' ')[0] ?? 'there';
+  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
+  const profileLoading = bootstrapLoading || shouldShowInitialLoader(profile);
+  const earningsLoading = bootstrapLoading || shouldShowInitialLoader(earnings);
+  const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
+  const summaryLoading = shouldShowAnyInitialLoader(profile, earnings, campaigns);
+
+  const firstName = profile.data?.display_name?.split(' ')[0];
   const thisMonth = earnings.data?.this_month ?? 0;
   const pendingEarnings = earnings.data?.pending_earnings ?? 0;
 
@@ -167,8 +190,21 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.greetingBlock}>
           <Text style={styles.greetingLine}>{getGreeting()}</Text>
-          <Text style={styles.nameLine}>{firstName}.</Text>
-          <Text style={styles.subtitle}>{contextualSubtitle()}</Text>
+          <AsyncText
+            loading={profileLoading}
+            value={firstName ? `${firstName}.` : null}
+            fallback="there."
+            style={styles.nameLine}
+            shimmerWidth="58%"
+            shimmerHeight={34}
+          />
+          <AsyncText
+            loading={summaryLoading}
+            value={contextualSubtitle()}
+            style={styles.subtitle}
+            shimmerWidth="78%"
+            shimmerHeight={18}
+          />
         </View>
         <NativeIconButton
           symbol="person.circle"
@@ -193,21 +229,24 @@ export default function HomeScreen() {
           }}
         >
           <Text style={styles.tileLabel}>This Month</Text>
-          <Text style={styles.tileValue}>{earnings.isLoading ? '—' : fmt(thisMonth)}</Text>
+          <AsyncText
+            loading={earningsLoading}
+            value={fmt(thisMonth)}
+            style={styles.tileValue}
+            shimmerWidth="70%"
+            shimmerHeight={24}
+          />
         </Pressable>
 
-        {earnings.isLoading ? (
-          <View style={styles.snapshotTile}>
-            <Text style={styles.tileLabel}>Pending</Text>
-            <Text style={styles.tileValue}>—</Text>
-          </View>
+        {earningsLoading ? (
+          <LoadingSnapshotTile label="Pending" />
         ) : (
           <PendingTile amount={pendingEarnings} />
         )}
       </View>
 
       {/* ── needs attention ── */}
-      {hasActionItems && (
+      {!campaignsLoading && !profileLoading && hasActionItems && (
         <>
           <SectionTitle eyebrow="Needs Attention" title="" />
           {deliveryPending && (
@@ -244,7 +283,7 @@ export default function HomeScreen() {
       )}
 
       {/* ── in progress ── */}
-      {activeCampaigns.length > 0 && (
+      {!campaignsLoading && activeCampaigns.length > 0 && (
         <>
           <SectionTitle eyebrow="In Progress" title="" />
           {activeCampaigns.slice(0, 2).map((c) => (

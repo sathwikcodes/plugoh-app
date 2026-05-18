@@ -1,10 +1,11 @@
 import { theme } from '@/constants/theme';
 import type { CampaignListItem } from '@plugoh/contracts';
 import { memo } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { CampaignEmptyState } from './campaign-empty-state';
 import { CampaignSwipeCard } from './campaign-swipe-card';
+import { ShimmerBlock, ShimmerCircle, ShimmerText } from './shimmer';
 
 const CARD_GAP = theme.spacing.lg;
 
@@ -53,6 +54,41 @@ const CarouselCard = memo(function CarouselCard({
   );
 });
 
+function CampaignCardSkeleton({
+  cardWidth,
+  cardHeight,
+}: {
+  cardWidth: number;
+  cardHeight: number;
+}) {
+  return (
+    <View
+      style={{
+        width: cardWidth,
+        height: cardHeight,
+        borderRadius: 34,
+        overflow: 'hidden',
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
+        padding: theme.spacing.xl,
+        justifyContent: 'space-between',
+      }}
+    >
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <ShimmerCircle size={58} />
+        <ShimmerBlock width={118} height={42} radius={21} />
+      </View>
+      <View style={{ gap: theme.spacing.md }}>
+        <ShimmerText width="34%" height={12} />
+        <ShimmerText width="88%" height={44} />
+        <ShimmerText width="62%" height={44} />
+        <ShimmerBlock width="100%" height={48} radius={24} />
+      </View>
+    </View>
+  );
+}
+
 export function CampaignDeckSwiper({
   campaigns,
   isLoading,
@@ -74,7 +110,7 @@ export function CampaignDeckSwiper({
   if (isLoading && campaigns.length === 0) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={theme.colors.muted} />
+        <CampaignCardSkeleton cardWidth={cardWidth} cardHeight={cardHeight} />
       </View>
     );
   }

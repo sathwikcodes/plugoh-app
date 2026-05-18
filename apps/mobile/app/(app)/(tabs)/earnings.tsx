@@ -1,8 +1,11 @@
 import { GlassCard } from '@/components/ui/glass-card';
 import { NativeIconButton } from '@/components/ui/native-icon-button';
-import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/primitives';
+import { PremiumEarningsGradientCard } from '@/components/ui/premium-earnings-gradient-card';
+import { EmptyState, ErrorState, Screen } from '@/components/ui/primitives';
+import { ShimmerBlock, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useEarnings, useInfluencerProfile } from '@/hooks/use-marketplace';
+import { useBootstrap, useEarnings, useInfluencerProfile } from '@/hooks/use-marketplace';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
 import appIcon from '@/assets/images/icon.png';
 import { Ionicons } from '@expo/vector-icons';
 import type { EarningsSummary } from '@plugoh/contracts';
@@ -38,6 +41,9 @@ function statusLabel(s: string): string {
 }
 
 const AVATAR_COLORS = ['#E76A92', '#F28EAF', '#D4587F', '#D7A323', '#2FA46F', '#5C84D6'] as const;
+type EarningsTransaction = EarningsSummary['transactions'][number];
+const TX_AVATAR_SIZE = 46;
+const TX_AVATAR_RADIUS = 14;
 
 function campaignAvatarColor(title: string): string {
   let hash = 0;
@@ -50,21 +56,32 @@ const CARD_CLUSTER_RADIUS = 36;
 /** ISO/IEC 7810 ID-1 payment card width ÷ height — makes the hero read as a physical card. */
 const DEBIT_CARD_ASPECT = 85.6 / 53.98;
 
-/** Last 12 calendar months (oldest → newest), merged with API breakdown amounts. */
-function buildLastTwelveMonthsSeries(
+const MONTH_LABELS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** Current calendar year (January → December), merged with API breakdown amounts. */
+function buildCalendarYearMonthlySeries(
   breakdown: EarningsSummary['monthly_breakdown'],
-): { month: string; amount: number }[] {
+): { month: string; label: (typeof MONTH_LABELS)[number]; amount: number }[] {
   const byMonth = new Map(breakdown.map((b) => [b.month, b.amount]));
-  const out: { month: string; amount: number }[] = [];
-  const now = new Date();
-  for (let i = 11; i >= 0; i -= 1) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1;
-    const key = `${y}-${String(m).padStart(2, '0')}`;
-    out.push({ month: key, amount: byMonth.get(key) ?? 0 });
-  }
-  return out;
+  const year = new Date().getFullYear();
+
+  return MONTH_LABELS.map((label, index) => {
+    const key = `${year}-${String(index + 1).padStart(2, '0')}`;
+    return { month: key, label, amount: byMonth.get(key) ?? 0 };
+  });
 }
 
 // ─── EarningsBarChart ──────────────────────────────────────────────────────────
@@ -75,7 +92,7 @@ const CHART_BAR_WIDTH = 7;
 const CHART_BAR_GAP = 4;
 
 function EarningsBarChart({ data }: { data: EarningsSummary['monthly_breakdown'] }) {
-  const series = buildLastTwelveMonthsSeries(data);
+  const series = buildCalendarYearMonthlySeries(data);
   const maxVal = Math.max(...series.map((d) => d.amount), 1);
   const pillR = CHART_BAR_WIDTH / 2;
 
@@ -85,7 +102,11 @@ function EarningsBarChart({ data }: { data: EarningsSummary['monthly_breakdown']
         const ratio = d.amount / maxVal;
         const fillH = d.amount <= 0 ? 0 : Math.max(2, Math.round(ratio * CHART_TRACK_HEIGHT));
         return (
-          <View key={d.month} style={chart.slot}>
+          <View
+            key={d.month}
+            style={chart.slot}
+            accessibilityLabel={`${d.label} earnings ${fmt(d.amount)}`}
+          >
             <View
               style={[
                 chart.track,
@@ -159,12 +180,7 @@ function EarningsCard3D({ data, displayName }: { data: EarningsSummary; displayN
 
   return (
     <View style={c3d.wrapper}>
-      <LinearGradient
-        colors={['#C94D88', '#8B6BC4', '#6FA84A']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={c3d.card}
-      >
+      <PremiumEarningsGradientCard style={c3d.card}>
         <View style={c3d.topRow}>
           <Image source={appIcon} style={c3d.logo} contentFit="contain" />
         </View>
@@ -183,7 +199,7 @@ function EarningsCard3D({ data, displayName }: { data: EarningsSummary; displayN
             <Text style={c3d.tierBadgeLabel}>{tierLabel}</Text>
           </View>
         </View>
-      </LinearGradient>
+      </PremiumEarningsGradientCard>
     </View>
   );
 }
@@ -263,11 +279,11 @@ const c3d = StyleSheet.create({
     opacity: 0.88,
   },
   tierCircleLeft: {
-    backgroundColor: '#EC4899',
+    backgroundColor: '#FF3CAC',
     left: 0,
   },
   tierCircleRight: {
-    backgroundColor: 'rgba(255,255,255,0.55)',
+    backgroundColor: '#FFD700',
     left: 20,
   },
   tierBadgeLabel: {
@@ -337,7 +353,9 @@ const totalEarned = StyleSheet.create({
 function MonthlyActivityCard({ data }: { data: EarningsSummary }) {
   return (
     <GlassCard style={activity.shell} contentStyle={activity.inner}>
-      <Text style={activity.title}>Monthly Activity</Text>
+      <Text style={activity.title} numberOfLines={1} adjustsFontSizeToFit>
+        Monthly Activity
+      </Text>
       <View style={activity.chartWrap}>
         <EarningsBarChart data={data.monthly_breakdown} />
       </View>
@@ -362,7 +380,10 @@ const activity = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: {
-    ...theme.typography.cardTitle,
+    fontFamily: theme.typography.cardTitle.fontFamily,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: theme.typography.cardTitle.fontWeight,
     color: 'rgba(255,255,255,0.88)',
     letterSpacing: 0.2,
   },
@@ -436,6 +457,131 @@ function EarningsWithdrawColumn({ onPress }: { onPress: () => void }) {
   );
 }
 
+function EarningsSkeleton() {
+  return (
+    <>
+      <View style={c3d.wrapper}>
+        <View style={[c3d.card, styles.skeletonCard]}>
+          <ShimmerCircle size={28} />
+          <View style={c3d.amountRow}>
+            <ShimmerText width="72%" height={44} />
+          </View>
+          <View style={c3d.bottomRow}>
+            <ShimmerText width="48%" height={14} />
+            <ShimmerBlock width={48} height={28} radius={14} />
+          </View>
+        </View>
+      </View>
+      <View style={styles.threeCardGrid}>
+        <View style={styles.threeCardLeftCol}>
+          <GlassCard style={totalEarned.shell} contentStyle={totalEarned.inner}>
+            <ShimmerText width="46%" height={13} />
+            <ShimmerText width="82%" height={24} />
+            <ShimmerText width="56%" height={11} />
+          </GlassCard>
+          <GlassCard style={activity.shell} contentStyle={activity.inner}>
+            <ShimmerText width="62%" height={18} />
+            <ShimmerBlock width="100%" height={CHART_TRACK_HEIGHT} radius={8} />
+          </GlassCard>
+        </View>
+        <View style={styles.threeCardRightCol}>
+          <GlassCard style={styles.withdrawShell} contentStyle={styles.withdrawInner}>
+            <ShimmerBlock
+              width="100%"
+              height={WITHDRAW_BTN_HEIGHT}
+              radius={WITHDRAW_BTN_HEIGHT / 2}
+            />
+          </GlassCard>
+        </View>
+      </View>
+      <View style={styles.transactionsSection}>
+        <View style={styles.sectionHeader}>
+          <ShimmerText width="52%" height={22} />
+        </View>
+        <GlassCard style={styles.txListShell} contentStyle={styles.txListInner}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <View key={index} style={styles.txListRow}>
+              <ShimmerBlock
+                width={TX_AVATAR_SIZE}
+                height={TX_AVATAR_SIZE}
+                radius={TX_AVATAR_RADIUS}
+              />
+              <View style={styles.txBody}>
+                <ShimmerText width="72%" height={16} />
+                <ShimmerText width="45%" height={13} />
+              </View>
+              <ShimmerText width={68} height={18} />
+              {index < 3 ? <View style={styles.txDivider} /> : null}
+            </View>
+          ))}
+        </GlassCard>
+      </View>
+    </>
+  );
+}
+
+function TransactionListRow({
+  transaction,
+  showDivider,
+}: {
+  transaction: EarningsTransaction;
+  showDivider: boolean;
+}) {
+  return (
+    <View style={styles.txListRow}>
+      <CampaignAvatar title={transaction.title} />
+      <View style={styles.txBody}>
+        <Text style={styles.txTitle} numberOfLines={1}>
+          {truncate(transaction.title, 28)}
+        </Text>
+        <Text style={styles.txMeta}>
+          {statusLabel(transaction.status)}
+          {transaction.date ? ' · ' + fmtDate(transaction.date) : ''}
+        </Text>
+      </View>
+      <View style={styles.txRight}>
+        <Text style={styles.txAmount}>{fmt(transaction.amount)}</Text>
+        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.34)" />
+      </View>
+      {showDivider ? <View style={styles.txDivider} /> : null}
+    </View>
+  );
+}
+
+function RecentTransactionsSection({ transactions }: { transactions: EarningsTransaction[] }) {
+  const visibleTransactions = transactions.slice(0, 10);
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(200).duration(500)}
+      style={styles.transactionsSection}
+    >
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionHeaderLeft}>
+          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+        </View>
+        <View style={styles.filterIcon}>
+          <Ionicons name="options-outline" size={16} color="rgba(255,255,255,0.55)" />
+        </View>
+      </View>
+
+      {visibleTransactions.length === 0 ? (
+        <EmptyState title="No earnings yet" subtitle="Complete a campaign to get paid" />
+      ) : (
+        <GlassCard style={styles.txListShell} contentStyle={styles.txListInner}>
+          {visibleTransactions.map((transaction, index) => (
+            <TransactionListRow
+              key={transaction.campaignId}
+              transaction={transaction}
+              showDivider={index < visibleTransactions.length - 1}
+            />
+          ))}
+        </GlassCard>
+      )}
+    </Animated.View>
+  );
+}
+
 const withdrawGlass = StyleSheet.create({
   pressable: {
     flex: 1,
@@ -473,9 +619,9 @@ function CampaignAvatar({ title }: { title: string }) {
 
 const avtr = StyleSheet.create({
   box: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: TX_AVATAR_SIZE,
+    height: TX_AVATAR_SIZE,
+    borderRadius: TX_AVATAR_RADIUS,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -490,7 +636,11 @@ const avtr = StyleSheet.create({
 
 export default function EarningsScreen() {
   const influencerProfile = useInfluencerProfile();
+  const bootstrap = useBootstrap();
   const earnings = useEarnings();
+  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
+  const earningsLoading = bootstrapLoading || shouldShowInitialLoader(earnings);
+  const profileLoading = bootstrapLoading || shouldShowInitialLoader(influencerProfile);
   const displayName =
     influencerProfile.data?.display_name ?? influencerProfile.data?.ig_username ?? 'Influencer';
 
@@ -516,8 +666,8 @@ export default function EarningsScreen() {
         />
       </View>
 
-      {earnings.isLoading ? (
-        <LoadingState label="Loading your earnings..." />
+      {earningsLoading ? (
+        <EarningsSkeleton />
       ) : earnings.isError ? (
         <ErrorState
           title="Couldn't load earnings"
@@ -527,7 +677,10 @@ export default function EarningsScreen() {
       ) : earnings.data ? (
         <>
           <Animated.View entering={FadeInDown.delay(0).duration(500)}>
-            <EarningsCard3D data={earnings.data} displayName={displayName} />
+            <EarningsCard3D
+              data={earnings.data}
+              displayName={profileLoading ? 'Influencer' : displayName}
+            />
           </Animated.View>
 
           <Animated.View
@@ -543,43 +696,7 @@ export default function EarningsScreen() {
             </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderLeft}>
-                <Text style={styles.sectionTitle}>Recent Transactions</Text>
-              </View>
-              <View style={styles.filterIcon}>
-                <Ionicons name="options-outline" size={16} color="rgba(255,255,255,0.55)" />
-              </View>
-            </View>
-          </Animated.View>
-
-          {earnings.data.transactions.length === 0 ? (
-            <EmptyState title="No earnings yet" subtitle="Complete a campaign to get paid" />
-          ) : (
-            earnings.data.transactions.slice(0, 10).map((tx, i) => (
-              <Animated.View
-                key={tx.campaignId}
-                entering={FadeInDown.delay(250 + Math.min(i, 4) * 40).duration(400)}
-              >
-                <GlassCard style={styles.txRowShell} contentStyle={styles.txRowInner}>
-                  <CampaignAvatar title={tx.title} />
-                  <View style={styles.txBody}>
-                    <Text style={styles.txTitle} numberOfLines={1}>
-                      {truncate(tx.title, 28)}
-                    </Text>
-                    <Text style={styles.txMeta}>
-                      {statusLabel(tx.status)}
-                      {tx.date ? ' · ' + fmtDate(tx.date) : ''}
-                    </Text>
-                  </View>
-                  <View style={styles.txRight}>
-                    <Text style={styles.txAmount}>+{fmt(tx.amount)}</Text>
-                  </View>
-                </GlassCard>
-              </Animated.View>
-            ))
-          )}
+          <RecentTransactionsSection transactions={earnings.data.transactions} />
         </>
       ) : null}
     </Screen>
@@ -615,6 +732,11 @@ const styles = StyleSheet.create({
     paddingLeft: theme.spacing.sm,
     flexDirection: 'column',
   },
+  skeletonCard: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
   withdrawShell: {
     flex: 1,
     width: '100%',
@@ -628,9 +750,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
   },
+  transactionsSection: {
+    gap: theme.spacing.lg,
+  },
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
   sectionHeaderLeft: {
@@ -641,25 +766,29 @@ const styles = StyleSheet.create({
     color: theme.colors.foreground,
   },
   filterIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.10)',
     alignItems: 'center',
     justifyContent: 'center',
+    transform: [{ translateX: -10 }, { translateY: 5 }],
   },
-  txRowShell: {
+  txListShell: {
     width: '100%',
-    borderRadius: CARD_CLUSTER_RADIUS,
+    borderRadius: 38,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
-  txRowInner: {
+  txListInner: {
+    paddingVertical: theme.spacing.sm,
+  },
+  txListRow: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
-    minHeight: 62,
-    paddingHorizontal: theme.spacing.lg,
+    minHeight: 76,
+    paddingHorizontal: theme.spacing.xl,
     paddingVertical: theme.spacing.md,
   },
   txBody: {
@@ -675,12 +804,23 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.50)',
   },
   txRight: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: theme.spacing.xs,
+    flexShrink: 0,
   },
   txAmount: {
     ...theme.typography.cardTitle,
     color: theme.colors.foreground,
     fontVariant: ['tabular-nums'],
+  },
+  txDivider: {
+    position: 'absolute',
+    left: theme.spacing.xl + TX_AVATAR_SIZE + theme.spacing.md,
+    right: theme.spacing.xl,
+    bottom: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.16)',
   },
 });

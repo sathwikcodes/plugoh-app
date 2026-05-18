@@ -4,8 +4,12 @@ import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { TextInput, View } from 'react-native';
 
-const SEARCH_TEXT = 'rgba(255,255,255,0.72)';
-const SEARCH_PLACEHOLDER_TONE = 'rgba(255,255,255,0.42)';
+const SEARCH_HEIGHT = 48;
+const SEARCH_INPUT_HEIGHT = 22;
+const SEARCH_INPUT_LINE_HEIGHT = 20;
+const SEARCH_TEXT = '#FFFFFF';
+const SEARCH_PLACEHOLDER_TONE = 'rgba(255,255,255,0.82)';
+const SEARCH_SELECTION = 'rgba(255,255,255,0.32)';
 
 export type GlassSearchFieldProps = {
   value: string;
@@ -21,7 +25,7 @@ export function GlassSearchField({ value, onChangeText, placeholder }: GlassSear
         alignItems: 'center',
         gap: theme.spacing.sm,
         paddingHorizontal: theme.spacing.lg,
-        minHeight: 48,
+        height: SEARCH_HEIGHT,
       }}
     >
       <Ionicons name="search" size={20} color={SEARCH_PLACEHOLDER_TONE} />
@@ -31,13 +35,19 @@ export function GlassSearchField({ value, onChangeText, placeholder }: GlassSear
         placeholder={placeholder}
         placeholderTextColor={SEARCH_PLACEHOLDER_TONE}
         cursorColor={SEARCH_TEXT}
-        selectionColor="rgba(255,255,255,0.35)"
+        selectionColor={SEARCH_SELECTION}
         style={{
           flex: 1,
           ...theme.typography.body,
+          lineHeight: SEARCH_INPUT_LINE_HEIGHT,
           color: SEARCH_TEXT,
-          paddingVertical: theme.spacing.sm,
+          height: SEARCH_INPUT_HEIGHT,
+          padding: 0,
+          margin: 0,
           backgroundColor: 'transparent',
+          includeFontPadding: false,
+          textAlignVertical: 'center',
+          transform: [{ translateY: -1 }],
         }}
       />
     </View>

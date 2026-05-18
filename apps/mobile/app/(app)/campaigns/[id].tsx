@@ -13,12 +13,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton, SecondaryButton } from '@/components/ui/primitives';
+import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { statusTone, theme } from '@/constants/theme';
 import { useBootstrap, useCampaign, useMarketplaceMutations } from '@/hooks/use-marketplace';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
 import type { CampaignListItem } from '@plugoh/contracts';
 
 function formatStatus(status?: string) {
-  if (!status) return 'Loading';
+  if (!status) return 'Status unavailable';
   return status.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -80,7 +82,7 @@ function formatDateTime(value?: string) {
 }
 
 function campaignDateLine(item?: CampaignListItem) {
-  if (!item) return 'Loading campaign';
+  if (!item) return 'Timing not specified';
   const timing = parseBriefValue(item.brief, 'Timing');
   if (timing) return timing.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return (
@@ -103,10 +105,12 @@ function DetailRow({
   icon,
   label,
   value,
+  loading,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
+  loading?: boolean;
 }) {
   return (
     <View style={styles.detailRow}>
@@ -115,9 +119,15 @@ function DetailRow({
       </View>
       <View style={styles.detailTextWrap}>
         <Text style={styles.detailLabel}>{label}</Text>
-        <Text selectable style={styles.detailValue} numberOfLines={2}>
-          {value}
-        </Text>
+        <AsyncText
+          loading={Boolean(loading)}
+          value={value}
+          selectable
+          style={styles.detailValue}
+          numberOfLines={2}
+          shimmerWidth="68%"
+          shimmerHeight={18}
+        />
       </View>
     </View>
   );
@@ -131,6 +141,8 @@ export default function CampaignDetailScreen() {
   const campaign = useCampaign(id);
   const mutations = useMarketplaceMutations();
   const role = bootstrap.data?.role ?? 'influencer';
+  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
+  const campaignLoading = bootstrapLoading || shouldShowInitialLoader(campaign);
 
   const item = campaign.data;
   const imageUrl = brandImageUrl(item);
@@ -208,16 +220,22 @@ export default function CampaignDetailScreen() {
             <Ionicons name="close" size={25} color="#FFFFFF" />
           </Pressable>
           <View style={[styles.previewPill, { backgroundColor: tone.bg }]}>
-            <Text style={[styles.previewText, { color: tone.fg }]}>
-              {formatStatus(item?.status)}
-            </Text>
+            <AsyncText
+              loading={campaignLoading}
+              value={formatStatus(item?.status)}
+              style={[styles.previewText, { color: tone.fg }]}
+              shimmerWidth={92}
+              shimmerHeight={18}
+            />
           </View>
         </View>
 
         <View style={styles.heroBottom}>
           <View style={styles.brandIdentity}>
             <View style={styles.brandAvatar}>
-              {imageUrl ? (
+              {campaignLoading ? (
+                <ShimmerCircle size={72} />
+              ) : imageUrl ? (
                 <Image
                   source={{ uri: imageUrl }}
                   style={styles.brandAvatarImage}
@@ -227,37 +245,61 @@ export default function CampaignDetailScreen() {
                 <Text style={styles.brandAvatarInitial}>{initial(brandName)}</Text>
               )}
             </View>
-            <Text style={styles.brandName} numberOfLines={1}>
-              {brandName}
-            </Text>
+            <AsyncText
+              loading={campaignLoading}
+              value={brandName}
+              style={styles.brandName}
+              numberOfLines={1}
+              shimmerWidth={140}
+              shimmerHeight={18}
+            />
           </View>
 
-          <Text
-            selectable
-            style={[
-              styles.heroTitle,
-              {
-                maxWidth: Math.min(window.width - theme.spacing.jumbo, 560),
-                fontSize: titleFontSize,
-                lineHeight: titleFontSize + 5,
-              },
-            ]}
-            numberOfLines={2}
-            adjustsFontSizeToFit
-            minimumFontScale={0.78}
-          >
-            {title}
-          </Text>
+          {campaignLoading ? (
+            <View style={{ alignItems: 'center', gap: theme.spacing.sm }}>
+              <ShimmerText width={Math.min(window.width - theme.spacing.jumbo, 360)} height={42} />
+              <ShimmerText width={Math.min(window.width - theme.spacing.jumbo, 260)} height={42} />
+            </View>
+          ) : (
+            <Text
+              selectable
+              style={[
+                styles.heroTitle,
+                {
+                  maxWidth: Math.min(window.width - theme.spacing.jumbo, 560),
+                  fontSize: titleFontSize,
+                  lineHeight: titleFontSize + 5,
+                },
+              ]}
+              numberOfLines={2}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+            >
+              {title}
+            </Text>
+          )}
 
           <View style={styles.eventPanel}>
             <View style={styles.eventPanelRow}>
               <Ionicons name="calendar" size={24} color="#B889FF" />
-              <Text style={styles.eventPanelText}>{campaignDateLine(item)}</Text>
+              <AsyncText
+                loading={campaignLoading}
+                value={campaignDateLine(item)}
+                style={styles.eventPanelText}
+                shimmerWidth="70%"
+                shimmerHeight={20}
+              />
             </View>
             <View style={styles.eventDivider} />
             <View style={styles.eventPanelRow}>
               <Ionicons name="location" size={24} color="#B889FF" />
-              <Text style={styles.eventPanelText}>{campaignLocation(item)}</Text>
+              <AsyncText
+                loading={campaignLoading}
+                value={campaignLocation(item)}
+                style={styles.eventPanelText}
+                shimmerWidth="76%"
+                shimmerHeight={20}
+              />
             </View>
           </View>
         </View>
@@ -265,21 +307,39 @@ export default function CampaignDetailScreen() {
 
       <View style={styles.body}>
         <View style={styles.nativeGroup}>
-          <DetailRow icon="cash" label="Payout" value={formatCurrency(item?.price_offered)} />
+          <DetailRow
+            icon="cash"
+            label="Payout"
+            value={formatCurrency(item?.price_offered)}
+            loading={campaignLoading}
+          />
           <DetailRow
             icon="sparkles"
             label="Package"
             value={formatPackageType(item?.package_type)}
+            loading={campaignLoading}
           />
           <DetailRow
             icon="flag"
             label="Objective"
             value={objective ? formatStatus(objective) : 'Not specified'}
+            loading={campaignLoading}
           />
-          <DetailRow icon="card" label="Payment" value={formatStatus(item?.payment_status)} />
+          <DetailRow
+            icon="card"
+            label="Payment"
+            value={formatStatus(item?.payment_status)}
+            loading={campaignLoading}
+          />
         </View>
 
-        {brief ? (
+        {campaignLoading ? (
+          <View style={styles.briefCard}>
+            <ShimmerText width="48%" height={18} />
+            <ShimmerText width="92%" height={15} />
+            <ShimmerText width="78%" height={15} />
+          </View>
+        ) : brief ? (
           <View style={styles.briefCard}>
             <Text style={styles.groupTitle}>Campaign brief</Text>
             <Text selectable style={styles.briefText}>
