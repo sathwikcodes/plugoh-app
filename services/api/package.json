@@ -25,7 +25,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "request": "hono request src/request-app.ts"
+    "request": "hono request src/request-app.ts",
+    "create:ai-campaign": "tsx src/scripts/create-ai-campaign.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",

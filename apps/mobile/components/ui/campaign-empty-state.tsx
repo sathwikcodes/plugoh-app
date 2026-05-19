@@ -9,7 +9,13 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-export function CampaignEmptyState() {
+export function CampaignEmptyState({
+  title = "You're all caught up!",
+  subtitle = 'No new campaign requests right now.\nPull down to check for updates.',
+}: {
+  title?: string;
+  subtitle?: string;
+}) {
   const scale = useSharedValue(0.3);
   const opacity = useSharedValue(0);
   const textOpacity = useSharedValue(0);
@@ -90,7 +96,7 @@ export function CampaignEmptyState() {
             textAlign: 'center',
           }}
         >
-          You're all caught up!
+          {title}
         </Text>
         <Text
           style={{
@@ -99,7 +105,7 @@ export function CampaignEmptyState() {
             textAlign: 'center',
           }}
         >
-          No new campaign requests right now.{'\n'}Pull down to check for updates.
+          {subtitle}
         </Text>
       </Animated.View>
     </View>

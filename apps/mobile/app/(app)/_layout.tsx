@@ -56,6 +56,7 @@ export default function AppLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       {role === 'business' ? <Stack.Screen name="(brand-tabs)" /> : <Stack.Screen name="(tabs)" />}
       <Stack.Screen name="campaigns/[id]" />
+      <Stack.Screen name="campaigns/[id]/brand" />
       <Stack.Screen name="creator/[id]" />
       <Stack.Screen name="booking/[id]" />
       <Stack.Screen name="booking/success" />

@@ -9,29 +9,48 @@ import { ShimmerBlock, ShimmerCircle, ShimmerText } from './shimmer';
 
 const CARD_GAP = theme.spacing.lg;
 
+export type CampaignDeckRole = 'business' | 'influencer';
+
 type Props = {
+  role: CampaignDeckRole;
   campaigns: CampaignListItem[];
   isLoading: boolean;
   cardWidth: number;
   cardHeight: number;
   viewportWidth: number;
+  emptyTitle?: string;
+  emptySubtitle?: string;
   onViewCampaign: (id: string) => void;
+  onAcceptCampaign?: (id: string) => void;
+  onDeclineCampaign?: (id: string) => void;
+  acceptingCampaignId?: string;
+  decliningCampaignId?: string;
 };
 
 type CarouselCardProps = {
+  role: CampaignDeckRole;
   campaign: CampaignListItem;
   cardWidth: number;
   cardHeight: number;
   interval: number;
   onViewCampaign: (id: string) => void;
+  onAcceptCampaign?: (id: string) => void;
+  onDeclineCampaign?: (id: string) => void;
+  acceptingCampaignId?: string;
+  decliningCampaignId?: string;
 };
 
 const CarouselCard = memo(function CarouselCard({
+  role,
   campaign,
   cardWidth,
   cardHeight,
   interval,
   onViewCampaign,
+  onAcceptCampaign,
+  onDeclineCampaign,
+  acceptingCampaignId,
+  decliningCampaignId,
 }: CarouselCardProps) {
   return (
     <Animated.View
@@ -43,12 +62,29 @@ const CarouselCard = memo(function CarouselCard({
       }}
     >
       <CampaignSwipeCard
+        role={role}
         campaign={campaign}
         cardWidth={cardWidth}
         cardHeight={cardHeight}
         onViewPress={() => {
           onViewCampaign(campaign.id);
         }}
+        onAcceptPress={
+          onAcceptCampaign
+            ? () => {
+                onAcceptCampaign(campaign.id);
+              }
+            : undefined
+        }
+        onDeclinePress={
+          onDeclineCampaign
+            ? () => {
+                onDeclineCampaign(campaign.id);
+              }
+            : undefined
+        }
+        acceptPending={acceptingCampaignId === campaign.id}
+        declinePending={decliningCampaignId === campaign.id}
       />
     </Animated.View>
   );
@@ -76,26 +112,47 @@ function CampaignCardSkeleton({
       }}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <ShimmerCircle size={58} />
-        <ShimmerBlock width={118} height={42} radius={21} />
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+            padding: 5,
+            paddingRight: theme.spacing.md,
+            borderRadius: 24,
+            backgroundColor: 'rgba(255,255,255,0.08)',
+          }}
+        >
+          <ShimmerCircle size={38} />
+          <ShimmerBlock width={96} height={16} radius={8} />
+        </View>
       </View>
       <View style={{ gap: theme.spacing.md }}>
-        <ShimmerText width="34%" height={12} />
         <ShimmerText width="88%" height={44} />
         <ShimmerText width="62%" height={44} />
-        <ShimmerBlock width="100%" height={48} radius={24} />
+        <View style={{ alignItems: 'center', gap: theme.spacing.sm }}>
+          <ShimmerText width="56%" height={18} />
+          <ShimmerText width="34%" height={18} />
+        </View>
       </View>
     </View>
   );
 }
 
 export function CampaignDeckSwiper({
+  role,
   campaigns,
   isLoading,
   cardWidth,
   cardHeight,
   viewportWidth,
+  emptyTitle,
+  emptySubtitle,
   onViewCampaign,
+  onAcceptCampaign,
+  onDeclineCampaign,
+  acceptingCampaignId,
+  decliningCampaignId,
 }: Props) {
   const scrollX = useSharedValue(0);
   const interval = cardWidth + CARD_GAP;
@@ -118,7 +175,7 @@ export function CampaignDeckSwiper({
   if (campaigns.length === 0) {
     return (
       <View style={{ width: viewportWidth, height: cardHeight, justifyContent: 'center' }}>
-        <CampaignEmptyState />
+        <CampaignEmptyState title={emptyTitle} subtitle={emptySubtitle} />
       </View>
     );
   }
@@ -148,11 +205,16 @@ export function CampaignDeckSwiper({
         {campaigns.map((campaign) => (
           <CarouselCard
             key={campaign.id}
+            role={role}
             campaign={campaign}
             cardWidth={cardWidth}
             cardHeight={cardHeight}
             interval={interval}
             onViewCampaign={onViewCampaign}
+            onAcceptCampaign={onAcceptCampaign}
+            onDeclineCampaign={onDeclineCampaign}
+            acceptingCampaignId={acceptingCampaignId}
+            decliningCampaignId={decliningCampaignId}
           />
         ))}
       </Animated.ScrollView>

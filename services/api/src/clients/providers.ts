@@ -1,12 +1,12 @@
-import crypto from "node:crypto";
-import { BUSINESS_TYPES, INFLUENCER_CATEGORIES, LANGUAGES } from "@plugoh/contracts";
-import Razorpay from "razorpay";
-import { Resend } from "resend";
-import { createClient } from "@supabase/supabase-js";
-import pRetry, { AbortError } from "p-retry";
-import type { EnvConfig } from "../config/env.js";
-import { requireConfig } from "../config/env.js";
-import { badRequest } from "../core/errors.js";
+import crypto from 'node:crypto';
+import { BUSINESS_TYPES, INFLUENCER_CATEGORIES, LANGUAGES } from '@plugoh/contracts';
+import Razorpay from 'razorpay';
+import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
+import pRetry, { AbortError } from 'p-retry';
+import type { EnvConfig } from '../config/env.js';
+import { requireConfig } from '../config/env.js';
+import { badRequest } from '../core/errors.js';
 
 class HttpStatusError extends Error {
   constructor(
@@ -19,7 +19,9 @@ class HttpStatusError extends Error {
 
 async function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
   try {
     return await run(controller.signal);
   } catch (error) {
@@ -35,13 +37,14 @@ async function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutM
 function shouldRetry(error: unknown) {
   if (error instanceof AbortError) return false;
   if (error instanceof HttpStatusError) return error.status >= 500;
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   return (
-    message.includes("timeout") ||
-    message.includes("network") ||
-    message.includes("econnreset") ||
-    message.includes("socket") ||
-    message.includes("5xx")
+    message.includes('timeout') ||
+    message.includes('network') ||
+    message.includes('econnreset') ||
+    message.includes('socket') ||
+    message.includes('5xx')
   );
 }
 
@@ -58,7 +61,7 @@ async function withRetry<T>(run: () => Promise<T>) {
   });
 }
 
-export type PaymentMethod = "card" | "upi" | "other";
+export type PaymentMethod = 'card' | 'upi' | 'other';
 
 export type RazorpayOrder = {
   id: string;
@@ -67,7 +70,12 @@ export type RazorpayOrder = {
 };
 
 export interface PaymentProvider {
-  createOrder(input: { amount: number; currency: "INR"; receipt?: string; payment_capture?: 0 | 1 }): Promise<RazorpayOrder>;
+  createOrder(input: {
+    amount: number;
+    currency: 'INR';
+    receipt?: string;
+    payment_capture?: 0 | 1;
+  }): Promise<RazorpayOrder>;
   fetchOrder(orderId: string): Promise<RazorpayOrder>;
   fetchPayment(paymentId: string): Promise<{ id: string; method: PaymentMethod }>;
   capturePayment(paymentId: string, amount: number): Promise<void>;
@@ -80,63 +88,66 @@ export class RazorpayProvider implements PaymentProvider {
   private readonly keySecret: string;
 
   constructor(config: EnvConfig) {
-    this.keySecret = requireConfig(config.razorpayKeySecret, "RAZORPAY_KEY_SECRET");
+    this.keySecret = requireConfig(config.razorpayKeySecret, 'RAZORPAY_KEY_SECRET');
     this.razorpay = new Razorpay({
-      key_id: requireConfig(config.razorpayKeyId, "RAZORPAY_KEY_ID"),
+      key_id: requireConfig(config.razorpayKeyId, 'RAZORPAY_KEY_ID'),
       key_secret: this.keySecret,
     });
   }
 
-  async createOrder(input: { amount: number; currency: "INR"; receipt?: string; payment_capture?: 0 | 1 }) {
-    const order = (await withRetry(() => withTimeout(() => this.razorpay.orders.create(input), 10_000))) as {
-      id: string;
-      amount: number;
-      currency: string;
-    };
+  async createOrder(input: {
+    amount: number;
+    currency: 'INR';
+    receipt?: string;
+    payment_capture?: 0 | 1;
+  }) {
+    const order: { id: string; amount: number; currency: string } = await withRetry(() =>
+      withTimeout(() => this.razorpay.orders.create(input), 10_000),
+    );
     return { id: order.id, amount: order.amount, currency: order.currency };
   }
 
   async fetchOrder(orderId: string) {
-    const order = (await withRetry(() => withTimeout(() => this.razorpay.orders.fetch(orderId), 10_000))) as {
-      id: string;
-      amount: number;
-      currency: string;
-    };
+    const order: { id: string; amount: number; currency: string } = await withRetry(() =>
+      withTimeout(() => this.razorpay.orders.fetch(orderId), 10_000),
+    );
     return { id: order.id, amount: order.amount, currency: order.currency };
   }
 
   async fetchPayment(paymentId: string) {
-    const payment = (await withRetry(() => withTimeout(() => this.razorpay.payments.fetch(paymentId), 10_000))) as {
-      id: string;
-      method: string;
-    };
-    const method: PaymentMethod = payment.method === "card" || payment.method === "upi" ? payment.method : "other";
+    const payment: { id: string; method: string } = await withRetry(() =>
+      withTimeout(() => this.razorpay.payments.fetch(paymentId), 10_000),
+    );
+    const method: PaymentMethod =
+      payment.method === 'card' || payment.method === 'upi' ? payment.method : 'other';
     return { id: payment.id, method };
   }
 
   async capturePayment(paymentId: string, amount: number) {
-    await withRetry(() => withTimeout(() => this.razorpay.payments.capture(paymentId, amount, "INR"), 10_000));
+    await withRetry(() =>
+      withTimeout(() => this.razorpay.payments.capture(paymentId, amount, 'INR'), 10_000),
+    );
   }
 
   async refundPayment(paymentId: string, amount: number) {
-    const refund = (await withRetry(() =>
+    const refund: { id: string } = await withRetry(() =>
       withTimeout(() => this.razorpay.payments.refund(paymentId, { amount }), 10_000),
-    )) as { id: string };
+    );
     return { id: refund.id };
   }
 
   verifySignature(input: { orderId: string; paymentId: string; signature: string }) {
     const expected = crypto
-      .createHmac("sha256", this.keySecret)
+      .createHmac('sha256', this.keySecret)
       .update(`${input.orderId}|${input.paymentId}`)
-      .digest("hex");
+      .digest('hex');
     if (expected.length !== input.signature.length) return false;
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(input.signature));
   }
 }
 
 export function verifyHmacSha256(input: { body: string; signature: string; secret: string }) {
-  const expected = crypto.createHmac("sha256", input.secret).update(input.body).digest("hex");
+  const expected = crypto.createHmac('sha256', input.secret).update(input.body).digest('hex');
   if (expected.length !== input.signature.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(input.signature));
 }
@@ -149,11 +160,16 @@ export class ResendEmailProvider implements EmailProvider {
   private readonly resend: Resend;
 
   constructor(config: EnvConfig) {
-    this.resend = new Resend(requireConfig(config.resendApiKey, "RESEND_API_KEY"));
+    this.resend = new Resend(requireConfig(config.resendApiKey, 'RESEND_API_KEY'));
   }
 
   async sendCallRequest(input: { to: string; subject: string; html: string }) {
-    await withRetry(() => withTimeout(() => this.resend.emails.send({ from: "Plugoh <noreply@plugoh.app>", ...input }), 10_000));
+    await withRetry(() =>
+      withTimeout(
+        () => this.resend.emails.send({ from: 'Plugoh <noreply@plugoh.app>', ...input }),
+        10_000,
+      ),
+    );
   }
 }
 
@@ -169,10 +185,10 @@ export class MetaInstagramProvider implements InstagramProvider {
 
   buildOAuthUrl(input: { state: string; scopes: string[] }) {
     const params = new URLSearchParams({
-      client_id: requireConfig(this.config.instagramClientId, "INSTAGRAM_CLIENT_ID"),
-      redirect_uri: requireConfig(this.config.instagramRedirectUri, "INSTAGRAM_REDIRECT_URI"),
-      scope: input.scopes.join(","),
-      response_type: "code",
+      client_id: requireConfig(this.config.instagramClientId, 'INSTAGRAM_CLIENT_ID'),
+      redirect_uri: requireConfig(this.config.instagramRedirectUri, 'INSTAGRAM_REDIRECT_URI'),
+      scope: input.scopes.join(','),
+      response_type: 'code',
       state: input.state,
     });
     return `https://api.instagram.com/oauth/authorize?${params.toString()}`;
@@ -180,31 +196,44 @@ export class MetaInstagramProvider implements InstagramProvider {
 
   async exchangeCode(code: string) {
     const body = new URLSearchParams({
-      client_id: requireConfig(this.config.instagramClientId, "INSTAGRAM_CLIENT_ID"),
-      client_secret: requireConfig(this.config.instagramAppSecret, "INSTAGRAM_APP_SECRET"),
-      grant_type: "authorization_code",
-      redirect_uri: requireConfig(this.config.instagramRedirectUri, "INSTAGRAM_REDIRECT_URI"),
+      client_id: requireConfig(this.config.instagramClientId, 'INSTAGRAM_CLIENT_ID'),
+      client_secret: requireConfig(this.config.instagramAppSecret, 'INSTAGRAM_APP_SECRET'),
+      grant_type: 'authorization_code',
+      redirect_uri: requireConfig(this.config.instagramRedirectUri, 'INSTAGRAM_REDIRECT_URI'),
       code,
     });
     const shortRes = await withRetry(() =>
-      withTimeout((signal) => fetch("https://api.instagram.com/oauth/access_token", { method: "POST", body, signal }), 10_000),
+      withTimeout(
+        (signal) =>
+          fetch('https://api.instagram.com/oauth/access_token', { method: 'POST', body, signal }),
+        10_000,
+      ),
     );
     if (!shortRes.ok) {
-      if (shortRes.status >= 500) throw new HttpStatusError(shortRes.status, "Instagram token exchange failed");
-      throw badRequest("INSTAGRAM_TOKEN_EXCHANGE_FAILED", "Instagram token exchange failed");
+      if (shortRes.status >= 500)
+        throw new HttpStatusError(shortRes.status, 'Instagram token exchange failed');
+      throw badRequest('INSTAGRAM_TOKEN_EXCHANGE_FAILED', 'Instagram token exchange failed');
     }
     const shortToken = (await shortRes.json()) as { access_token: string };
     const longParams = new URLSearchParams({
-      grant_type: "ig_exchange_token",
-      client_secret: requireConfig(this.config.instagramAppSecret, "INSTAGRAM_APP_SECRET"),
+      grant_type: 'ig_exchange_token',
+      client_secret: requireConfig(this.config.instagramAppSecret, 'INSTAGRAM_APP_SECRET'),
       access_token: shortToken.access_token,
     });
     const longRes = await withRetry(() =>
-      withTimeout((signal) => fetch(`https://graph.instagram.com/access_token?${longParams.toString()}`, { signal }), 10_000),
+      withTimeout(
+        (signal) =>
+          fetch(`https://graph.instagram.com/access_token?${longParams.toString()}`, { signal }),
+        10_000,
+      ),
     );
     if (!longRes.ok) {
-      if (longRes.status >= 500) throw new HttpStatusError(longRes.status, "Instagram long-lived token exchange failed");
-      throw badRequest("INSTAGRAM_TOKEN_EXCHANGE_FAILED", "Instagram long-lived token exchange failed");
+      if (longRes.status >= 500)
+        throw new HttpStatusError(longRes.status, 'Instagram long-lived token exchange failed');
+      throw badRequest(
+        'INSTAGRAM_TOKEN_EXCHANGE_FAILED',
+        'Instagram long-lived token exchange failed',
+      );
     }
     const longToken = (await longRes.json()) as { access_token: string; expires_in: number };
     return {
@@ -214,15 +243,24 @@ export class MetaInstagramProvider implements InstagramProvider {
   }
 
   async fetchProfile(accessToken: string) {
-    const fields = "id,username,biography,profile_picture_url,followers_count,follows_count,media_count";
+    const fields =
+      'id,username,biography,profile_picture_url,followers_count,follows_count,media_count';
     const res = await withRetry(() =>
-      withTimeout((signal) => fetch(`https://graph.instagram.com/me?fields=${fields}&access_token=${accessToken}`, { signal }), 10_000),
+      withTimeout(
+        (signal) =>
+          fetch(`https://graph.instagram.com/me?fields=${fields}&access_token=${accessToken}`, {
+            signal,
+          }),
+        10_000,
+      ),
     );
     if (!res.ok) {
-      if (res.status >= 500) throw new HttpStatusError(res.status, "Instagram profile fetch failed");
-      throw badRequest("INSTAGRAM_PROFILE_FETCH_FAILED", "Instagram profile fetch failed");
+      if (res.status >= 500)
+        throw new HttpStatusError(res.status, 'Instagram profile fetch failed');
+      throw badRequest('INSTAGRAM_PROFILE_FETCH_FAILED', 'Instagram profile fetch failed');
     }
     const profile = (await res.json()) as Record<string, unknown>;
+    const username = textValue(profile.username);
     return {
       ig_user_id: profile.id,
       ig_username: profile.username,
@@ -231,18 +269,26 @@ export class MetaInstagramProvider implements InstagramProvider {
       ig_followers_count: profile.followers_count,
       ig_follows_count: profile.follows_count,
       ig_media_count: profile.media_count,
-      instagram_url: profile.username ? `https://instagram.com/${profile.username}` : undefined,
+      instagram_url: username ? `https://instagram.com/${username}` : undefined,
     };
   }
 
   async fetchMedia(accessToken: string) {
-    const fields = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count";
+    const fields =
+      'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count';
     const res = await withRetry(() =>
-      withTimeout((signal) => fetch(`https://graph.instagram.com/me/media?fields=${fields}&limit=100&access_token=${accessToken}`, { signal }), 10_000),
+      withTimeout(
+        (signal) =>
+          fetch(
+            `https://graph.instagram.com/me/media?fields=${fields}&limit=100&access_token=${accessToken}`,
+            { signal },
+          ),
+        10_000,
+      ),
     );
     if (!res.ok) {
-      if (res.status >= 500) throw new HttpStatusError(res.status, "Instagram media fetch failed");
-      throw badRequest("INSTAGRAM_MEDIA_FETCH_FAILED", "Instagram media fetch failed");
+      if (res.status >= 500) throw new HttpStatusError(res.status, 'Instagram media fetch failed');
+      throw badRequest('INSTAGRAM_MEDIA_FETCH_FAILED', 'Instagram media fetch failed');
     }
     const payload = (await res.json()) as { data?: Record<string, unknown>[] };
     return (payload.data ?? []).map((item) => ({
@@ -263,6 +309,11 @@ export class MetaInstagramProvider implements InstagramProvider {
 export interface StorageProvider {
   uploadDelivery(input: { path: string; file: File }): Promise<string>;
   uploadMessageAttachment(input: { path: string; file: File }): Promise<string>;
+  uploadCampaignCardImage(input: {
+    path: string;
+    bytes: Uint8Array;
+    contentType: 'image/png' | 'image/jpeg';
+  }): Promise<{ path: string; publicUrl: string }>;
   signedUrl(path: string, expiresInSeconds: number): Promise<string>;
 }
 
@@ -271,40 +322,80 @@ export class SupabaseStorageProvider implements StorageProvider {
 
   constructor(config: EnvConfig) {
     this.client = createClient(
-      requireConfig(config.supabaseUrl, "SUPABASE_URL"),
-      requireConfig(config.supabaseServiceRoleKey, "SUPABASE_SERVICE_ROLE_KEY"),
+      requireConfig(config.supabaseUrl, 'SUPABASE_URL'),
+      requireConfig(config.supabaseServiceRoleKey, 'SUPABASE_SERVICE_ROLE_KEY'),
     );
   }
 
   async uploadDelivery(input: { path: string; file: File }) {
-    const { error } = await this.client.storage.from("campaign-deliveries").upload(input.path, input.file, {
-      contentType: input.file.type,
-      upsert: false,
-    });
+    const { error } = await this.client.storage
+      .from('campaign-deliveries')
+      .upload(input.path, input.file, {
+        contentType: input.file.type,
+        upsert: false,
+      });
     if (error) throw error;
     return input.path;
   }
 
   async uploadMessageAttachment(input: { path: string; file: File }) {
-    const { error } = await this.client.storage.from("campaign-messages").upload(input.path, input.file, {
-      contentType: input.file.type,
-      upsert: false,
-    });
+    const { error } = await this.client.storage
+      .from('campaign-messages')
+      .upload(input.path, input.file, {
+        contentType: input.file.type,
+        upsert: false,
+      });
     if (error) throw error;
     return input.path;
   }
 
+  async uploadCampaignCardImage(input: {
+    path: string;
+    bytes: Uint8Array;
+    contentType: 'image/png' | 'image/jpeg';
+  }) {
+    const bucket = this.client.storage.from('campaign-card-images');
+    const { error } = await bucket.upload(input.path, input.bytes, {
+      contentType: input.contentType,
+      upsert: true,
+    });
+    if (error) throw error;
+    const { data } = bucket.getPublicUrl(input.path);
+    return { path: input.path, publicUrl: data.publicUrl };
+  }
+
   async signedUrl(path: string, expiresInSeconds: number) {
-    const { data, error } = await this.client.storage.from("campaign-deliveries").createSignedUrl(path, expiresInSeconds);
+    const { data, error } = await this.client.storage
+      .from('campaign-deliveries')
+      .createSignedUrl(path, expiresInSeconds);
     if (error) throw error;
     return data.signedUrl;
   }
 }
 
 export interface AiProvider {
-  generateInfluencerProfile(input: { profile: Record<string, unknown>; media: Record<string, unknown>[] }): Promise<Record<string, unknown>>;
-  generateBusinessProfile(input: { profile: Record<string, unknown> }): Promise<Record<string, unknown>>;
+  generateInfluencerProfile(input: {
+    profile: Record<string, unknown>;
+    media: Record<string, unknown>[];
+  }): Promise<Record<string, unknown>>;
+  generateBusinessProfile(input: {
+    profile: Record<string, unknown>;
+  }): Promise<Record<string, unknown>>;
+  generateCampaignCreative(input: CampaignCreativeInput): Promise<CampaignCreativeResult>;
 }
+
+export type CampaignCreativeInput = {
+  campaign: Record<string, unknown>;
+  businessProfile?: Record<string, unknown> | null;
+  influencerProfile?: Record<string, unknown> | null;
+};
+
+export type CampaignCreativeResult = {
+  title: string;
+  imagePrompt: string;
+  imageBytes: Uint8Array;
+  imageMimeType: 'image/png' | 'image/jpeg';
+};
 
 export type PushMessage = {
   to: string;
@@ -332,10 +423,10 @@ export class ExpoPushProvider implements PushProvider {
     const response = await withRetry(() =>
       withTimeout(
         (signal) =>
-          fetch("https://exp.host/--/api/v2/push/send", {
-            method: "POST",
+          fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
             signal,
-            headers: { "content-type": "application/json" },
+            headers: { 'content-type': 'application/json' },
             body: JSON.stringify(messages),
           }),
         10_000,
@@ -343,8 +434,9 @@ export class ExpoPushProvider implements PushProvider {
     );
 
     if (!response.ok) {
-      if (response.status >= 500) throw new HttpStatusError(response.status, "Expo push send failed");
-      throw badRequest("PUSH_PROVIDER_ERROR", "Push provider rejected request");
+      if (response.status >= 500)
+        throw new HttpStatusError(response.status, 'Expo push send failed');
+      throw badRequest('PUSH_PROVIDER_ERROR', 'Push provider rejected request');
     }
 
     const payload = (await response.json()) as {
@@ -352,9 +444,9 @@ export class ExpoPushProvider implements PushProvider {
       errors?: Array<{ message?: string }>;
     };
     const ticketErrors = (payload.data ?? [])
-      .filter((ticket) => ticket.status === "error")
-      .map((ticket) => ticket.message ?? "Push ticket returned error");
-    const topErrors = (payload.errors ?? []).map((row) => row.message ?? "Push request failed");
+      .filter((ticket) => ticket.status === 'error')
+      .map((ticket) => ticket.message ?? 'Push ticket returned error');
+    const topErrors = (payload.errors ?? []).map((row) => row.message ?? 'Push request failed');
     const errors = [...ticketErrors, ...topErrors];
 
     return {
@@ -368,8 +460,11 @@ export class ExpoPushProvider implements PushProvider {
 export class ExternalAiProvider implements AiProvider {
   constructor(private readonly config: EnvConfig) {}
 
-  async generateInfluencerProfile(input: { profile: Record<string, unknown>; media: Record<string, unknown>[] }) {
-    if (this.config.aiProvider === "anthropic" && this.config.anthropicApiKey) {
+  async generateInfluencerProfile(input: {
+    profile: Record<string, unknown>;
+    media: Record<string, unknown>[];
+  }) {
+    if (this.config.aiProvider === 'anthropic' && this.config.anthropicApiKey) {
       try {
         return await this.generateInfluencerWithAnthropic(input);
       } catch {
@@ -380,7 +475,7 @@ export class ExternalAiProvider implements AiProvider {
   }
 
   async generateBusinessProfile(input: { profile: Record<string, unknown> }) {
-    if (this.config.aiProvider === "anthropic" && this.config.anthropicApiKey) {
+    if (this.config.aiProvider === 'anthropic' && this.config.anthropicApiKey) {
       try {
         return await this.generateBusinessWithAnthropic(input);
       } catch {
@@ -390,12 +485,31 @@ export class ExternalAiProvider implements AiProvider {
     return this.generateBusinessHeuristic(input);
   }
 
-  private generateInfluencerHeuristic(input: { profile: Record<string, unknown>; media: Record<string, unknown>[] }) {
-    const text = [input.profile.ig_biography, input.profile.bio, ...input.media.map((item) => item.caption)]
+  async generateCampaignCreative(input: CampaignCreativeInput) {
+    if (this.config.aiProvider !== 'azure_openai') {
+      throw badRequest(
+        'AI_PROVIDER_UNAVAILABLE',
+        'Azure OpenAI campaign creative provider is not configured',
+      );
+    }
+    return this.generateCampaignCreativeWithAzure(input);
+  }
+
+  private generateInfluencerHeuristic(input: {
+    profile: Record<string, unknown>;
+    media: Record<string, unknown>[];
+  }) {
+    const text = [
+      input.profile.ig_biography,
+      input.profile.bio,
+      ...input.media.map((item) => item.caption),
+    ]
       .filter(Boolean)
-      .join(" ")
+      .join(' ')
       .toLowerCase();
-    const followerCount = Number(input.profile.ig_followers_count ?? input.profile.follower_count ?? 0);
+    const followerCount = Number(
+      input.profile.ig_followers_count ?? input.profile.follower_count ?? 0,
+    );
     const avgEngagement = average(input.media.map((item) => Number(item.engagement ?? 0)));
     const category = inferInfluencerCategory(text);
     const languages = inferLanguages(text);
@@ -410,29 +524,38 @@ export class ExternalAiProvider implements AiProvider {
   }
 
   private generateBusinessHeuristic(input: { profile: Record<string, unknown> }) {
-    const brandName = String(input.profile.brand_name ?? input.profile.ig_username ?? "Brand").trim();
-    const brandType = String(input.profile.brand_type ?? inferBusinessType(String(input.profile.ig_biography ?? ""))).trim();
-    const summary = buildBusinessSummary(brandName, brandType, String(input.profile.ig_biography ?? ""));
+    const biography = textValue(input.profile.ig_biography);
+    const brandName = textValue(
+      input.profile.brand_name,
+      textValue(input.profile.ig_username, 'Brand'),
+    );
+    const brandType = textValue(input.profile.brand_type, inferBusinessType(biography));
+    const summary = buildBusinessSummary(brandName, brandType, biography);
     return {
       brand_summary: summary,
       tagline: buildBusinessTagline(brandName, brandType),
     };
   }
 
-  private async generateInfluencerWithAnthropic(input: { profile: Record<string, unknown>; media: Record<string, unknown>[] }) {
+  private async generateInfluencerWithAnthropic(input: {
+    profile: Record<string, unknown>;
+    media: Record<string, unknown>[];
+  }) {
     const response = await this.callAnthropic(
       [
-        "Return strict JSON with keys: category, languages, bio, price_per_reel, price_per_post, price_per_story.",
+        'Return strict JSON with keys: category, languages, bio, price_per_reel, price_per_post, price_per_story.',
         `Profile: ${JSON.stringify(input.profile)}`,
         `Media: ${JSON.stringify(input.media.slice(0, 20))}`,
-      ].join("\n"),
+      ].join('\n'),
       60_000,
     );
     const parsed = parseAnthropicJson(response);
     return {
-      category: String(parsed.category ?? "Other"),
-      languages: Array.isArray(parsed.languages) ? parsed.languages.map((item) => String(item)) : ["English"],
-      bio: String(parsed.bio ?? ""),
+      category: textValue(parsed.category, 'Other'),
+      languages: Array.isArray(parsed.languages)
+        ? parsed.languages.map((item) => String(item))
+        : ['English'],
+      bio: textValue(parsed.bio),
       price_per_reel: Number(parsed.price_per_reel ?? 1500),
       price_per_post: Number(parsed.price_per_post ?? 1000),
       price_per_story: Number(parsed.price_per_story ?? 500),
@@ -442,61 +565,422 @@ export class ExternalAiProvider implements AiProvider {
   private async generateBusinessWithAnthropic(input: { profile: Record<string, unknown> }) {
     const response = await this.callAnthropic(
       [
-        "Return strict JSON with keys: brand_summary, tagline.",
+        'Return strict JSON with keys: brand_summary, tagline.',
         `Profile: ${JSON.stringify(input.profile)}`,
-      ].join("\n"),
+      ].join('\n'),
       120_000,
     );
     const parsed = parseAnthropicJson(response);
     return {
-      brand_summary: String(parsed.brand_summary ?? ""),
-      tagline: String(parsed.tagline ?? ""),
+      brand_summary: textValue(parsed.brand_summary),
+      tagline: textValue(parsed.tagline),
     };
   }
 
-  private async callAnthropic(prompt: string, timeoutMs: number) {
-    const apiKey = requireConfig(this.config.anthropicApiKey, "ANTHROPIC_API_KEY");
+  private async generateCampaignCreativeWithAzure(input: CampaignCreativeInput) {
+    const chatJson = await this.callAzureChat(
+      [
+        'You are the creative director for premium campaign imagery.',
+        'Return strict JSON only with keys: title, imagePrompt.',
+        'title: 3 to 6 words, Gen Z but polished, memorable, brand-specific, collab/event energy, no hashtags, no emojis, no quotes, max 52 characters.',
+        'Avoid generic words like campaign, creator campaign, influencer, booking, package.',
+        'imagePrompt: create one full-bleed vertical premium mobile image for the exact campaign, optimized for a tall 9:14 aspect ratio.',
+        'The image should represent the brand owner, brand type, package/work being booked, objective, location/date/event if present, and the creator collaboration.',
+        'Place one strong hero subject in the upper image area, roughly 18% to 58% from the top, with the lower area kept smooth, quiet, and low-detail.',
+        'Frame any character with breathing room: show the full toy-like body or a relaxed waist-up view with head, torso, hands, and surrounding space visible. Avoid extreme close-ups, cropped faces, cropped heads, or characters pressed against the frame edges.',
+        'Use playful stylized 3D character art, Memoji-inspired mascots or toy-like creator characters only; never use photorealistic humans, real human portraits, real animals, or documentary photography.',
+        'Use a peaceful premium Gen Z aesthetic: happy, calm, modern, soft lighting, gentle depth, one cohesive dominant color palette, minimal supporting props, polished social energy.',
+        'The image must be a single continuous scene that fills the entire frame. Avoid inset squares, panels, grids, collage blocks, divided sections, picture frames, borders, split scenes, or multiple separate images.',
+        'Avoid pushing too many colors. Avoid clutter, rows of people, brand logos, UI, watermarks, distorted faces, distorted hands, or unsafe content.',
+        'Never include text, letters, numbers, signage, captions, labels, logos, UI, or watermark marks anywhere in the image.',
+        `Campaign: ${JSON.stringify(input.campaign)}`,
+        `Business profile: ${JSON.stringify(input.businessProfile ?? {})}`,
+        `Influencer profile: ${JSON.stringify(input.influencerProfile ?? {})}`,
+      ].join('\n'),
+    );
+    const parsed = parseAnthropicJson(chatJson);
+    const fallbackTitle = buildCampaignCreativeTitle(input);
+    const title = sanitizeCampaignTitle(textValue(parsed.title, fallbackTitle), fallbackTitle);
+    const imagePrompt = sanitizeImagePrompt(
+      textValue(parsed.imagePrompt, buildCampaignImagePrompt(input, title)),
+      input,
+      title,
+    );
+    const imageBytes = await this.callAzureImage(imagePrompt);
+    return {
+      title,
+      imagePrompt,
+      imageBytes,
+      imageMimeType: 'image/png' as const,
+    };
+  }
+
+  private async callAzureChat(prompt: string) {
+    const endpoint = requireConfig(
+      this.config.azureOpenAiEndpoint,
+      'AZURE_OPENAI_ENDPOINT',
+    ).replace(/\/+$/, '');
+    const deployment = requireConfig(
+      this.config.azureOpenAiChatDeployment,
+      'AZURE_OPENAI_CHAT_DEPLOYMENT',
+    );
+    const apiKey = requireConfig(this.config.azureOpenAiApiKey, 'AZURE_OPENAI_API_KEY');
+    const request =
+      endpoint.endsWith('/openai/v1') || endpoint.includes('/openai/v1/')
+        ? {
+            url: `${endpoint}/chat/completions`,
+            headers: {
+              authorization: `Bearer ${apiKey}`,
+              'content-type': 'application/json',
+            },
+            body: {
+              model: deployment,
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a precise creative director. Return valid JSON only.',
+                },
+                { role: 'user', content: prompt },
+              ],
+              temperature: 0.8,
+              max_tokens: 700,
+            },
+          }
+        : {
+            url: `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${
+              this.config.azureOpenAiApiVersion ?? '2025-04-01-preview'
+            }`,
+            headers: {
+              'api-key': apiKey,
+              'content-type': 'application/json',
+            },
+            body: {
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a precise creative director. Return valid JSON only.',
+                },
+                { role: 'user', content: prompt },
+              ],
+              temperature: 0.8,
+              max_tokens: 700,
+            },
+          };
     const response = await withRetry(() =>
       withTimeout(
         (signal) =>
-          fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
+          fetch(request.url, {
+            method: 'POST',
+            signal,
+            headers: request.headers,
+            body: JSON.stringify(request.body),
+          }),
+        30_000,
+      ),
+    );
+    if (!response.ok) {
+      const message = await providerErrorMessage(response, 'Azure OpenAI chat rejected request');
+      if (response.status >= 500) throw new HttpStatusError(response.status, message);
+      throw badRequest('AI_PROVIDER_ERROR', message);
+    }
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    return payload.choices?.[0]?.message?.content ?? '{}';
+  }
+
+  private async callAzureImage(prompt: string) {
+    if (this.config.azureImageProvider === 'mai') {
+      return this.callAzureMaiImage(prompt);
+    }
+
+    const endpoint = requireConfig(
+      this.config.azureOpenAiEndpoint,
+      'AZURE_OPENAI_ENDPOINT',
+    ).replace(/\/+$/, '');
+    const deployment = requireConfig(
+      this.config.azureOpenAiImageDeployment,
+      'AZURE_OPENAI_IMAGE_DEPLOYMENT',
+    );
+    const apiKey = requireConfig(this.config.azureOpenAiApiKey, 'AZURE_OPENAI_API_KEY');
+    const apiVersion = this.config.azureOpenAiApiVersion ?? '2025-04-01-preview';
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch(
+            `${endpoint}/openai/deployments/${deployment}/images/generations?api-version=${apiVersion}`,
+            {
+              method: 'POST',
+              signal,
+              headers: {
+                'api-key': apiKey,
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({
+                prompt,
+                n: 1,
+                size: this.config.azureOpenAiImageSize ?? '1024x1536',
+                quality: this.config.azureOpenAiImageQuality ?? 'medium',
+                output_format: 'png',
+              }),
+            },
+          ),
+        90_000,
+      ),
+    );
+    if (!response.ok) {
+      const message = await providerErrorMessage(
+        response,
+        'Azure OpenAI image generation rejected request',
+      );
+      if (response.status >= 500) throw new HttpStatusError(response.status, message);
+      throw badRequest('AI_PROVIDER_ERROR', message);
+    }
+    const payload = (await response.json()) as {
+      data?: Array<{ b64_json?: string; url?: string }>;
+    };
+    const image = payload.data?.[0];
+    if (image?.b64_json) {
+      return Buffer.from(image.b64_json, 'base64');
+    }
+    if (image?.url) {
+      return fetchImageBytes(image.url);
+    }
+    throw badRequest('AI_PROVIDER_ERROR', 'Azure OpenAI image generation returned no image');
+  }
+
+  private async callAzureMaiImage(prompt: string) {
+    const endpoint = requireConfig(this.config.azureMaiEndpoint, 'AZURE_MAI_ENDPOINT').replace(
+      /\/+$/,
+      '',
+    );
+    const deployment = requireConfig(
+      this.config.azureMaiImageDeployment ?? this.config.azureOpenAiImageDeployment,
+      'AZURE_MAI_IMAGE_DEPLOYMENT',
+    );
+    const apiKey = requireConfig(
+      this.config.azureMaiApiKey ?? this.config.azureOpenAiApiKey,
+      'AZURE_MAI_API_KEY',
+    );
+    const width = parseMaiDimension(this.config.azureMaiImageWidth, 1024);
+    const height = parseMaiDimension(this.config.azureMaiImageHeight, 1024);
+    validateMaiDimensions(width, height);
+
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch(`${endpoint}/mai/v1/images/generations`, {
+            method: 'POST',
             signal,
             headers: {
-              "content-type": "application/json",
-              "x-api-key": apiKey,
-              "anthropic-version": "2023-06-01",
+              'api-key': apiKey,
+              'content-type': 'application/json',
             },
             body: JSON.stringify({
-              model: "claude-3-5-haiku-latest",
+              model: deployment,
+              prompt,
+              width,
+              height,
+            }),
+          }),
+        90_000,
+      ),
+    );
+    if (!response.ok) {
+      const message = await providerErrorMessage(
+        response,
+        'Azure MAI image generation rejected request',
+      );
+      if (response.status >= 500) throw new HttpStatusError(response.status, message);
+      throw badRequest('AI_PROVIDER_ERROR', message);
+    }
+    const payload = (await response.json()) as {
+      data?: Array<{ b64_json?: string }>;
+    };
+    const b64Json = payload.data?.[0]?.b64_json;
+    if (b64Json) {
+      return Buffer.from(b64Json, 'base64');
+    }
+    throw badRequest('AI_PROVIDER_ERROR', 'Azure MAI image generation returned no image');
+  }
+
+  private async callAnthropic(prompt: string, timeoutMs: number) {
+    const apiKey = requireConfig(this.config.anthropicApiKey, 'ANTHROPIC_API_KEY');
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            signal,
+            headers: {
+              'content-type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+              model: 'claude-3-5-haiku-latest',
               max_tokens: 1024,
               temperature: 0.2,
-              messages: [{ role: "user", content: prompt }],
+              messages: [{ role: 'user', content: prompt }],
             }),
           }),
         timeoutMs,
       ),
     );
     if (!response.ok) {
-      if (response.status >= 500) throw new HttpStatusError(response.status, "Anthropic API failed");
-      throw badRequest("AI_PROVIDER_ERROR", "Anthropic API rejected request");
+      if (response.status >= 500)
+        throw new HttpStatusError(response.status, 'Anthropic API failed');
+      throw badRequest('AI_PROVIDER_ERROR', 'Anthropic API rejected request');
     }
     const payload = (await response.json()) as {
       content?: Array<{ type: string; text?: string }>;
     };
-    return payload.content?.find((item) => item.type === "text")?.text ?? "{}";
+    return payload.content?.find((item) => item.type === 'text')?.text ?? '{}';
   }
 }
 
 function parseAnthropicJson(text: string) {
-  const firstBrace = text.indexOf("{");
-  const lastBrace = text.lastIndexOf("}");
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
   if (firstBrace < 0 || lastBrace < 0 || lastBrace <= firstBrace) return {};
   try {
     return JSON.parse(text.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
   } catch {
     return {};
   }
+}
+
+function textValue(value: unknown, fallback = '') {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || fallback;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return fallback;
+}
+
+function parseMaiDimension(value: string | undefined, fallback: number) {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function validateMaiDimensions(width: number, height: number) {
+  if (width < 768 || height < 768 || width * height > 1_048_576) {
+    throw badRequest(
+      'AI_PROVIDER_ERROR',
+      'Azure MAI image dimensions must be at least 768x768 and no more than 1,048,576 total pixels',
+    );
+  }
+}
+
+async function providerErrorMessage(response: Response, fallback: string) {
+  const body = await response.text();
+  if (!body.trim()) return fallback;
+  try {
+    const payload = JSON.parse(body) as {
+      error?: { message?: string; code?: string };
+      message?: string;
+    };
+    const message = payload.error?.message ?? payload.message;
+    if (message) return `${fallback}: ${message}`;
+  } catch {
+    // Fall through to the trimmed response body.
+  }
+  return `${fallback}: ${body.trim().slice(0, 500)}`;
+}
+
+async function fetchImageBytes(url: string) {
+  const response = await withRetry(() => withTimeout((signal) => fetch(url, { signal }), 30_000));
+  if (!response.ok) {
+    if (response.status >= 500)
+      throw new HttpStatusError(response.status, 'Generated image download failed');
+    throw badRequest('AI_PROVIDER_ERROR', 'Generated image download failed');
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
+function sanitizeCampaignTitle(title: string, fallback: string) {
+  const normalized = title.replace(/["#]/g, '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return fallback;
+  return normalized.length > 52 ? normalized.slice(0, 49).trimEnd() + '...' : normalized;
+}
+
+function packageLabel(value: unknown) {
+  const raw = textValue(value, 'campaign');
+  return raw.replaceAll('_', ' ').replaceAll('+', ' + ');
+}
+
+function buildCampaignCreativeTitle(input: CampaignCreativeInput) {
+  const brandName = textValue(input.businessProfile?.brand_name, 'Brand');
+  const packageName = packageLabel(input.campaign.package_type);
+  const influencerName = textValue(
+    input.influencerProfile?.display_name,
+    textValue(input.influencerProfile?.ig_username),
+  );
+  const packageVibe =
+    packageName.toLowerCase().includes('reel') || packageName.toLowerCase().includes('video')
+      ? 'Reel Drop'
+      : packageName.toLowerCase().includes('story')
+        ? 'Story Drop'
+        : packageName.toLowerCase().includes('post')
+          ? 'Post Drop'
+          : 'Collab Drop';
+  return sanitizeCampaignTitle(
+    influencerName
+      ? `${brandName} ${packageVibe} with ${influencerName}`
+      : `${brandName} ${packageVibe}`,
+    'Creator Campaign',
+  );
+}
+
+function buildCampaignImagePrompt(input: CampaignCreativeInput, title: string) {
+  const brandName = textValue(input.businessProfile?.brand_name, 'the brand');
+  const brandType = textValue(input.businessProfile?.brand_type, 'lifestyle brand');
+  const brandSummary = textValue(input.businessProfile?.brand_summary);
+  const tagline = textValue(input.businessProfile?.tagline);
+  const location = textValue(
+    input.businessProfile?.brand_location,
+    textValue(input.influencerProfile?.city),
+  );
+  const packageName = packageLabel(input.campaign.package_type);
+  const objective = textValue(input.campaign.objective, textValue(input.campaign.brief));
+  const eventName = textValue(input.campaign.event_name);
+  const dueDate = textValue(input.campaign.due_date);
+  const influencerName = textValue(
+    input.influencerProfile?.display_name,
+    textValue(input.influencerProfile?.ig_username, 'the creator'),
+  );
+  return [
+    'Single full-bleed vertical premium mobile image, tall 9:14 aspect ratio, no UI frame.',
+    `Campaign concept: ${brandName}, a ${brandType}, collaborating with ${influencerName} for a ${packageName}.`,
+    objective ? `Work/objective cues: ${objective}.` : undefined,
+    brandSummary ? `Brand personality: ${brandSummary}.` : undefined,
+    tagline ? `Brand tagline mood: ${tagline}.` : undefined,
+    eventName ? `Event/place cue: ${eventName}.` : undefined,
+    dueDate ? `Timing cue: ${dueDate}.` : undefined,
+    location ? `Location flavor: ${location}.` : undefined,
+    `Hero placement: create one clear premium hero subject in the upper image area, roughly 18% to 58% from the top, representing the ${packageName} work for ${brandName}.`,
+    'Frame any character with breathing room: show the full toy-like body or a relaxed waist-up view with head, torso, hands, and surrounding space visible. Avoid extreme close-ups, cropped faces, cropped heads, or characters pressed against the frame edges.',
+    'Keep the lower area smooth, quiet, softly darker or naturally low-detail, with no objects competing for attention.',
+    'Character style: playful stylized 3D Memoji-inspired mascot or toy-like creator characters only; no photorealistic humans, no real human portraits, no real animals, no documentary photography.',
+    'Visual style: peaceful premium Gen Z, happy and calm, one cohesive dominant color palette, minimal supporting props, gentle depth, soft studio lighting, polished modern social energy.',
+    `Mood inspired by the title "${title}": warm, fresh, premium, creator-collab ready.`,
+    'Composition must be one continuous scene filling the entire frame; avoid inset squares, panels, grids, collage blocks, divided sections, picture frames, borders, split scenes, or multiple separate images.',
+    'Avoid pushing too many colors, clutter, rows of people, brand logos, UI, watermarks, distorted faces, or distorted hands.',
+    'Never include text, letters, numbers, signage, captions, labels, logos, UI, or watermark marks anywhere in the image.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function sanitizeImagePrompt(prompt: string, input: CampaignCreativeInput, title: string) {
+  const normalized = prompt.replace(/\s+/g, ' ').trim();
+  const fallback = buildCampaignImagePrompt(input, title);
+  const safe = normalized || fallback;
+  return safe.length > 1800 ? safe.slice(0, 1800).trimEnd() : safe;
 }
 
 function average(values: number[]) {
@@ -506,39 +990,44 @@ function average(values: number[]) {
 
 function inferInfluencerCategory(text: string) {
   const categoryMatchers: Record<(typeof INFLUENCER_CATEGORIES)[number], string[]> = {
-    Food: ["food", "recipe", "restaurant", "cafe", "meal", "biryani", "coffee"],
-    Fitness: ["fitness", "gym", "workout", "health", "trainer", "exercise", "protein"],
-    Beauty: ["beauty", "makeup", "skincare", "cosmetic", "glow", "haircare"],
-    Lifestyle: ["lifestyle", "daily", "routine", "self care", "life update"],
-    Travel: ["travel", "trip", "vacation", "hotel", "flight", "destination"],
-    Education: ["education", "study", "learn", "tutorial", "guide", "career"],
-    Tech: ["tech", "software", "app", "gadget", "review", "ai", "startup"],
-    Fashion: ["fashion", "style", "outfit", "lookbook", "wardrobe"],
+    Food: ['food', 'recipe', 'restaurant', 'cafe', 'meal', 'biryani', 'coffee'],
+    Fitness: ['fitness', 'gym', 'workout', 'health', 'trainer', 'exercise', 'protein'],
+    Beauty: ['beauty', 'makeup', 'skincare', 'cosmetic', 'glow', 'haircare'],
+    Lifestyle: ['lifestyle', 'daily', 'routine', 'self care', 'life update'],
+    Travel: ['travel', 'trip', 'vacation', 'hotel', 'flight', 'destination'],
+    Education: ['education', 'study', 'learn', 'tutorial', 'guide', 'career'],
+    Tech: ['tech', 'software', 'app', 'gadget', 'review', 'ai', 'startup'],
+    Fashion: ['fashion', 'style', 'outfit', 'lookbook', 'wardrobe'],
     Other: [],
   };
   for (const [category, keywords] of Object.entries(categoryMatchers)) {
     if (keywords.some((keyword) => text.includes(keyword))) return category;
   }
-  return "Other";
+  return 'Other';
 }
 
 function inferLanguages(text: string) {
   const languages: (typeof LANGUAGES)[number][] = [];
   const normalized = text.toLowerCase();
-  if (/[ऀ-ॿ]/u.test(text) || /\b(namaste|dhanyavaad|hindi)\b/.test(normalized)) languages.push("Hindi");
-  if (/[ఀ-౿]/u.test(text) || /\b(telugu)\b/.test(normalized)) languages.push("Telugu");
-  if (/[஀-௿]/u.test(text) || /\b(tamil)\b/.test(normalized)) languages.push("Tamil");
-  if (/[ಀ-೿]/u.test(text) || /\b(kannada)\b/.test(normalized)) languages.push("Kannada");
-  if (/[ഀ-ൿ]/u.test(text) || /\b(malayalam)\b/.test(normalized)) languages.push("Malayalam");
-  if (languages.length === 0 || /[a-z]/i.test(text)) languages.unshift("English");
+  if (/[ऀ-ॿ]/u.test(text) || /\b(namaste|dhanyavaad|hindi)\b/.test(normalized))
+    languages.push('Hindi');
+  if (/[ఀ-౿]/u.test(text) || /\b(telugu)\b/.test(normalized)) languages.push('Telugu');
+  if (/[஀-௿]/u.test(text) || /\b(tamil)\b/.test(normalized)) languages.push('Tamil');
+  if (/[ಀ-೿]/u.test(text) || /\b(kannada)\b/.test(normalized)) languages.push('Kannada');
+  if (/[ഀ-ൿ]/u.test(text) || /\b(malayalam)\b/.test(normalized)) languages.push('Malayalam');
+  if (languages.length === 0 || /[a-z]/i.test(text)) languages.unshift('English');
   return [...new Set(languages)];
 }
 
-function buildInfluencerBio(profile: Record<string, unknown>, category: string, languages: string[]) {
-  const displayName = String(profile.display_name ?? profile.ig_username ?? "Creator").trim();
-  const city = String(profile.city ?? "").trim();
-  const location = city ? ` based in ${city}` : "";
-  const languageLabel = languages.slice(0, 2).join(" & ");
+function buildInfluencerBio(
+  profile: Record<string, unknown>,
+  category: string,
+  languages: string[],
+) {
+  const displayName = textValue(profile.display_name, textValue(profile.ig_username, 'Creator'));
+  const city = textValue(profile.city);
+  const location = city ? ` based in ${city}` : '';
+  const languageLabel = languages.slice(0, 2).join(' & ');
   return `${displayName}${location} creating ${category.toLowerCase()} content for brands and audiences in ${languageLabel}.`;
 }
 
@@ -560,24 +1049,24 @@ function roundToNearestHundred(value: number) {
 function inferBusinessType(bio: string) {
   const normalized = bio.toLowerCase();
   const businessMatchers: Record<(typeof BUSINESS_TYPES)[number], string[]> = {
-    "Restaurant/Cafe": ["restaurant", "cafe", "food", "dining", "bistro"],
-    "D2C Brand": ["brand", "shop", "product", "storefront"],
-    "Local Business": ["local", "service", "studio", "clinic", "salon"],
-    "E-commerce": ["e-commerce", "ecommerce", "online store", "shipping"],
-    "SaaS/Tech": ["software", "saas", "tech", "platform", "app"],
-    Agency: ["agency", "marketing", "creative"],
-    "Personal Brand": ["coach", "founder", "creator", "consultant"],
+    'Restaurant/Cafe': ['restaurant', 'cafe', 'food', 'dining', 'bistro'],
+    'D2C Brand': ['brand', 'shop', 'product', 'storefront'],
+    'Local Business': ['local', 'service', 'studio', 'clinic', 'salon'],
+    'E-commerce': ['e-commerce', 'ecommerce', 'online store', 'shipping'],
+    'SaaS/Tech': ['software', 'saas', 'tech', 'platform', 'app'],
+    Agency: ['agency', 'marketing', 'creative'],
+    'Personal Brand': ['coach', 'founder', 'creator', 'consultant'],
     Other: [],
   };
   for (const [type, keywords] of Object.entries(businessMatchers)) {
     if (keywords.some((keyword) => normalized.includes(keyword))) return type;
   }
-  return "Other";
+  return 'Other';
 }
 
 function buildBusinessSummary(brandName: string, brandType: string, bio: string) {
   const baseBio = bio.trim();
-  if (baseBio) return `${brandName} is a ${brandType} focused on ${baseBio.replace(/\.$/, "")}.`;
+  if (baseBio) return `${brandName} is a ${brandType} focused on ${baseBio.replace(/\.$/, '')}.`;
   return `${brandName} is a ${brandType} building a clear, audience-friendly brand presence on Plugoh.`;
 }
 

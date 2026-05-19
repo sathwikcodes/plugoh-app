@@ -167,10 +167,17 @@ export interface InfluencerProfileResponse extends Influencer {
 export interface CampaignListItem {
   id: string;
   title: string;
+  ai_title?: string;
   brief?: string;
   status: CampaignStatus;
   price_offered?: number;
   package_type?: string;
+  card_image_url?: string;
+  card_image_path?: string;
+  card_image_prompt?: string;
+  creative_status?: 'pending' | 'ready' | 'failed';
+  creative_error?: string;
+  creative_generated_at?: string;
   expires_at?: string;
   delivery_submitted_at?: string;
   completed_at?: string;

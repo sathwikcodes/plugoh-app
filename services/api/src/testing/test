@@ -1,0 +1,13 @@
+npm run --workspace @plugoh/api create:ai-campaign -- \
+  --business-id "d3de3d66-4caa-49cf-a461-dee775d00a95" \
+  --influencer-id "f0383e18-42c0-4739-b6f0-ed40e41a692f" \
+  --package-type "reel" \
+  --objective "Gold jwellery showcase for vega jwellers" \
+  --timing-mode "scheduled" \
+  --due-date "2026-06-01" \
+  --event-name "Vega jwellers gold campaign" \
+  --brand-name "Vega jwellers" \
+  --brand-type "gold jwellery" \
+  --brand-location "Brooklyn, NY" \
+  --contact-email "test@plugoh.app" \
+  --contact-phone "+910000000000"

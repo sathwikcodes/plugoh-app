@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
+import { createServices } from './services/marketplace.js';
 import {
   FakeAiProvider,
   FakeEmailProvider,
@@ -67,6 +68,8 @@ function makeApp(seed = {}) {
     ...seed,
   });
   const payment = new FakePaymentProvider();
+  const storage = new FakeStorageProvider();
+  const ai = new FakeAiProvider();
   const app = createApp({
     store,
     config: {
@@ -83,13 +86,13 @@ function makeApp(seed = {}) {
     },
     providers: {
       payment,
-      storage: new FakeStorageProvider(),
+      storage,
       email: new FakeEmailProvider(),
       instagram: new FakeInstagramProvider(),
-      ai: new FakeAiProvider(),
+      ai,
     },
   });
-  return { app, store, payment };
+  return { app, store, payment, storage, ai };
 }
 
 class SearchFallbackStore extends MemoryDataStore {
@@ -361,6 +364,38 @@ describe('Plugoh API', () => {
     expect(res.status).toBe(201);
     expect((await json(res)).data.campaignId).toBeTruthy();
     expect(store.tables.get('notifications')?.[0].type).toBe('new_booking');
+    const campaign = store.tables.get('campaigns')?.[0];
+    expect(campaign?.ai_title).toBe('Aura Weekend Reel');
+    expect(campaign?.card_image_url).toContain('https://storage.test/campaigns/');
+    expect(campaign?.creative_status).toBe('ready');
+  });
+
+  it('keeps campaign creation successful when campaign creative generation fails', async () => {
+    const { app, store, ai } = makeApp();
+    ai.shouldFailCampaignCreative = true;
+
+    const res = await app.request('/campaigns', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        influencer_id: influencerId,
+        influencer_profile_id: influencerProfileId,
+        package_type: 'reel',
+        price_offered: 10000,
+        objective: 'visit_place',
+        timing_mode: 'choose_date',
+        due_date: '2026-07-01',
+        event_name: 'Hyderabad',
+        contact_email: 'brand@test.dev',
+        contact_phone: '+919999999999',
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const campaign = store.tables.get('campaigns')?.[0];
+    expect(campaign?.card_image_url).toBeUndefined();
+    expect(campaign?.creative_status).toBe('failed');
+    expect(campaign?.creative_error).toContain('fake campaign creative failure');
   });
 
   it('hydrates campaign business profile images from Instagram and common profile data', async () => {
@@ -613,6 +648,77 @@ describe('Plugoh API', () => {
       }),
     });
     expect(res.status).toBe(409);
+  });
+
+  it('generates campaign creative after successful booking payment verification', async () => {
+    const { app, store } = makeApp();
+    const orderId = 'order_booking_ok';
+    const paymentId = 'pay_card';
+
+    const res = await app.request('/payment/verify-booking-payment', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-verify-ok',
+      },
+      body: JSON.stringify({
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature(orderId, paymentId),
+        influencer_id: influencerId,
+        influencer_profile_id: influencerProfileId,
+        package_type: 'reel',
+        objective: 'feature_product',
+        timing_mode: 'asap',
+        contact_email: 'brand@test.dev',
+        contact_phone: '+919999999999',
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const campaignIdFromResponse = (await json(res)).data.campaignId;
+    const campaign = store.tables
+      .get('campaigns')
+      ?.find((row) => row.id === campaignIdFromResponse);
+    const escrow = store.tables
+      .get('escrow_transactions')
+      ?.find((row) => row.campaign_id === campaignIdFromResponse);
+    expect(escrow?.type).toBe('escrow_lock');
+    expect(campaign?.ai_title).toBe('Aura Weekend Reel');
+    expect(campaign?.card_image_url).toContain(`campaigns/${campaignIdFromResponse}/card.png`);
+  });
+
+  it('does not regenerate creative for campaigns that already have a card image', async () => {
+    const store = new MemoryDataStore({
+      campaigns: [
+        {
+          id: campaignId,
+          business_id: businessId,
+          influencer_id: influencerId,
+          title: 'Existing',
+          status: 'requested',
+          creative_status: 'ready',
+          card_image_url: 'https://cdn.test/existing.png',
+        },
+      ],
+      business_profiles: [],
+      influencer_profiles: [],
+    });
+    const storage = new FakeStorageProvider();
+    const services = createServices(
+      store,
+      {
+        storage,
+        ai: new FakeAiProvider(),
+      },
+      { port: 4000, demoEnabled: false, cronHttpEnabled: true, corsOrigin: '*' },
+    );
+
+    const campaign = await services.campaigns.generateCreative(campaignId);
+
+    expect(campaign.card_image_url).toBe('https://cdn.test/existing.png');
+    expect(storage.campaignImages).toHaveLength(0);
   });
 
   it('derives combo package pricing on create booking order', async () => {

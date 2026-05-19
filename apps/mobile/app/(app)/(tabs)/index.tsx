@@ -115,6 +115,7 @@ function ActionCard({
 function CampaignSpotlightCard({ campaign }: { campaign: CampaignListItem }) {
   const brandName = campaign.business_profile?.brand_name;
   const price = campaign.price_offered;
+  const title = campaign.ai_title?.trim() || campaign.title;
 
   return (
     <Pressable
@@ -134,7 +135,7 @@ function CampaignSpotlightCard({ campaign }: { campaign: CampaignListItem }) {
         status={campaign.status}
       />
       <Text style={styles.spotlightTitle} numberOfLines={2}>
-        {campaign.title}
+        {title}
       </Text>
       {brandName || price ? (
         <Text style={styles.spotlightMeta}>
@@ -253,7 +254,7 @@ export default function HomeScreen() {
             <ActionCard
               icon="time-outline"
               title="Delivery pending review"
-              subtitle={truncate(deliveryPending.title, 36)}
+              subtitle={truncate(deliveryPending.ai_title ?? deliveryPending.title, 36)}
               onPress={() => {
                 router.push('/(app)/(tabs)/campaigns');
               }}

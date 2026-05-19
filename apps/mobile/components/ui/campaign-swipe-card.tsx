@@ -1,18 +1,33 @@
 import { CAMPAIGN_CARD_CORNER_RADIUS } from '@/constants/campaign-card-frame';
 import { statusTone, theme } from '@/constants/theme';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type { CampaignListItem } from '@plugoh/contracts';
-import { Ionicons } from '@expo/vector-icons';
+import MaskedView from '@react-native-masked-view/masked-view';
+import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { useEffect, useMemo, useState, type ComponentProps } from 'react';
+import { ImageBackground, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import type { CampaignDeckRole } from './campaign-deck-swiper';
 
 type Props = {
+  role: CampaignDeckRole;
   campaign: CampaignListItem;
   cardWidth: number;
   cardHeight: number;
   style?: ViewStyle;
   onViewPress?: () => void;
+  onAcceptPress?: () => void;
+  onDeclinePress?: () => void;
+  acceptPending?: boolean;
+  declinePending?: boolean;
 };
+
+const ACTIONABLE_STATUSES = new Set(['requested', 'pre_authorized']);
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
 
 function formatBudget(amount?: number) {
   if (amount == null) return null;
@@ -32,209 +47,390 @@ function formatStatus(status?: string) {
   return status.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function brandImageUrl(campaign: CampaignListItem) {
-  return (
-    campaign.business_profile?.profile_photo_url ||
-    campaign.business_profile?.ig_profile_picture_url ||
-    campaign.business_profile?.avatar_url ||
-    undefined
-  );
-}
-
 function initial(value: string) {
   return value.trim().charAt(0).toUpperCase() || 'P';
 }
 
-function parseBriefValue(brief: string | undefined, label: string) {
-  if (!brief) return null;
-  const prefix = `${label}:`;
-  const match = brief
-    .split('\n')
-    .map((line) => line.trim())
-    .find((line) => line.toLowerCase().startsWith(prefix.toLowerCase()));
-  return match?.slice(prefix.length).trim() || null;
+function firstImageUrl(...candidates: Array<string | undefined>) {
+  return candidates.find((candidate) => Boolean(candidate?.trim()))?.trim();
 }
 
-function formatDateLabel(label: string, value?: string) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return `${label} ${date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
-}
-
-function campaignTiming(campaign: CampaignListItem) {
-  const briefTiming = parseBriefValue(campaign.brief, 'Timing');
-  if (briefTiming) {
-    return briefTiming.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-  return (
-    formatDateLabel('Done', campaign.completed_at) ||
-    formatDateLabel('Sent', campaign.delivery_submitted_at) ||
-    formatDateLabel('Expires', campaign.expires_at)
+function businessProfileImageUrl(campaign: CampaignListItem) {
+  return firstImageUrl(
+    campaign.business_profile?.profile_photo_url,
+    campaign.business_profile?.ig_profile_picture_url,
+    campaign.business_profile?.avatar_url,
   );
 }
 
-function compactMeta(campaign: CampaignListItem) {
-  return [
-    formatBudget(campaign.price_offered),
-    formatPackageType(campaign.package_type),
-    campaignTiming(campaign),
-  ].filter((value): value is string => Boolean(value));
+function influencerProfileImageUrl(campaign: CampaignListItem) {
+  return firstImageUrl(
+    campaign.influencer_profile?.profile_photo_url,
+    campaign.influencer_profile?.avatar_url,
+  );
 }
 
-export function CampaignSwipeCard({ campaign, cardWidth, cardHeight, style, onViewPress }: Props) {
-  const scale = Math.min(cardWidth / 360, cardHeight / 560);
-  const px = (value: number) => Math.round(value * scale);
-  const brandName = campaign.business_profile?.brand_name?.trim() || 'Plugoh brand';
-  const location = campaign.business_profile?.brand_location?.trim();
-  const venue = parseBriefValue(campaign.brief, 'Venue');
-  const imageUrl = brandImageUrl(campaign);
-  const statusLabel = formatStatus(campaign.status);
-  const tone = statusTone(campaign.status);
-  const meta = compactMeta(campaign);
-  const title = campaign.title.trim() || brandName;
-  const subtitle = [brandName, venue || location].filter(Boolean).join(' · ');
+function cardImageUrl(campaign: CampaignListItem) {
+  return firstImageUrl(campaign.card_image_url, businessProfileImageUrl(campaign));
+}
 
+function influencerBookedLine(campaign: CampaignListItem) {
+  const packageType = formatPackageType(campaign.package_type);
+  const price = formatBudget(campaign.price_offered);
+  if (packageType && price) return `Booked ${packageType} for ${price}`;
+  if (packageType) return `Booked ${packageType}`;
+  if (price) return `Booked for ${price}`;
+  return 'Booked campaign';
+}
+
+function creatorName(campaign: CampaignListItem) {
   return (
+    campaign.influencer_profile?.display_name?.trim() ||
+    campaign.influencer_profile?.ig_username?.trim() ||
+    'Creator'
+  );
+}
+
+function brandBookedLine(campaign: CampaignListItem) {
+  const packageType = formatPackageType(campaign.package_type);
+  const price = formatBudget(campaign.price_offered);
+  const parts = [creatorName(campaign), packageType, price].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : 'Booked campaign';
+}
+
+function formatExpiryLabel(expiresAt: string | undefined, now: number) {
+  if (!expiresAt) return null;
+  const expiresTime = new Date(expiresAt).getTime();
+  if (Number.isNaN(expiresTime)) return null;
+  const remaining = expiresTime - now;
+  if (remaining <= 0) return 'Expired';
+  if (remaining < HOUR_MS) return `${Math.ceil(remaining / MINUTE_MS)}m left`;
+  if (remaining < DAY_MS) return `${Math.ceil(remaining / HOUR_MS)}h left`;
+  return `${Math.ceil(remaining / DAY_MS)}d left`;
+}
+
+function statusIcon(status?: string): ComponentProps<typeof Ionicons>['name'] {
+  switch (status) {
+    case 'completed':
+      return 'checkmark-circle';
+    case 'delivery_submitted':
+      return 'paper-plane';
+    case 'in_escrow':
+      return 'lock-closed';
+    case 'payment_pending':
+    case 'pre_authorized':
+      return 'card';
+    case 'requested':
+      return 'sparkles';
+    case 'disputed':
+      return 'alert-circle';
+    case 'declined':
+    case 'cancelled':
+    case 'refunded':
+      return 'close-circle';
+    case 'expired':
+      return 'hourglass';
+    default:
+      return 'ellipse';
+  }
+}
+
+function InviteGlassButton({
+  label,
+  onPress,
+  disabled,
+  tint,
+  accessibilityLabel,
+}: {
+  label: string;
+  onPress?: () => void;
+  disabled?: boolean;
+  tint: 'accept' | 'decline';
+  accessibilityLabel: string;
+}) {
+  const tintOverlayColor =
+    tint === 'accept' ? 'rgba(35, 174, 97, 0.34)' : 'rgba(230, 70, 70, 0.34)';
+  const borderColor = tint === 'accept' ? 'rgba(94, 255, 168, 0.34)' : 'rgba(255, 126, 126, 0.34)';
+  const textColor = tint === 'accept' ? '#B8FFD3' : '#FFD0D0';
+  const shellStyle = [
+    styles.actionGlass,
+    {
+      borderColor,
+      opacity: disabled ? 0.58 : 1,
+    },
+  ];
+  const content = (
     <Pressable
-      onPress={onViewPress}
+      onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={`View ${title}`}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      hitSlop={8}
       style={({ pressed }) => [
-        styles.shell,
-        {
-          width: cardWidth,
-          height: cardHeight,
-          borderRadius: CAMPAIGN_CARD_CORNER_RADIUS,
-          transform: [{ scale: pressed ? 0.985 : 1 }],
-        },
-        style,
+        styles.actionPressable,
+        pressed && !disabled ? styles.pressed : null,
       ]}
     >
-      {imageUrl ? (
-        <Image
-          source={{ uri: imageUrl }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          transition={180}
-        />
-      ) : (
-        <LinearGradient
-          colors={['#1A0714', '#091610', '#050509']}
-          locations={[0, 0.48, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
-
-      <LinearGradient
-        colors={['rgba(0,0,0,0.62)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.18)', 'rgba(0,0,0,0.82)']}
-        locations={[0, 0.28, 0.55, 1]}
-        style={StyleSheet.absoluteFill}
+      <View
+        pointerEvents="none"
+        style={[styles.actionTint, { backgroundColor: tintOverlayColor }]}
       />
-      <LinearGradient
-        colors={['rgba(231,106,146,0.22)', 'rgba(245,192,166,0)', 'rgba(215,163,35,0.18)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {!imageUrl ? (
-        <View style={styles.fallbackArt} pointerEvents="none">
-          <Text style={[styles.fallbackInitial, { fontSize: px(168), lineHeight: px(176) }]}>
-            {initial(brandName)}
-          </Text>
-          <Text style={[styles.fallbackMark, { fontSize: px(44) }]}>plugoh</Text>
-        </View>
-      ) : null}
-
-      <View style={[styles.topRow, { padding: px(20) }]}>
-        <View
-          style={[
-            styles.avatarFrame,
-            {
-              width: px(58),
-              height: px(58),
-              borderRadius: px(29),
-            },
-          ]}
-        >
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.avatarImage} contentFit="cover" />
-          ) : (
-            <Text style={[styles.avatarInitial, { fontSize: px(23) }]}>{initial(brandName)}</Text>
-          )}
-        </View>
-
-        <View
-          style={[
-            styles.statusPill,
-            {
-              minHeight: px(42),
-              borderRadius: px(22),
-              backgroundColor: tone.bg,
-            },
-          ]}
-        >
-          <View style={[styles.statusDot, { backgroundColor: tone.fg }]} />
-          <Text style={[styles.statusText, { color: tone.fg, fontSize: px(14) }]} numberOfLines={1}>
-            {statusLabel}
-          </Text>
-        </View>
-      </View>
-
-      <View style={[styles.content, { padding: px(22), gap: px(14) }]}>
-        <Text style={[styles.brandKicker, { fontSize: px(12) }]} numberOfLines={1}>
-          PLUGOH CAMPAIGN
-        </Text>
-        <Text
-          selectable
-          style={[
-            styles.title,
-            {
-              fontSize: px(title.length > 30 ? 38 : 46),
-              lineHeight: px(title.length > 30 ? 42 : 50),
-            },
-          ]}
-          numberOfLines={3}
-          adjustsFontSizeToFit
-          minimumFontScale={0.78}
-        >
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text
-            style={[styles.subtitle, { fontSize: px(17), lineHeight: px(23) }]}
-            numberOfLines={2}
-          >
-            {subtitle}
-          </Text>
-        ) : null}
-
-        <View style={[styles.metaDock, { borderRadius: px(28), padding: px(8), gap: px(8) }]}>
-          {meta.slice(0, 3).map((item, index) => (
-            <View key={`${item}-${index}`} style={[styles.metaChip, { borderRadius: px(20) }]}>
-              <Ionicons
-                name={index === 0 ? 'cash' : index === 1 ? 'sparkles' : 'time'}
-                size={px(15)}
-                color="#FFF5CF"
-              />
-              <Text style={[styles.metaText, { fontSize: px(12) }]} numberOfLines={1}>
-                {item}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={[styles.viewRow, { marginTop: px(2) }]}>
-          <Text style={[styles.viewText, { fontSize: px(15) }]}>View details</Text>
-          <Ionicons name="arrow-forward" size={px(18)} color="#FFFFFF" />
-        </View>
-      </View>
+      <Text style={[styles.actionText, { color: textColor }]} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
+  );
+
+  if (isLiquidGlassAvailable()) {
+    return (
+      <GlassView isInteractive glassEffectStyle="regular" colorScheme="dark" style={shellStyle}>
+        {content}
+      </GlassView>
+    );
+  }
+
+  return (
+    <BlurView tint="systemUltraThinMaterialDark" intensity={82} style={shellStyle}>
+      {content}
+    </BlurView>
+  );
+}
+
+export function CampaignSwipeCard({
+  role,
+  campaign,
+  cardWidth,
+  cardHeight,
+  style,
+  onViewPress,
+  onAcceptPress,
+  onDeclinePress,
+  acceptPending,
+  declinePending,
+}: Props) {
+  const scale = Math.min(cardWidth / 360, cardHeight / 560);
+  const px = (value: number) => Math.round(value * scale);
+  const [now, setNow] = useState(() => Date.now());
+  const brandName = campaign.business_profile?.brand_name?.trim() || 'Plugoh brand';
+  const displayIdentity = role === 'business' ? creatorName(campaign) : brandName;
+  const ownerImageUrl =
+    role === 'business' ? influencerProfileImageUrl(campaign) : businessProfileImageUrl(campaign);
+  const imageUrl = cardImageUrl(campaign);
+  const title = campaign.ai_title?.trim() || campaign.title.trim() || brandName;
+  const detailLine =
+    role === 'business' ? brandBookedLine(campaign) : influencerBookedLine(campaign);
+  const expiryLabel = useMemo(
+    () => formatExpiryLabel(campaign.expires_at, now),
+    [campaign.expires_at, now],
+  );
+  const isExpired = expiryLabel === 'Expired';
+  const hasActiveTimer = Boolean(expiryLabel && !isExpired);
+  const badgeLabel = hasActiveTimer ? expiryLabel : formatStatus(campaign.status);
+  const badgeTone = hasActiveTimer
+    ? { bg: 'rgba(10,12,16,0.48)', fg: 'rgba(255,255,255,0.9)' }
+    : statusTone(campaign.status);
+  const badgeBorderColor = hasActiveTimer ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.16)';
+  const badgeIcon = hasActiveTimer ? 'time-outline' : statusIcon(campaign.status);
+  const isActionable =
+    role === 'influencer' && ACTIONABLE_STATUSES.has(campaign.status) && !isExpired;
+  const isMutating = Boolean(acceptPending || declinePending);
+  const actionRowHeight = px(56);
+  const bottomContentPadding = isActionable ? px(104) : px(36);
+
+  useEffect(() => {
+    if (!campaign.expires_at) return undefined;
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, MINUTE_MS);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [campaign.expires_at]);
+
+  return (
+    <View style={[styles.wrapper, { width: cardWidth, height: cardHeight }, style]}>
+      <View
+        style={[
+          styles.shell,
+          {
+            width: cardWidth,
+            height: cardHeight,
+            borderRadius: CAMPAIGN_CARD_CORNER_RADIUS,
+          },
+        ]}
+      >
+        {imageUrl ? (
+          <ImageBackground
+            source={{ uri: imageUrl }}
+            style={StyleSheet.absoluteFill}
+            imageStyle={styles.backgroundImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.fallbackBackground} />
+        )}
+
+        <LinearGradient
+          pointerEvents="none"
+          colors={[
+            'rgba(0,0,0,0)',
+            'rgba(10,12,16,0)',
+            'rgba(10,12,16,0.15)',
+            'rgba(10,12,16,0.45)',
+            'rgba(10,12,16,0.78)',
+            'rgba(10,12,16,0.97)',
+          ]}
+          locations={[0, 0.25, 0.42, 0.58, 0.72, 1]}
+          style={styles.backgroundGradient}
+        />
+
+        <MaskedView
+          pointerEvents="none"
+          style={styles.bottomFogMask}
+          maskElement={
+            <LinearGradient
+              colors={[
+                'rgba(0,0,0,0)',
+                'rgba(0,0,0,0.12)',
+                'rgba(0,0,0,0.42)',
+                'rgba(0,0,0,0.78)',
+                'rgba(0,0,0,1)',
+              ]}
+              locations={[0, 0.24, 0.52, 0.76, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+          }
+        >
+          <BlurView tint="dark" intensity={14} style={StyleSheet.absoluteFill} />
+        </MaskedView>
+
+        <Pressable
+          onPress={onViewPress}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${title}`}
+          style={({ pressed }) => [styles.cardHitArea, pressed ? styles.cardPressed : null]}
+        />
+
+        <View style={[styles.topRow, { padding: px(20) }]}>
+          <View
+            style={[
+              styles.statusPill,
+              {
+                minHeight: px(34),
+                borderRadius: px(17),
+                paddingHorizontal: px(11),
+                gap: px(6),
+                backgroundColor: badgeTone.bg,
+                borderColor: badgeBorderColor,
+              },
+            ]}
+          >
+            <Ionicons name={badgeIcon} size={px(14)} color={badgeTone.fg} />
+            <Text
+              style={[styles.statusPillText, { color: badgeTone.fg, fontSize: px(12) }]}
+              numberOfLines={1}
+            >
+              {badgeLabel}
+            </Text>
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.content,
+            {
+              paddingHorizontal: px(26),
+              paddingBottom: bottomContentPadding,
+              gap: px(9),
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.contentAvatarFrame,
+              {
+                width: px(54),
+                height: px(54),
+                borderRadius: px(27),
+              },
+            ]}
+          >
+            {ownerImageUrl ? (
+              <Image
+                source={{ uri: ownerImageUrl }}
+                style={styles.avatarImage}
+                contentFit="cover"
+              />
+            ) : (
+              <Text style={[styles.avatarInitial, { fontSize: px(22) }]}>
+                {initial(displayIdentity)}
+              </Text>
+            )}
+          </View>
+          <Text
+            selectable
+            style={[
+              styles.title,
+              {
+                fontSize: px(title.length > 30 ? 28 : 34),
+                lineHeight: px(title.length > 30 ? 33 : 40),
+              },
+            ]}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.78}
+          >
+            {title}
+          </Text>
+          <Text
+            style={[styles.detailLine, { fontSize: px(15), lineHeight: px(21) }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+          >
+            {detailLine}
+          </Text>
+        </View>
+
+        {isActionable ? (
+          <View
+            style={[
+              styles.actionRow,
+              {
+                height: actionRowHeight,
+                gap: px(10),
+                left: px(22),
+                right: px(22),
+                bottom: px(24),
+              },
+            ]}
+          >
+            <InviteGlassButton
+              label={declinePending ? 'Declining...' : 'Decline'}
+              tint="decline"
+              disabled={isMutating}
+              onPress={onDeclinePress}
+              accessibilityLabel={`Decline ${title}`}
+            />
+            <InviteGlassButton
+              label={acceptPending ? 'Accepting...' : 'Accept'}
+              tint="accept"
+              disabled={isMutating}
+              onPress={onAcceptPress}
+              accessibilityLabel={`Accept ${title}`}
+            />
+          </View>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    alignItems: 'center',
+  },
   shell: {
     overflow: 'hidden',
     borderCurve: 'continuous',
@@ -247,25 +443,30 @@ const styles = StyleSheet.create({
     shadowRadius: 22,
     elevation: 16,
   },
-  fallbackArt: {
+  fallbackBackground: {
     ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#202322',
   },
-  fallbackInitial: {
-    color: 'rgba(245,192,166,0.18)',
-    fontWeight: '900',
-    letterSpacing: -8,
-    textShadowColor: 'rgba(231,106,146,0.35)',
-    textShadowOffset: { width: 0, height: 10 },
-    textShadowRadius: 28,
+  backgroundImage: {
+    borderRadius: CAMPAIGN_CARD_CORNER_RADIUS,
   },
-  fallbackMark: {
+  backgroundGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  bottomFogMask: {
     position: 'absolute',
-    bottom: '38%',
-    color: 'rgba(255,255,255,0.12)',
-    fontWeight: '900',
-    letterSpacing: -2,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '60%',
+  },
+  cardHitArea: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 1,
+  },
+  cardPressed: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
   topRow: {
     position: 'absolute',
@@ -275,16 +476,15 @@ const styles = StyleSheet.create({
     zIndex: 3,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    justifyContent: 'flex-start',
   },
-  avatarFrame: {
+  contentAvatarFrame: {
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.84)',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.7)',
+    borderColor: 'rgba(255,255,255,0.78)',
   },
   avatarImage: {
     width: '100%',
@@ -295,89 +495,83 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   statusPill: {
-    maxWidth: '64%',
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
   },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontWeight: '900',
-    letterSpacing: 0.1,
+  statusPillText: {
+    fontWeight: '700',
+    letterSpacing: 0,
+    fontVariant: ['tabular-nums'],
   },
   content: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 2,
-  },
-  brandKicker: {
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '900',
-    letterSpacing: 1.6,
+    zIndex: 3,
+    alignItems: 'center',
   },
   title: {
     color: '#FFFFFF',
     fontFamily: theme.typography.display.fontFamily,
-    fontWeight: '900',
-    letterSpacing: -1.6,
+    fontWeight: '400',
+    letterSpacing: 0,
+    textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.42)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 12,
   },
-  subtitle: {
-    color: 'rgba(236,247,255,0.9)',
-    fontWeight: '700',
+  detailLine: {
+    color: 'rgba(255,255,255,0.68)',
+    fontWeight: '400',
+    letterSpacing: 0,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
     textShadowColor: 'rgba(0,0,0,0.36)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
   },
-  metaDock: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(7,7,10,0.46)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+  description: {
+    color: 'rgba(255,255,255,0.82)',
+    fontWeight: '500',
+    letterSpacing: 0,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.38)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 9,
   },
-  metaChip: {
-    flex: 1,
-    minWidth: 0,
+  actionRow: {
+    position: 'absolute',
+    zIndex: 4,
     flexDirection: 'row',
+  },
+  actionGlass: {
+    flex: 1,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderRadius: 28,
+    borderWidth: 1,
+  },
+  actionPressable: {
+    flex: 1,
+    minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 9,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    position: 'relative',
   },
-  metaText: {
-    minWidth: 0,
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
+  actionTint: {
+    ...StyleSheet.absoluteFillObject,
   },
-  viewRow: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+  actionText: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0,
   },
-  viewText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
+  pressed: {
+    opacity: 0.82,
   },
 });

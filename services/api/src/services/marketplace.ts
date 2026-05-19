@@ -73,7 +73,13 @@ export function createServices(
   config: EnvConfig,
 ): Services {
   const notifications = new NotificationService(store, providers.push);
-  const campaignCore = new CampaignService(store, notifications, providers.payment);
+  const campaignCore = new CampaignService(
+    store,
+    notifications,
+    providers.payment,
+    providers.storage,
+    providers.ai,
+  );
   const payments = new PaymentService(
     store,
     notifications,
@@ -206,6 +212,16 @@ function withInfluencerProfileImage(profile?: Row | null, account?: Row | null) 
   };
 }
 
+function creativeErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.slice(0, 240);
+}
+
+function campaignCreativePath(campaignId: string, mimeType: 'image/png' | 'image/jpeg') {
+  const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
+  return `campaigns/${campaignId}/card.${ext}`;
+}
+
 function hasGeneratedInfluencerFields(profile?: Row | null) {
   return Boolean(
     profile?.category &&
@@ -306,13 +322,14 @@ export class NotificationService {
   }
 
   private async sendPush(userId: string, type: NotificationType, data: Row) {
+    if (!this.push) return;
     const tokens = await this.store.list<Row>('user_push_tokens', {
       eq: { user_id: userId },
     });
     const activeTokens = tokens
       .map((row) => row.expo_push_token)
       .filter((value): value is string => typeof value === 'string' && value.length > 0);
-    if (activeTokens.length === 0 || !this.push) return;
+    if (activeTokens.length === 0) return;
     try {
       const result = await this.push.send(
         activeTokens.map((to) => ({
@@ -670,9 +687,16 @@ export class CampaignService {
     private readonly store: DataStore,
     private readonly notifications: NotificationService,
     private readonly payment?: PaymentProvider,
+    private readonly storage?: StorageProvider,
+    private readonly ai?: AiProvider,
   ) {}
 
-  async create(user: AuthUser, input: Row, paymentInput: Partial<Row> = {}) {
+  async create(
+    user: AuthUser,
+    input: Row,
+    paymentInput: Partial<Row> = {},
+    options: { skipCreative?: boolean } = {},
+  ) {
     const profileService = new ProfileService(this.store);
     await profileService.assertBusinessComplete(user.id);
     const influencer = await this.store.findOne<Row>('influencer_profiles', {
@@ -729,6 +753,9 @@ export class CampaignService {
       read_by: [user.id],
       created_at: nowIso(),
     });
+    if (!options.skipCreative) {
+      await this.generateCreative(campaign.id);
+    }
     return { campaignId: campaign.id };
   }
 
@@ -742,7 +769,7 @@ export class CampaignService {
     if (query.search) {
       const term = String(query.search).toLowerCase();
       campaigns = campaigns.filter((campaign) =>
-        [campaign.title, campaign.brief, campaign.package_type].some((value) =>
+        [campaign.ai_title, campaign.title, campaign.brief, campaign.package_type].some((value) =>
           String(value ?? '')
             .toLowerCase()
             .includes(term),
@@ -786,6 +813,75 @@ export class CampaignService {
       order: { column: 'created_at', ascending: true },
     });
     return { ...(await this.withProfiles(campaign)), delivery, messages };
+  }
+
+  async generateCreative(id: string) {
+    const campaign = await this.store.getById<Row>('campaigns', id);
+    if (!campaign) throw notFound('Campaign');
+    if (campaign.card_image_url || campaign.creative_status === 'ready') {
+      return campaign;
+    }
+
+    await this.store.update(
+      'campaigns',
+      { eq: { id } },
+      { creative_status: 'pending', creative_error: null, updated_at: nowIso() },
+    );
+
+    if (!this.ai || !this.storage) {
+      const error = 'Campaign creative requires configured AI and storage providers';
+      await this.markCreativeFailed(id, error);
+      return { ...campaign, creative_status: 'failed', creative_error: error };
+    }
+
+    try {
+      const [business, influencer] = await Promise.all([
+        this.store.findOne<Row>('business_profiles', { eq: { user_id: campaign.business_id } }),
+        this.store.findOne<Row>('influencer_profiles', { eq: { user_id: campaign.influencer_id } }),
+      ]);
+      const creative = await this.ai.generateCampaignCreative({
+        campaign,
+        businessProfile: business,
+        influencerProfile: influencer,
+      });
+      const upload = await this.storage.uploadCampaignCardImage({
+        path: campaignCreativePath(id, creative.imageMimeType),
+        bytes: creative.imageBytes,
+        contentType: creative.imageMimeType,
+      });
+      const [updated] = await this.store.update<Row>(
+        'campaigns',
+        { eq: { id } },
+        {
+          ai_title: creative.title,
+          card_image_url: upload.publicUrl,
+          card_image_path: upload.path,
+          card_image_prompt: creative.imagePrompt,
+          creative_status: 'ready',
+          creative_error: null,
+          creative_generated_at: nowIso(),
+          updated_at: nowIso(),
+        },
+      );
+      return updated ?? (await this.store.getById<Row>('campaigns', id)) ?? campaign;
+    } catch (error) {
+      const message = creativeErrorMessage(error);
+      logger.warn({ err: error, campaignId: id }, 'Campaign creative generation failed');
+      await this.markCreativeFailed(id, message);
+      return { ...campaign, creative_status: 'failed', creative_error: message };
+    }
+  }
+
+  private async markCreativeFailed(id: string, message: string) {
+    await this.store.update(
+      'campaigns',
+      { eq: { id } },
+      {
+        creative_status: 'failed',
+        creative_error: message,
+        updated_at: nowIso(),
+      },
+    );
   }
 
   async accept(user: AuthUser, id: string) {
@@ -1106,6 +1202,7 @@ export class PaymentService {
         payment_captured_at: payment.method === 'upi' ? nowIso() : undefined,
         expires_at: futureIso(24 * HOUR_MS),
       },
+      { skipCreative: true },
     );
     const campaign = await this.store.getById<Row>('campaigns', created.campaignId);
     await this.store.insert('escrow_transactions', {
@@ -1118,6 +1215,7 @@ export class PaymentService {
       status: payment.method === 'upi' ? 'success' : 'pending',
       created_at: nowIso(),
     });
+    await this.campaigns.generateCreative(created.campaignId);
     return { success: true, campaignId: created.campaignId };
   }
 
