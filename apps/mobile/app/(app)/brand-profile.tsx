@@ -2,7 +2,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { GlassCircleButton } from '@/components/ui/glass-circle-button';
 import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useBootstrap, useBusinessProfile, useCampaigns } from '@/hooks/use-marketplace';
+import { useBusinessProfile } from '@/hooks/use-marketplace';
 import { logout } from '@/lib/auth/logout';
 import {
   getPushNotificationsPreference,
@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   AppState,
@@ -32,25 +32,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, {
-  Circle,
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Path,
-  Stop,
-} from 'react-native-svg';
 
 const SETTINGS_GROUP_RADIUS = 28;
 const SIGN_OUT_GLASS_TINT = 'rgba(211, 83, 83, 0.28)';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-function formatAmount(n?: number) {
-  if (!n) return '₹0';
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${String(Math.round(n))}`;
-}
 
 function initials(name?: string | null): string {
   if (!name) return 'B';
@@ -60,77 +46,6 @@ function initials(name?: string | null): string {
     .join('')
     .toUpperCase()
     .slice(0, 2);
-}
-
-function groupMonthlySpend(items: Array<{ created_at?: string; price_offered?: number }>) {
-  const grouped = new Map<string, number>();
-  items.forEach((item) => {
-    const date = item.created_at ? new Date(item.created_at) : null;
-    if (!date || Number.isNaN(date.getTime())) return;
-    const monthKey = date.toLocaleString('en-US', { month: 'short' });
-    grouped.set(monthKey, (grouped.get(monthKey) ?? 0) + (item.price_offered ?? 0));
-  });
-  return Array.from(grouped.entries()).map(([month, amount]) => ({ month, amount }));
-}
-
-function buildPath(points: Array<{ x: number; y: number }>) {
-  if (!points.length) return '';
-  if (points.length === 1) return `M ${points[0]?.x ?? 0} ${points[0]?.y ?? 0}`;
-  return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-}
-
-// ─── SpendChart ───────────────────────────────────────────────────────────────
-
-function SpendChart({ data }: { data: Array<{ month: string; amount: number }> }) {
-  if (data.length < 2) {
-    return (
-      <View style={styles.emptyChart}>
-        <SymbolView
-          name="chart.line.uptrend.xyaxis"
-          size={28}
-          tintColor="rgba(255,255,255,0.18)"
-          type="monochrome"
-          fallback={<Ionicons name="analytics-outline" size={28} color="rgba(255,255,255,0.18)" />}
-        />
-        <Text style={styles.emptyChartText}>Trend appears after campaigns launch.</Text>
-      </View>
-    );
-  }
-  const chartW = 320;
-  const chartH = 102;
-  const maxVal = Math.max(...data.map((d) => d.amount), 1);
-  const stepX = chartW / (data.length - 1);
-  const points = data.map((d, i) => ({
-    x: i * stepX,
-    y: chartH - (d.amount / maxVal) * (chartH - 12),
-  }));
-  const linePath = buildPath(points);
-  const areaPath = `${linePath} L ${chartW} ${chartH} L 0 ${chartH} Z`;
-
-  return (
-    <View>
-      <Svg width="100%" height={140} viewBox={`0 0 ${chartW} 140`}>
-        <Defs>
-          <SvgLinearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={theme.colors.accentSoft} stopOpacity={0.9} />
-            <Stop offset="1" stopColor={theme.colors.accentSoft} stopOpacity={0.08} />
-          </SvgLinearGradient>
-        </Defs>
-        <Path d={areaPath} fill="url(#spendFill)" />
-        <Path d={linePath} stroke={theme.colors.accentStrong} strokeWidth={3} fill="none" />
-        {points.map((p) => (
-          <Circle key={p.x} cx={p.x} cy={p.y} r={4} fill={theme.colors.accentStrong} />
-        ))}
-      </Svg>
-      <View style={styles.monthLabels}>
-        {data.map((d) => (
-          <Text key={d.month} style={styles.monthLabel}>
-            {d.month}
-          </Text>
-        ))}
-      </View>
-    </View>
-  );
 }
 
 // ─── SettingRow ───────────────────────────────────────────────────────────────
@@ -265,58 +180,12 @@ function NotificationToggleRow({ first }: { first?: boolean }) {
   );
 }
 
-// ─── Badges ───────────────────────────────────────────────────────────────────
-
-const BRAND_BADGES = [
-  {
-    id: 'first_campaign',
-    name: 'First Campaign',
-    icon: 'flag-outline',
-    unlocked: (c: number) => c >= 1,
-  },
-  {
-    id: 'five_campaigns',
-    name: '5 Campaigns',
-    icon: 'briefcase-outline',
-    unlocked: (c: number) => c >= 5,
-  },
-  {
-    id: 'connected',
-    name: 'Connected',
-    icon: 'logo-instagram',
-    unlocked: (_c: number, ig: boolean) => ig,
-  },
-  {
-    id: 'profile_complete',
-    name: 'Profile Complete',
-    icon: 'shield-checkmark-outline',
-    unlocked: (_c: number, _ig: boolean, complete: boolean) => complete,
-  },
-] as const;
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BrandProfileScreen() {
   const insets = useSafeAreaInsets();
-  const bootstrap = useBootstrap();
   const profile = useBusinessProfile();
-  const campaigns = useCampaigns();
-  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
   const profileLoading = shouldShowInitialLoader(profile);
-  const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
-
-  const launchedCampaigns = campaigns.data?.items.length ?? 0;
-  const totalSpent = useMemo(
-    () => (campaigns.data?.items ?? []).reduce((sum, item) => sum + (item.price_offered ?? 0), 0),
-    [campaigns.data?.items],
-  );
-  const monthlySpend = useMemo(
-    () => groupMonthlySpend(campaigns.data?.items ?? []),
-    [campaigns.data?.items],
-  );
-  const profileComplete = Boolean(
-    profile.data?.brand_name && profile.data.brand_type && profile.data.brand_summary,
-  );
 
   const igConnected = Boolean(profile.data?.instagram_connected);
   const brandName = profile.data?.brand_name;
@@ -409,132 +278,6 @@ export default function BrandProfileScreen() {
       </Pressable>
 
       <View style={styles.sectionDivider} />
-
-      {/* ── Instagram card ── */}
-      {profileLoading ? (
-        <GlassCard style={styles.igConnectedCard} contentStyle={styles.igConnectedInner}>
-          <ShimmerCircle size={36} />
-          <View style={styles.settingBody}>
-            <ShimmerText width="58%" height={17} />
-            <ShimmerText width="38%" height={13} />
-          </View>
-        </GlassCard>
-      ) : igConnected ? (
-        <GlassCard style={styles.igConnectedCard} contentStyle={styles.igConnectedInner}>
-          <View style={[styles.iconBox, { backgroundColor: theme.colors.success }]}>
-            <Ionicons name="logo-instagram" size={17} color="#fff" />
-          </View>
-          <View style={styles.settingBody}>
-            <Text style={styles.settingTitle}>Instagram Connected</Text>
-            <Text style={styles.settingSubtitle}>Your account is linked</Text>
-          </View>
-          <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
-        </GlassCard>
-      ) : (
-        <Pressable
-          onPress={() => {
-            router.push('/(app)/profile/instagram');
-          }}
-          style={({ pressed }) => [styles.igCtaCard, pressed && { opacity: 0.88 }]}
-        >
-          <LinearGradient
-            colors={['#EC4899', '#A855F7']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.igCtaGradient}
-          >
-            <View style={styles.igCtaLeft}>
-              <Text style={styles.igCtaTitle}>Connect Instagram</Text>
-              <Text style={styles.igCtaBody}>
-                Link your account to{'\n'}unlock full campaign features.
-              </Text>
-              <View style={styles.igCtaBtn}>
-                <Text style={styles.igCtaBtnText}>Connect now →</Text>
-              </View>
-            </View>
-            <Ionicons
-              name="logo-instagram"
-              size={72}
-              color="rgba(255,255,255,0.12)"
-              style={styles.igCtaDecor}
-            />
-          </LinearGradient>
-        </Pressable>
-      )}
-
-      {/* ── Stats row ── */}
-      <View style={styles.statsRow}>
-        <GlassCard style={styles.statCard} contentStyle={styles.statInner}>
-          <AsyncText
-            loading={campaignsLoading}
-            value={launchedCampaigns}
-            style={styles.statValue}
-            shimmerWidth={38}
-            shimmerHeight={24}
-          />
-          <Text style={styles.statLabel}>Campaigns Launched</Text>
-        </GlassCard>
-        <GlassCard style={styles.statCard} contentStyle={styles.statInner}>
-          <AsyncText
-            loading={campaignsLoading}
-            value={formatAmount(totalSpent)}
-            style={styles.statValue}
-            numberOfLines={1}
-            shimmerWidth={74}
-            shimmerHeight={24}
-          />
-          <Text style={styles.statLabel}>Total Spent</Text>
-        </GlassCard>
-      </View>
-
-      {/* ── Badges ── */}
-      <Text style={styles.sectionHeader}>Achievements</Text>
-      <View style={styles.badgeRow}>
-        {profileLoading || campaignsLoading
-          ? BRAND_BADGES.map((badge) => (
-              <View key={badge.id} style={[styles.badgeCard, styles.badgeLocked]}>
-                <ShimmerCircle size={22} />
-                <ShimmerText width="70%" height={12} />
-              </View>
-            ))
-          : BRAND_BADGES.map((badge) => {
-              const unlocked = badge.unlocked(launchedCampaigns, igConnected, profileComplete);
-              return (
-                <View
-                  key={badge.id}
-                  style={[styles.badgeCard, unlocked ? styles.badgeUnlocked : styles.badgeLocked]}
-                >
-                  <Ionicons
-                    name={badge.icon}
-                    size={22}
-                    color={unlocked ? theme.colors.accentStrong : 'rgba(255,255,255,0.2)'}
-                  />
-                  <Text
-                    style={[
-                      styles.badgeName,
-                      { color: unlocked ? theme.colors.accentStrong : 'rgba(255,255,255,0.2)' },
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {badge.name}
-                  </Text>
-                </View>
-              );
-            })}
-      </View>
-
-      {/* ── Monthly Spend chart ── */}
-      <Text style={styles.sectionHeader}>Monthly Spend</Text>
-      <GlassCard style={styles.chartCard} contentStyle={styles.chartInner}>
-        {campaignsLoading ? (
-          <>
-            <ShimmerText width="44%" height={14} />
-            <ShimmerText width="100%" height={76} />
-          </>
-        ) : (
-          <SpendChart data={monthlySpend} />
-        )}
-      </GlassCard>
 
       {/* ── Account settings group ── */}
       <Text style={styles.sectionHeader}>Account</Text>
@@ -668,76 +411,6 @@ const styles = StyleSheet.create({
     marginVertical: theme.spacing.xs,
   },
 
-  // Instagram card
-  igConnectedCard: {},
-  igConnectedInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: 14,
-  },
-  igCtaCard: { borderRadius: 24, overflow: 'hidden' },
-  igCtaGradient: {
-    borderRadius: 24,
-    paddingHorizontal: theme.spacing.xxl,
-    paddingVertical: theme.spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  igCtaLeft: { flex: 1, gap: 8 },
-  igCtaTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  igCtaBody: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: 'rgba(255,255,255,0.72)',
-  },
-  igCtaBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginTop: 4,
-  },
-  igCtaBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  igCtaDecor: {
-    position: 'absolute',
-    right: -8,
-    bottom: -8,
-  },
-
-  // Stats
-  statsRow: { flexDirection: 'row', gap: theme.spacing.sm },
-  statCard: { flex: 1 },
-  statInner: {
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
-  },
-  statValue: {
-    ...theme.typography.section,
-    color: theme.colors.foreground,
-    fontVariant: ['tabular-nums'],
-  },
-  statLabel: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.45)',
-    textAlign: 'center',
-    fontSize: 11,
-  },
-
-  // Badges
   sectionHeader: {
     ...theme.typography.label,
     color: 'rgba(255,255,255,0.45)',
@@ -747,62 +420,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     paddingLeft: 4,
     marginTop: theme.spacing.xs,
-  },
-  badgeRow: { flexDirection: 'row', gap: 10 },
-  badgeCard: {
-    flex: 1,
-    height: 80,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 8,
-  },
-  badgeUnlocked: {
-    backgroundColor: theme.colors.accentSoft,
-    borderWidth: 1.5,
-    borderColor: theme.colors.pink,
-  },
-  badgeLocked: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  badgeName: {
-    fontSize: 9,
-    lineHeight: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-
-  // Chart
-  chartCard: {},
-  chartInner: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  emptyChart: {
-    height: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  emptyChartText: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.3)',
-    textAlign: 'center',
-  },
-  monthLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: -6,
-    paddingHorizontal: 2,
-  },
-  monthLabel: {
-    fontSize: 10,
-    lineHeight: 12,
-    color: 'rgba(255,255,255,0.28)',
   },
 
   // Settings groups

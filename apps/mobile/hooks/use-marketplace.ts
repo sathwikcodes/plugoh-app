@@ -73,12 +73,12 @@ export function useInfluencerProfile() {
   });
 }
 
-export function useBusinessProfile() {
+export function useBusinessProfile(options?: { enabled?: boolean }) {
   const session = useAuthStore((state) => state.session);
   return useQuery({
     queryKey: queryKeys.profile('business'),
     queryFn: endpoints.businessProfile,
-    enabled: Boolean(session),
+    enabled: Boolean(session && (options?.enabled ?? true)),
   });
 }
 
