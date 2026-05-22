@@ -2,7 +2,16 @@ import { authTypography } from '@/components/auth/typography';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useRef } from 'react';
-import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = {
@@ -10,9 +19,16 @@ type Props = {
   onClose: () => void;
   onEmail: () => void;
   onGoogle: () => void;
+  googleLoading?: boolean;
 };
 
-export function GetStartedModal({ visible, onClose, onEmail, onGoogle }: Props) {
+export function GetStartedModal({
+  visible,
+  onClose,
+  onEmail,
+  onGoogle,
+  googleLoading = false,
+}: Props) {
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(500)).current;
 
@@ -52,29 +68,47 @@ export function GetStartedModal({ visible, onClose, onEmail, onGoogle }: Props) 
             <View style={styles.logoCircle}>
               <View style={styles.logoDiamond} />
             </View>
-            <Pressable onPress={onClose} style={styles.closeButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close sign-in options"
+              onPress={onClose}
+              style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
+            >
               <Ionicons name="close" size={18} color="#666666" />
             </Pressable>
           </View>
 
-          <Text style={styles.heading}>Get Started</Text>
+          <Text style={styles.heading}>Start with Plugoh</Text>
           <Text style={styles.body}>
-            Register for events, subscribe to calendars and manage campaigns.
+            Sign in to book creators, manage delivery, and keep campaign payments protected.
           </Text>
 
-          <Pressable style={[styles.button, styles.emailButton]} onPress={onEmail}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continue with email"
+            style={({ pressed }) => [styles.button, styles.emailButton, pressed && styles.pressed]}
+            onPress={onEmail}
+          >
             <Text style={styles.emailButtonText}>Continue with Email</Text>
           </Pressable>
 
           <View style={styles.socialRow}>
-            <Pressable style={styles.socialButton}>
-              <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
-              <Text style={styles.socialText}>Apple</Text>
-            </Pressable>
-
-            <Pressable style={styles.socialButton} onPress={onGoogle}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
+              style={({ pressed }) => [
+                styles.socialButton,
+                pressed && !googleLoading && styles.pressed,
+                googleLoading && styles.disabled,
+              ]}
+              disabled={googleLoading}
+              onPress={onGoogle}
+            >
               <Ionicons name="logo-google" size={20} color="#FFFFFF" />
-              <Text style={styles.socialText}>Google</Text>
+              <Text style={styles.socialText}>
+                {googleLoading ? 'Connecting Google...' : 'Continue with Google'}
+              </Text>
+              {googleLoading ? <ActivityIndicator color="#FFFFFF" size="small" /> : null}
             </Pressable>
           </View>
 
@@ -148,6 +182,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pressed: {
+    opacity: 0.78,
+  },
   heading: {
     ...authTypography.displaySm,
     fontSize: 22,
@@ -178,13 +215,10 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   socialRow: {
-    flexDirection: 'row',
-    gap: 8,
     marginTop: 2,
     marginBottom: 18,
   },
   socialButton: {
-    flex: 1,
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
@@ -194,6 +228,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
+  },
+  disabled: {
+    opacity: 0.62,
   },
   socialText: {
     ...authTypography.bodyStrong,

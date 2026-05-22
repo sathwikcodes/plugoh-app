@@ -2,7 +2,7 @@ import { AnimatedPillButton } from '@/components/auth/AnimatedPillButton';
 import { LumaTextField } from '@/components/auth/LumaTextField';
 import { authTypography } from '@/components/auth/typography';
 import { theme } from '@/constants/theme';
-import { supabase } from '@/lib/supabase/client';
+import { sendEmailOtp } from '@/lib/auth/otp';
 import { Feather } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { router } from 'expo-router';
@@ -20,17 +20,18 @@ export default function EmailScreen() {
   const handleNext = async () => {
     if (!isValidEmail || isSending) return;
     setIsSending(true);
-    const cleaned = email.trim().toLowerCase();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: cleaned,
-      options: { shouldCreateUser: true },
-    });
-    setIsSending(false);
-    if (error) {
-      Alert.alert('Could not send code', error.message);
-      return;
+    try {
+      const cleaned = await sendEmailOtp(email);
+      router.push({ pathname: '/(auth)/verify', params: { email: cleaned } });
+    } catch (error) {
+      Alert.alert('Could not send code', error instanceof Error ? error.message : 'Try again.');
+    } finally {
+      setIsSending(false);
     }
-    router.push({ pathname: '/(auth)/verify', params: { email: cleaned } });
+  };
+
+  const handleEmailChange = (next: string) => {
+    setEmail(next);
   };
 
   return (
@@ -45,16 +46,19 @@ export default function EmailScreen() {
           </View>
 
           <Text style={styles.heading}>Continue with Email</Text>
-          <Text style={styles.subheading}>Sign in or sign up with your email.</Text>
+          <Text style={styles.subheading}>We’ll send a one-time code. No password needed.</Text>
 
           <LumaTextField
             value={email}
-            onChangeText={setEmail}
-            placeholder="Email Address"
+            onChangeText={handleEmailChange}
+            placeholder="Email address"
             keyboardType="email-address"
             autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
             autoCorrect={false}
             autoFocus
+            accessibilityLabel="Email address"
           />
         </View>
 

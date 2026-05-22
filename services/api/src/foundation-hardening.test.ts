@@ -78,6 +78,8 @@ function makeApp(
       if (token === 'business') return { id: businessId, email: 'brand@test.dev' };
       if (token === 'influencer') return { id: influencerId, email: 'creator@test.dev' };
       if (token === 'outsider') return { id: outsiderId, email: 'outsider@test.dev' };
+      if (token === 'newuser')
+        return { id: '55555555-5555-4555-8555-555555555555', email: 'new@test.dev' };
       throw new Error('bad token');
     },
     providers: {
@@ -107,6 +109,18 @@ describe('Foundation Hardening Routes', () => {
     expect(res.status).toBe(200);
     expect(body.data.user.id).toBe(influencerId);
     expect(body.data.onboardingStage).toBe('needs_basics');
+  });
+
+  it('routes newly authenticated users without a role into role selection', async () => {
+    const { app } = makeApp();
+    const res = await app.request('/me/bootstrap', {
+      headers: { authorization: 'Bearer newuser' },
+    });
+    const body = await json(res);
+    expect(res.status).toBe(200);
+    expect(body.data.user.email).toBe('new@test.dev');
+    expect(body.data.role).toBeNull();
+    expect(body.data.onboardingStage).toBe('needs_role');
   });
 
   it('returns JSON when authenticated bootstrap requests are rate limited', async () => {

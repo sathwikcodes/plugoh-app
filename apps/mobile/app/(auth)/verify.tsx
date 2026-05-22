@@ -2,11 +2,12 @@ import { AnimatedPillButton } from '@/components/auth/AnimatedPillButton';
 import { OtpInputRow } from '@/components/auth/OtpInputRow';
 import { authTypography } from '@/components/auth/typography';
 import { theme } from '@/constants/theme';
+import { sendEmailOtp } from '@/lib/auth/otp';
 import { supabase } from '@/lib/supabase/client';
 import { Feather } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,15 +20,30 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const CODE_LENGTH = 6;
+const RESEND_COOLDOWN_SECONDS = 30;
 
 export default function VerifyScreen() {
   const headerHeight = useHeaderHeight();
   const { email } = useLocalSearchParams<{ email?: string }>();
   const [token, setToken] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(RESEND_COOLDOWN_SECONDS);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   const normalizedToken = useMemo(() => token.replace(/\D/g, '').slice(0, CODE_LENGTH), [token]);
   const canContinue = normalizedToken.length === CODE_LENGTH;
+  const canResend = Boolean(email) && !isResending && resendSeconds === 0;
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = setTimeout(() => {
+      setResendSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [resendSeconds]);
 
   const handleVerify = async () => {
     if (!email) {
@@ -51,6 +67,28 @@ export default function VerifyScreen() {
     router.replace('/');
   };
 
+  const handleResend = async () => {
+    if (!email) {
+      Alert.alert('Missing email', 'Go back and request a fresh code.');
+      return;
+    }
+    if (!canResend) return;
+
+    setIsResending(true);
+    setResendMessage(null);
+    try {
+      await sendEmailOtp(email);
+      setToken('');
+      setResendSeconds(RESEND_COOLDOWN_SECONDS);
+      setResendMessage('A fresh code is on its way.');
+    } catch (error) {
+      setResendSeconds(10);
+      Alert.alert('Could not resend code', error instanceof Error ? error.message : 'Try again.');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <KeyboardAvoidingView
@@ -69,9 +107,26 @@ export default function VerifyScreen() {
           </Text>
 
           <OtpInputRow value={normalizedToken} onChange={setToken} length={CODE_LENGTH} />
-          <Pressable style={styles.resendButton}>
-            <Text style={styles.resendText}>Resend code</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Resend verification code"
+            disabled={!canResend}
+            style={({ pressed }) => [
+              styles.resendButton,
+              pressed && canResend && styles.resendPressed,
+              !canResend && styles.resendDisabled,
+            ]}
+            onPress={handleResend}
+          >
+            <Text style={styles.resendText}>
+              {isResending
+                ? 'Sending...'
+                : resendSeconds > 0
+                  ? `Resend code in ${resendSeconds}s`
+                  : 'Resend code'}
+            </Text>
           </Pressable>
+          {resendMessage ? <Text style={styles.resendMessage}>{resendMessage}</Text> : null}
         </View>
 
         <View style={styles.footer}>
@@ -128,11 +183,28 @@ const styles = StyleSheet.create({
   resendButton: {
     alignSelf: 'center',
     marginTop: 2,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resendPressed: {
+    opacity: 0.76,
+  },
+  resendDisabled: {
+    opacity: 0.58,
   },
   resendText: {
     ...authTypography.body,
     color: theme.colors.muted,
     fontSize: 14,
+    lineHeight: 18,
+  },
+  resendMessage: {
+    ...authTypography.body,
+    color: theme.colors.success,
+    textAlign: 'center',
+    fontSize: 13,
     lineHeight: 18,
   },
   footer: {

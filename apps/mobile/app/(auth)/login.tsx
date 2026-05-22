@@ -1,8 +1,9 @@
 import { GetStartedModal } from '@/components/auth/GetStartedModal';
 import { OrbitalComposition } from '@/components/auth/OrbitalComposition';
 import { authTypography } from '@/components/auth/typography';
-import { supabase } from '@/lib/supabase/client';
+import { signInWithSupabaseGoogle, userMessageForGoogleAuth } from '@/lib/auth/google';
 import MaskedView from '@react-native-masked-view/masked-view';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -12,19 +13,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
   const [modalVisible, setModalVisible] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleGoogle = async () => {
-    const redirectTo = 'plugoh://google-callback';
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo },
-    });
-    if (error) {
-      Alert.alert('Google sign-in unavailable', error.message);
-      return;
-    }
-    if (data.url) {
-      router.push({ pathname: '/(auth)/google-callback', params: { url: data.url } });
+    if (isGoogleLoading) return;
+    setIsGoogleLoading(true);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await signInWithSupabaseGoogle();
+      router.replace('/');
+    } catch (error) {
+      const message = userMessageForGoogleAuth(error);
+      if (message !== 'Google sign-in was cancelled.') {
+        Alert.alert('Google sign-in unavailable', message);
+      }
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -43,23 +47,30 @@ export default function LoginScreen() {
         <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.bottomContent}>
           <View style={styles.brandLockup}>
             <Text style={styles.brand}>plugoh</Text>
-            <Text style={styles.brandSpark}>✦</Text>
+            <View style={styles.brandSpark} />
           </View>
-          <Text style={styles.title}>Delightful Events</Text>
+          <Text style={styles.title}>Book creators with confidence</Text>
 
-          <MaskedView maskElement={<Text style={styles.subtitleMask}>Start Here</Text>}>
+          <MaskedView
+            maskElement={<Text style={styles.subtitleMask}>Escrow-backed campaigns</Text>}
+          >
             <LinearGradient
               colors={['#5B7FFF', '#E84B8A']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
-              <Text style={[styles.subtitleMask, styles.subtitleHidden]}>Start Here</Text>
+              <Text style={[styles.subtitleMask, styles.subtitleHidden]}>
+                Escrow-backed campaigns
+              </Text>
             </LinearGradient>
           </MaskedView>
 
           <Pressable
-            style={styles.ctaButton}
+            accessibilityRole="button"
+            accessibilityLabel="Get started"
+            style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaPressed]}
             onPress={() => {
+              void Haptics.selectionAsync();
               setModalVisible(true);
             }}
           >
@@ -80,6 +91,7 @@ export default function LoginScreen() {
             setModalVisible(false);
             await handleGoogle();
           }}
+          googleLoading={isGoogleLoading}
         />
       </SafeAreaView>
     </LinearGradient>
@@ -117,13 +129,13 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   brandSpark: {
-    ...authTypography.displaySm,
-    marginLeft: 2,
-    marginTop: 1,
-    fontSize: 12,
-    lineHeight: 14,
-    color: '#FFFFFF',
-    letterSpacing: -0.2,
+    width: 8,
+    height: 8,
+    borderRadius: 2,
+    marginLeft: 5,
+    marginTop: 2,
+    backgroundColor: '#E76A92',
+    transform: [{ rotate: '45deg' }],
   },
   title: {
     ...authTypography.displayLg,
@@ -148,6 +160,9 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  ctaPressed: {
+    opacity: 0.88,
   },
   ctaLabel: {
     ...authTypography.bodyStrong,

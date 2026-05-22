@@ -44,7 +44,6 @@ export default function AuthLayout() {
             headerBackButtonDisplayMode: 'minimal',
           }}
         />
-        <Stack.Screen name="google-callback" />
       </Stack>
     );
   }

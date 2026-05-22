@@ -27,6 +27,32 @@ describe('mobile foundation', () => {
       resolveGateStatus({
         initialized: true,
         hasSession: true,
+        bootstrapLoading: true,
+        bootstrapError: false,
+      }),
+    ).toBe('loading');
+    expect(
+      resolveGateStatus({
+        initialized: true,
+        hasSession: true,
+        bootstrapLoading: false,
+        bootstrapError: false,
+        onboardingStage: 'needs_role',
+      }),
+    ).toBe('needs_role');
+    expect(
+      resolveGateStatus({
+        initialized: true,
+        hasSession: true,
+        bootstrapLoading: false,
+        bootstrapError: false,
+        onboardingStage: 'needs_basics',
+      }),
+    ).toBe('needs_basics');
+    expect(
+      resolveGateStatus({
+        initialized: true,
+        hasSession: true,
         bootstrapLoading: false,
         bootstrapError: false,
         onboardingStage: 'ready',
