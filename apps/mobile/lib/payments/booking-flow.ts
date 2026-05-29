@@ -33,8 +33,12 @@ export async function runBookingPaymentFlow(input: BookingInput) {
     influencer_profile_id: input.influencer_profile_id,
     package_type: input.package_type,
   });
-  const razorpayKey = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID;
-  if (!razorpayKey) throw new Error('Missing EXPO_PUBLIC_RAZORPAY_KEY_ID');
+  const razorpayKey = order.keyId ?? process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID;
+  if (!razorpayKey) {
+    throw new Error(
+      'Razorpay checkout key is missing. Configure RAZORPAY_KEY_ID on the API or EXPO_PUBLIC_RAZORPAY_KEY_ID in apps/mobile/.env.',
+    );
+  }
   const payment = await openRazorpayCheckout({
     key: razorpayKey,
     amount: String(order.amount),

@@ -1134,7 +1134,9 @@ export class PaymentService {
     return { success: true, campaignId: campaign.id };
   }
 
-  async createBookingOrder(input: Row) {
+  async createBookingOrder(user: AuthUser, input: Row) {
+    const profileService = new ProfileService(this.store);
+    await profileService.assertBusinessComplete(user.id);
     const influencer = await this.store.getById<Row>(
       'influencer_profiles',
       input.influencer_profile_id,
@@ -1150,6 +1152,7 @@ export class PaymentService {
     });
     return {
       orderId: order.id,
+      keyId: this.config.razorpayKeyId,
       amount: order.amount,
       currency: order.currency,
       priceOffered: price,

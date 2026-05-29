@@ -25,6 +25,8 @@ type Props = {
   haptic?: HapticFlavor;
   /** When set, shows this image (e.g. profile photo) instead of the SF Symbol */
   imageUri?: string | null;
+  accessibilityLabel?: string;
+  glassRendering?: 'native' | 'blur';
 };
 
 const VARIANT_DEFAULTS: Record<Variant, { size: number; symbolSize: number; tintColor: string }> = {
@@ -61,6 +63,8 @@ export function NativeIconButton({
   style,
   haptic = 'light',
   imageUri,
+  accessibilityLabel,
+  glassRendering = 'native',
 }: Props) {
   const defaults = VARIANT_DEFAULTS[variant];
   const containerSize = size ?? defaults.size;
@@ -119,11 +123,13 @@ export function NativeIconButton({
       justifyContent: 'center',
     };
 
-    if (isLiquidGlassAvailable()) {
+    if (glassRendering === 'native' && isLiquidGlassAvailable()) {
       return (
         <GlassView isInteractive style={[glassStyle, style]}>
           <Pressable
             onPress={handlePress}
+            accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel}
             hitSlop={hitSlop}
             style={({ pressed }) => ({
               opacity: pressed ? 0.92 : 1,
@@ -141,6 +147,8 @@ export function NativeIconButton({
     return (
       <Pressable
         onPress={handlePress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         hitSlop={hitSlop}
         style={[
           { width: containerSize, height: containerSize, borderRadius: radius, overflow: 'hidden' },
@@ -158,7 +166,8 @@ export function NativeIconButton({
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1.5,
-              borderColor: 'rgba(255,255,255,0.18)',
+              borderColor: 'rgba(255,255,255,0.24)',
+              backgroundColor: 'rgba(255,255,255,0.06)',
               opacity: pressed ? 0.94 : 1,
             }}
           >
@@ -172,6 +181,8 @@ export function NativeIconButton({
   return (
     <Pressable
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       hitSlop={hitSlop}
       style={({ pressed }) => [
         {

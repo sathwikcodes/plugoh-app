@@ -1,4 +1,5 @@
 import { GlassCard } from '@/components/ui/glass-card';
+import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { ErrorState, PrimaryButton, Screen, StatusChip } from '@/components/ui/primitives';
 import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
@@ -9,6 +10,7 @@ import {
   useNotifications,
 } from '@/hooks/use-marketplace';
 import { deriveBrandDashboard, formatBrandAmount } from '@/lib/brand/dashboard';
+import { businessProfileImageUri } from '@/lib/brand/profile-image';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,7 +36,7 @@ function getGreeting() {
   return 'Good evening';
 }
 
-function buildLinePath(points: Array<{ x: number; y: number }>) {
+function buildLinePath(points: { x: number; y: number }[]) {
   if (!points.length) return '';
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }
@@ -250,19 +252,19 @@ export default function BrandHomeScreen() {
   const profileLoading = bootstrapLoading || shouldShowInitialLoader(profile);
   const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
   const notificationsLoading = bootstrapLoading || shouldShowInitialLoader(notifications);
-  const campaignItems = campaigns.data?.items ?? [];
   const dashboard = useMemo(
-    () => deriveBrandDashboard(profile.data, campaignItems),
-    [campaignItems, profile.data],
+    () => deriveBrandDashboard(profile.data, campaigns.data?.items ?? []),
+    [campaigns.data?.items, profile.data],
   );
   const latestNotification = notifications.data?.[0];
   const displayName =
     profile.data?.brand_name?.trim() || bootstrap.data?.user.email?.split('@')[0] || 'brand owner';
   const dashboardLoading = profileLoading || campaignsLoading;
+  const profileImageUri = businessProfileImageUri(profile.data);
 
   return (
     <Screen contentContainerStyle={styles.screenContent}>
-      <Animated2.View entering={FadeInDown.duration(320)} style={styles.hero}>
+      <Animated2.View entering={FadeInDown.duration(320)} style={styles.header}>
         <View style={styles.heroCopy}>
           <Text style={styles.greeting}>{getGreeting()},</Text>
           <AsyncText
@@ -277,6 +279,18 @@ export default function BrandHomeScreen() {
             Track creator spend, campaign motion, and launch readiness from one place.
           </Text>
         </View>
+        <NativeIconButton
+          symbol="person.circle"
+          fallbackIcon="person-circle-outline"
+          variant="glass"
+          haptic="light"
+          size={44}
+          symbolSize={20}
+          imageUri={profileImageUri}
+          onPress={() => {
+            router.push('/(app)/brand-profile');
+          }}
+        />
       </Animated2.View>
 
       {campaigns.isError ? (
@@ -391,10 +405,15 @@ const styles = StyleSheet.create({
   screenContent: {
     gap: theme.spacing.md,
   },
-  hero: {
-    gap: theme.spacing.sm,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
   },
   heroCopy: {
+    flex: 1,
+    minWidth: 0,
     gap: theme.spacing.xs,
   },
   greeting: {
@@ -404,6 +423,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     ...theme.typography.display,
     color: theme.colors.foreground,
+    marginTop: -2,
   },
   heroSubtitle: {
     ...theme.typography.body,

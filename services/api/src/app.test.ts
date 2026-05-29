@@ -76,6 +76,7 @@ function makeApp(seed = {}) {
       port: 4000,
       internalSecret: 'internal',
       cronSecret: 'cron',
+      razorpayKeyId: 'rzp_test_public',
       razorpayWebhookSecret: 'webhook_secret',
       demoEnabled: true,
     },
@@ -733,9 +734,32 @@ describe('Plugoh API', () => {
     });
     const body = await json(res);
     expect(res.status).toBe(200);
+    expect(body.data.keyId).toBe('rzp_test_public');
     expect(body.data.priceOffered).toBe(13000);
     expect(body.data.platformFee).toBe(1560);
     expect(body.data.total).toBe(14560);
+  });
+
+  it('rejects booking order creation before taking payment when the business profile is incomplete', async () => {
+    const { app } = makeApp({
+      business_profiles: [
+        {
+          id: 'bp-1',
+          user_id: businessId,
+          brand_name: '',
+          brand_type: 'Restaurant/Cafe',
+        },
+      ],
+    });
+    const res = await app.request('/payment/create-booking-order', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        influencer_profile_id: influencerProfileId,
+        package_type: 'reel',
+      }),
+    });
+    expect(res.status).toBe(403);
   });
 
   it('blocks chat send when campaign is outside active states', async () => {

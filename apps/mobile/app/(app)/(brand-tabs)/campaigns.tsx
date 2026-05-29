@@ -1,5 +1,6 @@
 import { CampaignsDeckScreen } from '@/components/ui/campaigns-deck-screen';
-import { useBootstrap, useCampaigns } from '@/hooks/use-marketplace';
+import { useBootstrap, useBusinessProfile, useCampaigns } from '@/hooks/use-marketplace';
+import { businessProfileImageUri } from '@/lib/brand/profile-image';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import type { CampaignListItem } from '@plugoh/contracts';
 import { router } from 'expo-router';
@@ -18,9 +19,11 @@ function matchesBrandCampaign(item: CampaignListItem, query: string) {
 
 export default function BrandCampaignsScreen() {
   const bootstrap = useBootstrap();
+  const profile = useBusinessProfile();
   const campaigns = useCampaigns({ sort: 'created_desc', limit: 50, offset: 0 });
   const bootstrapLoading = shouldShowInitialLoader(bootstrap);
   const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
+  const profileImageUri = businessProfileImageUri(profile.data);
 
   const handleOpenCampaign = useCallback((id: string) => {
     router.push(`/(app)/campaigns/${id}`);
@@ -31,10 +34,11 @@ export default function BrandCampaignsScreen() {
       role="business"
       campaigns={campaigns.data?.items ?? []}
       isLoading={campaignsLoading}
-      profileSymbol="storefront"
-      profileFallbackIcon="storefront-outline"
+      profileImageUri={profileImageUri}
+      profileSymbol="person.circle"
+      profileFallbackIcon="person-circle-outline"
       profileRoute="/(app)/brand-profile"
-      searchPlaceholder="Search campaigns or creators"
+      searchPlaceholder="Search Campaigns"
       searchMatcher={matchesBrandCampaign}
       onOpenCampaign={handleOpenCampaign}
     />

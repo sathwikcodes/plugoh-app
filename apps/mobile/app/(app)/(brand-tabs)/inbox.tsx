@@ -1,9 +1,24 @@
 import { ConversationRow } from '@/components/inbox/conversation-row';
+import { InboxFilterSheet } from '@/components/inbox/inbox-filter-sheet';
 import { GlassSearchField } from '@/components/ui/glass-search-field';
 import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useBootstrap, useInbox, useMarketplaceMutations } from '@/hooks/use-marketplace';
+import {
+  useBootstrap,
+  useBusinessProfile,
+  useInbox,
+  useMarketplaceMutations,
+} from '@/hooks/use-marketplace';
+import { businessProfileImageUri } from '@/lib/brand/profile-image';
+import {
+  DEFAULT_INBOX_FILTERS,
+  DEFAULT_INBOX_SORT,
+  getVisibleInboxItems,
+  inboxActiveFilterCount,
+  type InboxFilterDraft,
+  type InboxSort,
+} from '@/lib/filters/inbox';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import type { InboxItem } from '@plugoh/contracts';
@@ -14,8 +29,6 @@ import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TAB_BAR_CLEARANCE = 12;
-
-type InboxFilter = 'all' | 'unread';
 
 function SkeletonRow() {
   return (
@@ -30,7 +43,7 @@ function SkeletonRow() {
   );
 }
 
-function EmptyInboxState() {
+function EmptyInboxState({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <View style={styles.emptyWrap}>
       <SymbolView
@@ -40,8 +53,8 @@ function EmptyInboxState() {
         type="monochrome"
         fallback={<Ionicons name="chatbubbles-outline" size={52} color="rgba(255,255,255,0.15)" />}
       />
-      <Text style={styles.emptyTitle}>No campaign threads yet</Text>
-      <Text style={styles.emptySubtitle}>Threads appear when a booking starts.</Text>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptySubtitle}>{subtitle}</Text>
     </View>
   );
 }
@@ -49,45 +62,47 @@ function EmptyInboxState() {
 export default function BrandInboxScreen() {
   const insets = useSafeAreaInsets();
   const bootstrap = useBootstrap();
+  const profile = useBusinessProfile();
   const inbox = useInbox();
   const mutations = useMarketplaceMutations();
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<InboxFilter>('all');
+  const [filters, setFilters] = useState<InboxFilterDraft>(DEFAULT_INBOX_FILTERS);
+  const [sort, setSort] = useState<InboxSort>(DEFAULT_INBOX_SORT);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const profileImageUri = businessProfileImageUri(profile.data);
+  const appliedFilterCount =
+    inboxActiveFilterCount(filters) + (sort !== DEFAULT_INBOX_SORT ? 1 : 0);
 
   const filtered = useMemo(() => {
-    const items = inbox.data ?? [];
-    const q = query.trim().toLowerCase();
-    return items.filter((item) => {
-      const creatorName =
-        item.campaign.influencer_profile?.display_name ??
-        item.campaign.influencer_profile?.ig_username ??
-        '';
-      const matchesSearch =
-        q.length === 0 ||
-        item.campaign.title.toLowerCase().includes(q) ||
-        creatorName.toLowerCase().includes(q);
-      const matchesFilter = filter === 'all' || item.unreadCount > 0;
-      return matchesSearch && matchesFilter;
+    return getVisibleInboxItems({
+      items: inbox.data ?? [],
+      query,
+      filters,
+      sort,
+      matchesSearch: (item, q) => {
+        const creatorName =
+          item.campaign.influencer_profile?.display_name ??
+          item.campaign.influencer_profile?.ig_username ??
+          '';
+        return (
+          item.campaign.title.toLowerCase().includes(q) || creatorName.toLowerCase().includes(q)
+        );
+      },
     });
-  }, [inbox.data, query, filter]);
+  }, [filters, inbox.data, query, sort]);
 
   const handleFilterPress = useCallback(() => {
-    Alert.alert('Filter', undefined, [
-      {
-        text: 'All conversations',
-        onPress: () => {
-          setFilter('all');
-        },
-      },
-      {
-        text: 'Unread only',
-        onPress: () => {
-          setFilter('unread');
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setFiltersVisible(true);
   }, []);
+
+  const handleApplyFilters = useCallback(
+    ({ filters: nextFilters, sort: nextSort }: { filters: InboxFilterDraft; sort: InboxSort }) => {
+      setFilters(nextFilters);
+      setSort(nextSort);
+      setFiltersVisible(false);
+    },
+    [],
+  );
 
   const handleLongPress = useCallback(
     (item: InboxItem) => {
@@ -133,6 +148,14 @@ export default function BrandInboxScreen() {
 
   const keyExtractor = useCallback((item: InboxItem) => item.campaign.id, []);
   const Separator = useCallback(() => <View style={styles.separator} />, []);
+  const emptyTitle =
+    query.trim().length > 0 || appliedFilterCount > 0
+      ? 'No campaign threads match'
+      : 'No campaign threads yet';
+  const emptySubtitle =
+    query.trim().length > 0 || appliedFilterCount > 0
+      ? 'Try another search or filter option.'
+      : 'Threads appear when a booking starts.';
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
@@ -151,12 +174,13 @@ export default function BrandInboxScreen() {
             Messages
           </Text>
           <NativeIconButton
-            symbol="storefront"
-            fallbackIcon="storefront-outline"
+            symbol="person.circle"
+            fallbackIcon="person-circle-outline"
             variant="glass"
             haptic="light"
             size={44}
             symbolSize={20}
+            imageUri={profileImageUri}
             onPress={() => {
               router.push('/(app)/brand-profile');
             }}
@@ -171,15 +195,23 @@ export default function BrandInboxScreen() {
               placeholder="Search conversations"
             />
           </View>
-          <NativeIconButton
-            symbol="line.3.horizontal.decrease.circle"
-            fallbackIcon="options-outline"
-            variant="glass"
-            haptic="light"
-            size={44}
-            symbolSize={20}
-            onPress={handleFilterPress}
-          />
+          <View style={styles.filterButtonWrap}>
+            <NativeIconButton
+              symbol="line.3.horizontal.decrease.circle"
+              fallbackIcon="options-outline"
+              variant="glass"
+              haptic="light"
+              size={44}
+              symbolSize={20}
+              accessibilityLabel="Open filters"
+              onPress={handleFilterPress}
+            />
+            {appliedFilterCount > 0 ? (
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>{appliedFilterCount}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -196,7 +228,7 @@ export default function BrandInboxScreen() {
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           ItemSeparatorComponent={Separator}
-          ListEmptyComponent={EmptyInboxState}
+          ListEmptyComponent={<EmptyInboxState title={emptyTitle} subtitle={emptySubtitle} />}
           contentContainerStyle={{
             flexGrow: 1,
             paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE,
@@ -205,6 +237,16 @@ export default function BrandInboxScreen() {
           keyboardShouldPersistTaps="handled"
         />
       )}
+
+      <InboxFilterSheet
+        visible={filtersVisible}
+        filters={filters}
+        sort={sort}
+        onCancel={() => {
+          setFiltersVisible(false);
+        }}
+        onApply={handleApplyFilters}
+      />
     </View>
   );
 }
@@ -230,6 +272,30 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   searchFieldWrap: { flex: 1, minWidth: 0 },
+  filterButtonWrap: {
+    position: 'relative',
+  },
+  activeBadge: {
+    position: 'absolute',
+    right: -3,
+    top: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    backgroundColor: theme.colors.pink,
+    borderWidth: 1,
+    borderColor: theme.colors.background,
+  },
+  activeBadgeText: {
+    ...theme.typography.label,
+    color: theme.colors.background,
+    fontSize: 10,
+    lineHeight: 12,
+    fontVariant: ['tabular-nums'],
+  },
   list: { flex: 1 },
   skeletonList: { flex: 1 },
   separator: {

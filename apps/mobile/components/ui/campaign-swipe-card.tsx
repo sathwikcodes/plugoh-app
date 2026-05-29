@@ -1,5 +1,5 @@
 import { CAMPAIGN_CARD_CORNER_RADIUS } from '@/constants/campaign-card-frame';
-import { statusTone, theme } from '@/constants/theme';
+import { theme } from '@/constants/theme';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { CampaignListItem } from '@plugoh/contracts';
 import MaskedView from '@react-native-masked-view/masked-view';
@@ -51,7 +51,7 @@ function initial(value: string) {
   return value.trim().charAt(0).toUpperCase() || 'P';
 }
 
-function firstImageUrl(...candidates: Array<string | undefined>) {
+function firstImageUrl(...candidates: (string | undefined)[]) {
   return candidates.find((candidate) => Boolean(candidate?.trim()))?.trim();
 }
 
@@ -197,6 +197,59 @@ function InviteGlassButton({
   );
 }
 
+function StatusGlassPill({
+  icon,
+  label,
+  borderColor,
+  minHeight,
+  paddingHorizontal,
+  gap,
+  iconSize,
+  fontSize,
+}: {
+  icon: ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  borderColor: string;
+  minHeight: number;
+  paddingHorizontal: number;
+  gap: number;
+  iconSize: number;
+  fontSize: number;
+}) {
+  const shellStyle = [
+    styles.statusPillShell,
+    {
+      minHeight,
+      borderRadius: theme.radius.pill,
+      borderColor,
+    },
+  ];
+  const content = (
+    <View
+      style={[
+        styles.statusPillInner,
+        {
+          minHeight,
+          paddingHorizontal,
+          gap,
+        },
+      ]}
+    >
+      <Ionicons name={icon} size={iconSize} color="rgba(255,255,255,0.94)" />
+      <Text style={[styles.statusPillText, { fontSize }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={shellStyle}>
+      <BlurView tint="systemUltraThinMaterialDark" intensity={72} style={styles.statusPillBlur} />
+      {content}
+    </View>
+  );
+}
+
 export function CampaignSwipeCard({
   role,
   campaign,
@@ -226,11 +279,8 @@ export function CampaignSwipeCard({
   );
   const isExpired = expiryLabel === 'Expired';
   const hasActiveTimer = Boolean(expiryLabel && !isExpired);
-  const badgeLabel = hasActiveTimer ? expiryLabel : formatStatus(campaign.status);
-  const badgeTone = hasActiveTimer
-    ? { bg: 'rgba(10,12,16,0.48)', fg: 'rgba(255,255,255,0.9)' }
-    : statusTone(campaign.status);
-  const badgeBorderColor = hasActiveTimer ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.16)';
+  const badgeLabel = hasActiveTimer && expiryLabel ? expiryLabel : formatStatus(campaign.status);
+  const badgeBorderColor = 'rgba(255,255,255,0.2)';
   const badgeIcon = hasActiveTimer ? 'time-outline' : statusIcon(campaign.status);
   const isActionable =
     role === 'influencer' && ACTIONABLE_STATUSES.has(campaign.status) && !isExpired;
@@ -313,27 +363,16 @@ export function CampaignSwipeCard({
         />
 
         <View style={[styles.topRow, { padding: px(20) }]}>
-          <View
-            style={[
-              styles.statusPill,
-              {
-                minHeight: px(34),
-                borderRadius: px(17),
-                paddingHorizontal: px(11),
-                gap: px(6),
-                backgroundColor: badgeTone.bg,
-                borderColor: badgeBorderColor,
-              },
-            ]}
-          >
-            <Ionicons name={badgeIcon} size={px(14)} color={badgeTone.fg} />
-            <Text
-              style={[styles.statusPillText, { color: badgeTone.fg, fontSize: px(12) }]}
-              numberOfLines={1}
-            >
-              {badgeLabel}
-            </Text>
-          </View>
+          <StatusGlassPill
+            icon={badgeIcon}
+            label={badgeLabel}
+            borderColor={badgeBorderColor}
+            minHeight={px(34)}
+            paddingHorizontal={px(12)}
+            gap={px(6)}
+            iconSize={px(14)}
+            fontSize={px(12)}
+          />
         </View>
 
         <View
@@ -494,14 +533,26 @@ const styles = StyleSheet.create({
     color: '#111522',
     fontWeight: '900',
   },
-  statusPill: {
+  statusPillShell: {
     flexShrink: 0,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.055)',
+  },
+  statusPillBlur: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: theme.radius.pill,
+    overflow: 'hidden',
+  },
+  statusPillInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    position: 'relative',
   },
   statusPillText: {
+    color: 'rgba(255,255,255,0.94)',
     fontWeight: '700',
     letterSpacing: 0,
     fontVariant: ['tabular-nums'],

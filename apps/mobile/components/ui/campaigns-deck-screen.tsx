@@ -1,28 +1,36 @@
-import { theme } from '@/constants/theme';
+import {
+  campaignActiveFilterCount,
+  campaignFilterError,
+  DEFAULT_CAMPAIGN_FILTERS,
+  getVisibleCampaigns,
+  type CampaignSort,
+  type CampaignStatusFilter,
+} from '@/lib/filters/campaigns';
 import type { CampaignListItem } from '@plugoh/contracts';
-import { router, type Href } from 'expo-router';
-import { Alert, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { Href } from 'expo-router';
+import { useMemo, type ComponentProps } from 'react';
 import { CampaignDeckSwiper, type CampaignDeckRole } from './campaign-deck-swiper';
-import { GlassSearchField } from './glass-search-field';
+import { DeckBrowseScreen, type DeckSortOption } from './deck-browse-screen';
+import { FilterOption, FilterRange, FilterSheetSection } from './filter-sheet';
 import { NativeIconButton } from './native-icon-button';
-import { Screen } from './primitives';
-import { useMemo, useState, type ComponentProps } from 'react';
+import { PremiumCampaignFilterSheet } from './premium-campaign-filter-sheet';
 
-export type CampaignSort = 'created_desc' | 'created_asc' | 'amount_desc' | 'amount_asc';
-
-const NATIVE_TAB_DOCK_HEIGHT = 72;
-const TAB_DOCK_GAP = theme.spacing.lg;
-const PAGE_HORIZONTAL_INSET = theme.spacing.lg;
-const MAX_CARD_WIDTH = 390;
-const CARD_VIEWPORT_RATIO = 0.84;
-const DECK_FRAME_CLEARANCE = theme.spacing.section;
-
-const SORT_OPTIONS: { value: CampaignSort; label: string }[] = [
+const SORT_OPTIONS: DeckSortOption<CampaignSort>[] = [
   { value: 'created_desc', label: 'Newest first' },
   { value: 'created_asc', label: 'Oldest first' },
   { value: 'amount_desc', label: 'Highest amount' },
   { value: 'amount_asc', label: 'Lowest amount' },
+];
+
+const STATUS_OPTIONS: { value: CampaignStatusFilter; label: string; description: string }[] = [
+  { value: 'all', label: 'All campaigns', description: 'Show every campaign state' },
+  { value: 'active', label: 'Active work', description: 'Requests, escrow, and delivery stages' },
+  { value: 'completed', label: 'Completed', description: 'Finished campaigns only' },
+  {
+    value: 'attention',
+    label: 'Needs attention',
+    description: 'Disputed, declined, expired, or refunded',
+  },
 ];
 
 type Props = {
@@ -42,31 +50,6 @@ type Props = {
   decliningCampaignId?: string;
 };
 
-function createdTime(item: CampaignListItem): number {
-  const createdAt = item.created_at ? new Date(item.created_at).getTime() : 0;
-  return Number.isNaN(createdAt) ? 0 : createdAt;
-}
-
-function campaignAmount(item: CampaignListItem): number {
-  return item.price_offered ?? 0;
-}
-
-function sortCampaigns(items: CampaignListItem[], sort: CampaignSort): CampaignListItem[] {
-  return [...items].sort((a, b) => {
-    switch (sort) {
-      case 'created_asc':
-        return createdTime(a) - createdTime(b);
-      case 'amount_desc':
-        return campaignAmount(b) - campaignAmount(a);
-      case 'amount_asc':
-        return campaignAmount(a) - campaignAmount(b);
-      case 'created_desc':
-      default:
-        return createdTime(b) - createdTime(a);
-    }
-  });
-}
-
 export function CampaignsDeckScreen({
   role,
   campaigns,
@@ -83,132 +66,83 @@ export function CampaignsDeckScreen({
   acceptingCampaignId,
   decliningCampaignId,
 }: Props) {
-  const insets = useSafeAreaInsets();
-  const window = useWindowDimensions();
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<CampaignSort>('created_desc');
-  const [deckSlotHeight, setDeckSlotHeight] = useState(0);
-
-  const visibleCampaigns = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const filtered =
-      q.length === 0 ? campaigns : campaigns.filter((item) => searchMatcher(item, q));
-    return sortCampaigns(filtered, sort);
-  }, [campaigns, search, searchMatcher, sort]);
-
-  const frame = useMemo(() => {
-    const viewportWidth = window.width;
-    const maxWidth = Math.min(viewportWidth * CARD_VIEWPORT_RATIO, MAX_CARD_WIDTH);
-    const fallbackHeight = window.height * 0.58;
-    const availableHeight =
-      deckSlotHeight > 0 ? Math.max(0, deckSlotHeight - DECK_FRAME_CLEARANCE) : fallbackHeight;
-    const cardHeight = Math.max(360, availableHeight);
+  const campaignAmountBounds = useMemo(() => {
+    const amounts = campaigns
+      .map((campaign) => campaign.price_offered ?? 0)
+      .filter((amount) => Number.isFinite(amount) && amount > 0);
 
     return {
-      width: Math.max(260, Math.round(maxWidth)),
-      height: Math.round(cardHeight),
-      viewportWidth: Math.round(viewportWidth),
+      min: 0,
+      max: amounts.length > 0 ? Math.max(...amounts) : 100000,
     };
-  }, [deckSlotHeight, window.height, window.width]);
-
-  function handleDeckLayout(event: LayoutChangeEvent) {
-    setDeckSlotHeight(event.nativeEvent.layout.height);
-  }
-
-  function handleSortPress() {
-    Alert.alert(
-      'Sort campaigns',
-      undefined,
-      [
-        ...SORT_OPTIONS.map((option) => ({
-          text: option.value === sort ? `${option.label} (selected)` : option.label,
-          onPress: () => {
-            setSort(option.value);
-          },
-        })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ],
-      { cancelable: true },
-    );
-  }
+  }, [campaigns]);
 
   return (
-    <Screen
-      scrollEnabled={false}
-      contentInsetAdjustmentBehavior="never"
-      contentContainerStyle={{
-        flexGrow: 1,
-        paddingHorizontal: PAGE_HORIZONTAL_INSET,
-        paddingTop: insets.top + theme.spacing.lg,
-        paddingBottom:
-          Math.max(insets.bottom, theme.spacing.sm) + NATIVE_TAB_DOCK_HEIGHT + TAB_DOCK_GAP,
-        gap: theme.spacing.md,
-      }}
-    >
-      <View style={{ gap: theme.spacing.md }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: theme.spacing.md,
-          }}
-        >
-          <Text
-            style={{
-              ...theme.typography.title,
-              color: theme.colors.foreground,
-              flex: 1,
-              minWidth: 0,
-            }}
-            numberOfLines={1}
-          >
-            Campaigns
-          </Text>
-          <NativeIconButton
-            symbol={profileSymbol}
-            fallbackIcon={profileFallbackIcon}
-            variant="glass"
-            haptic="light"
-            size={44}
-            symbolSize={20}
-            imageUri={profileImageUri}
-            onPress={() => {
-              router.push(profileRoute);
-            }}
-          />
-        </View>
+    <DeckBrowseScreen
+      title="Campaigns"
+      presentation={role === 'business' ? 'premiumCampaigns' : 'default'}
+      items={campaigns}
+      isLoading={isLoading}
+      profileImageUri={profileImageUri}
+      profileSymbol={profileSymbol}
+      profileFallbackIcon={profileFallbackIcon}
+      profileRoute={profileRoute}
+      searchPlaceholder={searchPlaceholder}
+      sortTitle="Sort campaigns"
+      sortOptions={SORT_OPTIONS}
+      initialSort="created_desc"
+      initialFilters={DEFAULT_CAMPAIGN_FILTERS}
+      getActiveFilterCount={campaignActiveFilterCount}
+      validateFilters={campaignFilterError}
+      getVisibleItems={({ items, search, sort, filters }) =>
+        getVisibleCampaigns({ items, search, sort, filters, searchMatcher })
+      }
+      renderFilterSheet={
+        role === 'business'
+          ? (input) => <PremiumCampaignFilterSheet {...input} amountBounds={campaignAmountBounds} />
+          : undefined
+      }
+      renderFilterSections={({ draftFilters, setDraftFilters }) => (
+        <>
+          <FilterSheetSection title="Status">
+            {STATUS_OPTIONS.map((option) => (
+              <FilterOption
+                key={option.value}
+                label={option.label}
+                description={option.description}
+                selected={draftFilters.status === option.value}
+                onPress={() => {
+                  setDraftFilters({ ...draftFilters, status: option.value });
+                }}
+              />
+            ))}
+          </FilterSheetSection>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-          <View style={{ flex: 1 }}>
-            <GlassSearchField
-              value={search}
-              onChangeText={setSearch}
-              placeholder={searchPlaceholder}
+          <FilterSheetSection title="Campaign amount">
+            <FilterRange
+              label="Amount range"
+              minValue={draftFilters.amount.min}
+              maxValue={draftFilters.amount.max}
+              minPlaceholder="₹ min"
+              maxPlaceholder="₹ max"
+              error={campaignFilterError(draftFilters)}
+              onMinChange={(value) => {
+                setDraftFilters({
+                  ...draftFilters,
+                  amount: { ...draftFilters.amount, min: value },
+                });
+              }}
+              onMaxChange={(value) => {
+                setDraftFilters({
+                  ...draftFilters,
+                  amount: { ...draftFilters.amount, max: value },
+                });
+              }}
             />
-          </View>
-          <NativeIconButton
-            symbol="line.3.horizontal.decrease.circle"
-            fallbackIcon="options-outline"
-            variant="glass"
-            haptic="selection"
-            size={44}
-            symbolSize={20}
-            onPress={handleSortPress}
-          />
-        </View>
-      </View>
-
-      <View
-        onLayout={handleDeckLayout}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          marginHorizontal: -PAGE_HORIZONTAL_INSET,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+          </FilterSheetSection>
+        </>
+      )}
+      renderDeck={({ items: visibleCampaigns, allItems, frame }) => (
         <CampaignDeckSwiper
           role={role}
           campaigns={visibleCampaigns}
@@ -216,9 +150,9 @@ export function CampaignsDeckScreen({
           cardWidth={frame.width}
           cardHeight={frame.height}
           viewportWidth={frame.viewportWidth}
-          emptyTitle={campaigns.length === 0 ? 'No campaigns yet' : 'No campaigns match'}
+          emptyTitle={allItems.length === 0 ? 'No campaigns yet' : 'No campaigns match'}
           emptySubtitle={
-            campaigns.length === 0
+            allItems.length === 0
               ? role === 'business'
                 ? 'Start in Find to discover creators and launch your first campaign.'
                 : 'No new campaign requests right now. Pull down to check for updates.'
@@ -230,7 +164,7 @@ export function CampaignsDeckScreen({
           acceptingCampaignId={acceptingCampaignId}
           decliningCampaignId={decliningCampaignId}
         />
-      </View>
-    </Screen>
+      )}
+    />
   );
 }

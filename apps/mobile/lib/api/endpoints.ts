@@ -256,6 +256,7 @@ export async function createBookingOrder(input: {
 }) {
   return api<{
     orderId: string;
+    keyId?: string;
     amount: number;
     currency: string;
     priceOffered: number;
