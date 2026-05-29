@@ -269,6 +269,7 @@ export default function InboxThreadScreen() {
   const bootstrapLoading = shouldShowInitialLoader(bootstrap);
   const campaignLoading = bootstrapLoading || shouldShowInitialLoader(campaign);
   const messagesLoading = shouldShowInitialLoader(messages);
+  const isBusiness = bootstrap.data?.role === 'business';
 
   const chatEnabled = CHAT_ENABLED_STATUSES.includes(campaign.data?.status ?? '');
 
@@ -281,14 +282,21 @@ export default function InboxThreadScreen() {
 
   const listItems = useMemo(() => buildListItems(messages.data ?? []), [messages.data]);
 
-  const brandName = campaign.data?.business_profile?.brand_name;
-  const headerDisplayName = brandName?.trim() || campaign.data?.title.trim() || 'Chat';
-  const headerInitialsSource = brandName?.trim() || campaign.data?.title;
-  const headerAvatarUri =
-    campaign.data?.business_profile?.profile_photo_url ??
-    campaign.data?.business_profile?.ig_profile_picture_url ??
-    campaign.data?.business_profile?.avatar_url ??
-    null;
+  const brandName = campaign.data?.business_profile?.brand_name?.trim();
+  const creatorName =
+    campaign.data?.influencer_profile?.display_name?.trim() ||
+    campaign.data?.influencer_profile?.ig_username?.trim();
+  const counterpartyName = isBusiness ? creatorName : brandName;
+  const headerDisplayName = counterpartyName || campaign.data?.title.trim() || 'Chat';
+  const headerInitialsSource = counterpartyName || campaign.data?.title;
+  const headerAvatarUri = isBusiness
+    ? (campaign.data?.influencer_profile?.profile_photo_url ??
+      campaign.data?.influencer_profile?.avatar_url ??
+      null)
+    : (campaign.data?.business_profile?.profile_photo_url ??
+      campaign.data?.business_profile?.ig_profile_picture_url ??
+      campaign.data?.business_profile?.avatar_url ??
+      null);
 
   const identityNameMaxWidth = useMemo(() => {
     const rowInner = windowWidth - theme.spacing.lg * 2;
@@ -365,11 +373,17 @@ export default function InboxThreadScreen() {
   const handleThreadInfo = useCallback(() => {
     void Haptics.selectionAsync();
     const title = campaign.data?.title.trim() || 'Campaign';
-    const brand = campaign.data?.business_profile?.brand_name?.trim();
     const status = campaign.data?.status.replace(/_/g, ' ') ?? '…';
-    const lines = [brand ? `Brand: ${brand}` : null, `Status: ${status}`].filter(Boolean);
+    const participantLine = isBusiness
+      ? creatorName
+        ? `Creator: ${creatorName}`
+        : null
+      : brandName
+        ? `Brand: ${brandName}`
+        : null;
+    const lines = [participantLine, `Status: ${status}`].filter(Boolean);
     Alert.alert(title, lines.join('\n'));
-  }, [campaign.data]);
+  }, [brandName, campaign.data?.status, campaign.data?.title, creatorName, isBusiness]);
 
   const renderItem = useCallback(
     ({ item }: { item: ListItem }) => {

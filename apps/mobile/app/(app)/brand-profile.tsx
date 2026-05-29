@@ -17,7 +17,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -35,6 +34,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SETTINGS_GROUP_RADIUS = 28;
 const SIGN_OUT_GLASS_TINT = 'rgba(211, 83, 83, 0.28)';
+const SIGN_OUT_GLASS_BORDER = 'rgba(211, 83, 83, 0.58)';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -225,16 +225,11 @@ export default function BrandProfileScreen() {
             router.back();
           }}
         />
-        <Text style={styles.pageTitle}>Brand Profile</Text>
+        <Text style={styles.pageTitle}>Profile</Text>
       </View>
 
       {/* ── Profile hero row ── */}
-      <Pressable
-        onPress={() => {
-          router.push('/(app)/profile/edit');
-        }}
-        style={({ pressed }) => [styles.profileRow, pressed && styles.rowPressed]}
-      >
+      <View style={styles.profileRow}>
         {profileLoading ? (
           <ShimmerCircle size={72} />
         ) : (
@@ -273,9 +268,7 @@ export default function BrandProfileScreen() {
             <ShimmerText width="34%" height={13} />
           ) : null}
         </View>
-
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
-      </Pressable>
+      </View>
 
       <View style={styles.sectionDivider} />
 
@@ -306,14 +299,6 @@ export default function BrandProfileScreen() {
             router.push('/(app)/profile/instagram');
           }}
         />
-        <SettingRow
-          iconName="settings-outline"
-          iconBg={theme.colors.muted}
-          title="Settings"
-          onPress={() => {
-            router.push('/(app)/profile/settings');
-          }}
-        />
       </GlassCard>
 
       {/* ── Preferences group ── */}
@@ -327,24 +312,18 @@ export default function BrandProfileScreen() {
 
       {/* ── Sign out ── */}
       <GlassCard
-        style={StyleSheet.flatten([styles.settingsShell, styles.signOutShell])}
-        contentStyle={{ borderRadius: SETTINGS_GROUP_RADIUS, overflow: 'hidden' }}
+        style={styles.signOutGlassCard}
+        contentStyle={styles.settingsGroupInner}
         tintOverlayColor={SIGN_OUT_GLASS_TINT}
       >
         <Pressable
           onPress={handleSignOut}
           style={({ pressed }) => [styles.signOutRow, pressed && styles.rowPressed]}
         >
-          <View style={[styles.iconBox, { backgroundColor: theme.colors.danger }]}>
-            <SymbolView
-              name="rectangle.portrait.and.arrow.right"
-              size={17}
-              tintColor="#fff"
-              type="monochrome"
-              fallback={<Ionicons name="log-out-outline" size={17} color="#fff" />}
-            />
+          <View style={styles.signOutLabelRow}>
+            <Ionicons name="log-out-outline" size={16} color={theme.colors.danger} />
+            <Text style={styles.signOutTitle}>Sign out</Text>
           </View>
-          <Text style={styles.signOutText}>Sign Out</Text>
         </Pressable>
       </GlassCard>
     </ScrollView>
@@ -377,7 +356,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
   },
-  rowPressed: { backgroundColor: 'rgba(255,255,255,0.04)' },
+  rowPressed: { opacity: 0.75 },
   avatarWrap: {
     width: 72,
     height: 72,
@@ -424,7 +403,16 @@ const styles = StyleSheet.create({
 
   // Settings groups
   settingsShell: { borderRadius: SETTINGS_GROUP_RADIUS },
-  signOutShell: { marginTop: theme.spacing.xs },
+  signOutGlassCard: {
+    borderRadius: SETTINGS_GROUP_RADIUS,
+    marginTop: theme.spacing.xs,
+    borderColor: SIGN_OUT_GLASS_BORDER,
+    overflow: 'hidden',
+  },
+  settingsGroupInner: {
+    padding: 0,
+    gap: 0,
+  },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -460,14 +448,18 @@ const styles = StyleSheet.create({
     marginLeft: 66,
   },
   signOutRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    minHeight: 62,
+  },
+  signOutLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: 13,
-    gap: theme.spacing.md,
-    minHeight: 54,
+    gap: theme.spacing.sm,
   },
-  signOutText: {
+  signOutTitle: {
     ...theme.typography.body,
     color: theme.colors.danger,
     fontWeight: '600',

@@ -1,26 +1,161 @@
+import { GlassCircleButton } from '@/components/ui/glass-circle-button';
+import { PrimaryButton } from '@/components/ui/primitives';
+import { theme } from '@/constants/theme';
+import { useMarketplaceMutations, usePayout } from '@/hooks/use-marketplace';
+import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Alert } from 'react-native';
+import {
+  ActionSheetIOS,
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
-import { LabeledField, PrimaryButton, Screen, SectionTitle } from '@/components/ui/primitives';
-import { useMarketplaceMutations, usePayout } from '@/hooks/use-marketplace';
+
+const FIELD_RADIUS = 28;
+const FIELD_BORDER = 'rgba(255,255,255,0.18)';
+const FIELD_WASH = 'rgba(255,255,255,0.055)';
+const SINGLE_LINE_HEIGHT = 58;
+
+const payoutMethods = ['upi', 'bank'] as const;
 
 const schema = z.object({
   upi_id: z.string().optional(),
   bank_account_no: z.string().optional(),
   bank_ifsc: z.string().optional(),
   bank_account_name: z.string().optional(),
-  preferred_method: z.enum(['upi', 'bank']).default('upi'),
+  preferred_method: z.enum(payoutMethods),
 });
 
+type FormValues = z.infer<typeof schema>;
+type PayoutMethod = FormValues['preferred_method'];
+
+function methodLabel(method: PayoutMethod) {
+  return method === 'upi' ? 'UPI' : 'Bank account';
+}
+
+function GlassPayoutField({
+  label,
+  ...inputProps
+}: TextInputProps & {
+  label: string;
+}) {
+  return (
+    <View style={styles.fieldBlock}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <BlurView tint="systemUltraThinMaterialDark" intensity={86} style={styles.blurFieldShell}>
+        <View pointerEvents="none" style={styles.fieldWash} />
+        <TextInput
+          {...inputProps}
+          {...(Platform.OS === 'android' ? { includeFontPadding: false } : {})}
+          textAlignVertical="center"
+          underlineColorAndroid="transparent"
+          placeholderTextColor="rgba(255,255,255,0.38)"
+          cursorColor="#FFFFFF"
+          selectionColor="#FFFFFF"
+          style={[styles.fieldInputSingle, inputProps.style]}
+        />
+      </BlurView>
+    </View>
+  );
+}
+
+function GlassMethodSelector({
+  value,
+  onChange,
+}: {
+  value: PayoutMethod;
+  onChange: (value: PayoutMethod) => void;
+}) {
+  const label = 'Preferred method';
+
+  const openMethodPicker = () => {
+    if (Platform.OS === 'ios') {
+      const options = ['UPI', 'Bank account', 'Cancel'];
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: label,
+          options,
+          cancelButtonIndex: options.length - 1,
+          userInterfaceStyle: 'dark',
+        },
+        (buttonIndex) => {
+          if (buttonIndex < payoutMethods.length) {
+            onChange(payoutMethods[buttonIndex]);
+          }
+        },
+      );
+      return;
+    }
+
+    Alert.alert(
+      label,
+      undefined,
+      [
+        {
+          text: 'UPI',
+          onPress: () => {
+            onChange('upi');
+          },
+        },
+        {
+          text: 'Bank account',
+          onPress: () => {
+            onChange('bank');
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      { cancelable: true },
+    );
+  };
+
+  return (
+    <View style={styles.fieldBlock}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <BlurView tint="systemUltraThinMaterialDark" intensity={86} style={styles.blurFieldShell}>
+        <View pointerEvents="none" style={styles.fieldWash} />
+        <Pressable
+          accessibilityLabel={label}
+          accessibilityRole="button"
+          accessibilityValue={{ text: methodLabel(value) }}
+          onPress={openMethodPicker}
+          style={({ pressed }) => [styles.selectorPressable, pressed && styles.selectorPressed]}
+        >
+          <Text style={styles.selectorText} numberOfLines={1}>
+            {methodLabel(value)}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="rgba(255,255,255,0.66)" />
+        </Pressable>
+      </BlurView>
+    </View>
+  );
+}
+
 export default function PayoutScreen() {
+  const insets = useSafeAreaInsets();
   const payout = usePayout();
   const mutations = useMarketplaceMutations();
-  const { handleSubmit, setValue, watch } = useForm({
+  const { handleSubmit, setValue, watch } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { preferred_method: 'upi' },
+    defaultValues: {
+      upi_id: '',
+      bank_account_no: '',
+      bank_ifsc: '',
+      bank_account_name: '',
+      preferred_method: 'upi',
+    },
   });
 
   useEffect(() => {
@@ -41,41 +176,207 @@ export default function PayoutScreen() {
     }
   });
 
+  const scrollBottomPad =
+    theme.spacing.hero + theme.spacing.jumbo + theme.spacing.xxl + insets.bottom;
+
   return (
-    <Screen>
-      <SectionTitle
-        title="Payout Setup"
-        subtitle="Add your UPI ID or bank account to receive payouts."
-      />
-      <LabeledField
-        label="UPI ID"
-        value={watch('upi_id') ?? ''}
-        onChangeText={(value) => {
-          setValue('upi_id', value);
-        }}
-      />
-      <LabeledField
-        label="Bank account number"
-        value={watch('bank_account_no') ?? ''}
-        onChangeText={(value) => {
-          setValue('bank_account_no', value);
-        }}
-      />
-      <LabeledField
-        label="IFSC"
-        value={watch('bank_ifsc') ?? ''}
-        onChangeText={(value) => {
-          setValue('bank_ifsc', value);
-        }}
-      />
-      <LabeledField
-        label="Account holder name"
-        value={watch('bank_account_name') ?? ''}
-        onChangeText={(value) => {
-          setValue('bank_account_name', value);
-        }}
-      />
-      <PrimaryButton label="Save payout details" onPress={onSubmit} />
-    </Screen>
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.pageHeaderRow}>
+          <View style={styles.pageBackShadow}>
+            <GlassCircleButton
+              symbol="chevron.left"
+              fallbackIcon="chevron-back"
+              tintColor="#FFFFFF"
+              size={44}
+              symbolSize={19}
+              accessibilityLabel="Go back"
+              onPress={() => {
+                router.back();
+              }}
+            />
+          </View>
+          <View style={styles.headerCopy}>
+            <Text style={styles.pageTitle}>Payout Details</Text>
+          </View>
+        </View>
+
+        <View style={styles.fieldsColumn}>
+          <GlassMethodSelector
+            value={watch('preferred_method')}
+            onChange={(value) => {
+              setValue('preferred_method', value, { shouldValidate: true });
+            }}
+          />
+          <GlassPayoutField
+            label="UPI ID"
+            value={watch('upi_id') ?? ''}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            onChangeText={(value) => {
+              setValue('upi_id', value, { shouldValidate: true });
+            }}
+          />
+          <GlassPayoutField
+            label="Bank account number"
+            value={watch('bank_account_no') ?? ''}
+            keyboardType="number-pad"
+            onChangeText={(value) => {
+              setValue('bank_account_no', value, { shouldValidate: true });
+            }}
+          />
+          <GlassPayoutField
+            label="IFSC"
+            value={watch('bank_ifsc') ?? ''}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            onChangeText={(value) => {
+              setValue('bank_ifsc', value.toUpperCase(), { shouldValidate: true });
+            }}
+          />
+          <GlassPayoutField
+            label="Account holder name"
+            value={watch('bank_account_name') ?? ''}
+            autoCapitalize="words"
+            onChangeText={(value) => {
+              setValue('bank_account_name', value, { shouldValidate: true });
+            }}
+          />
+        </View>
+      </ScrollView>
+
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: Math.max(insets.bottom, theme.spacing.md) + theme.spacing.md,
+          },
+        ]}
+      >
+        <PrimaryButton
+          label={mutations.updatePayout.isPending ? 'Saving...' : 'Save payout details'}
+          disabled={mutations.updatePayout.isPending}
+          onPress={onSubmit}
+          style={styles.saveButton}
+        />
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: theme.spacing.xxl,
+    paddingTop: theme.spacing.xl,
+    gap: theme.spacing.section,
+  },
+  pageHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.xs,
+  },
+  pageBackShadow: {
+    flexShrink: 0,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.32,
+        shadowRadius: 10,
+      },
+      default: {
+        elevation: 8,
+      },
+    }),
+  },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pageTitle: {
+    ...theme.typography.display,
+    color: theme.colors.foreground,
+  },
+  fieldsColumn: {
+    gap: theme.spacing.xxl,
+  },
+  fieldBlock: {
+    gap: theme.spacing.sm,
+  },
+  blurFieldShell: {
+    height: SINGLE_LINE_HEIGHT,
+    borderRadius: FIELD_RADIUS,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: FIELD_BORDER,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  fieldWash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: FIELD_WASH,
+  },
+  fieldLabel: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.62)',
+    paddingLeft: theme.spacing.lg,
+  },
+  fieldInputSingle: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    paddingHorizontal: theme.spacing.xxl,
+    paddingTop: 0,
+    paddingBottom: 0,
+    margin: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    color: theme.colors.foreground,
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 17,
+    fontWeight: '400',
+    textAlignVertical: 'center',
+  },
+  selectorPressable: {
+    flex: 1,
+    zIndex: 1,
+    minHeight: SINGLE_LINE_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xxl,
+  },
+  selectorPressed: {
+    opacity: 0.78,
+  },
+  selectorText: {
+    flex: 1,
+    color: theme.colors.foreground,
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 17,
+    fontWeight: '400',
+  },
+  footer: {
+    paddingHorizontal: theme.spacing.xxl,
+    paddingTop: theme.spacing.lg,
+    backgroundColor: theme.colors.background,
+  },
+  saveButton: {
+    alignSelf: 'stretch',
+  },
+});

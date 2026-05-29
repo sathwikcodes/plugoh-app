@@ -17,7 +17,6 @@ import {
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import type { PayoutUpsert } from '@plugoh/contracts';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -69,36 +68,6 @@ const fmtINR = (n?: number) =>
         maximumFractionDigits: 0,
       }).format(n)
     : '—';
-
-// ─── RatePill ─────────────────────────────────────────────────────────────────
-
-function RatePill({ icon, label, amount }: { icon: string; label: string; amount?: number }) {
-  return (
-    <View style={rate.pill}>
-      <Ionicons name={icon as never} size={13} color="rgba(255,255,255,0.65)" />
-      <Text style={rate.amount}>{fmtINR(amount)}</Text>
-      <Text style={rate.label}>{label}</Text>
-    </View>
-  );
-}
-
-const rate = StyleSheet.create({
-  pill: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  amount: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontVariant: ['tabular-nums'],
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.6)',
-  },
-});
 
 // ─── SettingRow ───────────────────────────────────────────────────────────────
 
@@ -246,6 +215,9 @@ export default function ProfileScreen() {
   const payoutLoading = bootstrapLoading || shouldShowInitialLoader(payout);
 
   const pricingSet = !!(data?.price_per_reel || data?.price_per_post || data?.price_per_story);
+  const pricingSubtitle = pricingSet
+    ? `From ${fmtINR(data.price_per_story ?? data.price_per_post ?? data.price_per_reel)}`
+    : 'Set your rates';
 
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
@@ -284,12 +256,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* ── profile row ── */}
-      <Pressable
-        onPress={() => {
-          router.push('/(app)/profile/edit');
-        }}
-        style={({ pressed }) => [styles.profileRow, pressed && styles.rowPressed]}
-      >
+      <View style={styles.profileRow}>
         <View style={styles.avatarWrap}>
           {data?.profile_photo_url ? (
             <Image source={{ uri: data.profile_photo_url }} style={styles.avatar} />
@@ -317,71 +284,9 @@ export default function ProfileScreen() {
             <ShimmerText width="38%" height={14} />
           ) : null}
         </View>
-
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.4)" />
-      </Pressable>
+      </View>
 
       <View style={styles.sectionDivider} />
-
-      {/* ── pricing hero card ── */}
-      {profileLoading ? (
-        <View style={styles.ratesCard}>
-          <View style={styles.ratesInner}>
-            <ShimmerText width={86} height={12} />
-            <View style={styles.ratesRow}>
-              <ShimmerText width={58} height={32} />
-              <View style={styles.rateDivider} />
-              <ShimmerText width={58} height={32} />
-              <View style={styles.rateDivider} />
-              <ShimmerText width={58} height={32} />
-            </View>
-          </View>
-        </View>
-      ) : pricingSet ? (
-        <Pressable
-          onPress={() => {
-            router.push('/(app)/profile/pricing');
-          }}
-          style={({ pressed }) => [styles.ratesCard, pressed && { opacity: 0.85 }]}
-        >
-          <View style={styles.ratesInner}>
-            <Text style={styles.ratesLabel}>YOUR RATES</Text>
-            <View style={styles.ratesRow}>
-              <RatePill icon="videocam-outline" label="Reel" amount={data.price_per_reel} />
-              <View style={styles.rateDivider} />
-              <RatePill icon="image-outline" label="Post" amount={data.price_per_post} />
-              <View style={styles.rateDivider} />
-              <RatePill icon="play-circle-outline" label="Story" amount={data.price_per_story} />
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.4)" />
-        </Pressable>
-      ) : (
-        <Pressable
-          onPress={() => {
-            router.push('/(app)/profile/pricing');
-          }}
-          style={styles.pricingCard}
-        >
-          <LinearGradient
-            colors={['#EC4899', '#A855F7']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.pricingGradient}
-          >
-            <View style={styles.pricingLeft}>
-              <Text style={styles.pricingTitle}>Set your rates</Text>
-              <Text style={styles.pricingBody}>
-                Brands can't book you{'\n'}until you list your prices.
-              </Text>
-              <View style={styles.pricingCtaBtn}>
-                <Text style={styles.pricingCtaText}>Get started →</Text>
-              </View>
-            </View>
-            <Text style={styles.pricingDecor}>₹</Text>
-          </LinearGradient>
-        </Pressable>
-      )}
 
       {/* ── Account section ── */}
       <Text style={styles.sectionHeader}>Account</Text>
@@ -396,6 +301,16 @@ export default function ProfileScreen() {
             router.push('/(app)/profile/edit');
           }}
           first
+        />
+        <SettingRow
+          iconName="pricetag-outline"
+          iconBg={theme.colors.accentStrong}
+          title="Pricing"
+          subtitle={pricingSubtitle}
+          subtitleLoading={profileLoading}
+          onPress={() => {
+            router.push('/(app)/profile/pricing');
+          }}
         />
         <SettingRow
           iconName="logo-instagram"
@@ -517,85 +432,6 @@ const styles = StyleSheet.create({
   sectionDivider: {
     height: 1,
     backgroundColor: theme.colors.border,
-  },
-  // ── pricing card (unset state) ──
-  pricingCard: {
-    borderRadius: theme.radius.card,
-    overflow: 'hidden',
-  },
-  pricingGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: theme.spacing.xl,
-    borderRadius: theme.radius.card,
-    overflow: 'hidden',
-  },
-  pricingLeft: {
-    flex: 1,
-    gap: theme.spacing.sm,
-  },
-  pricingTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  pricingBody: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: 'rgba(255,255,255,0.78)',
-    lineHeight: 19,
-  },
-  pricingCtaBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.xs + 2,
-    marginTop: theme.spacing.xs,
-  },
-  pricingCtaText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  pricingDecor: {
-    fontSize: 80,
-    fontWeight: '900',
-    color: 'rgba(255,255,255,0.15)',
-    lineHeight: 88,
-    marginLeft: theme.spacing.md,
-  },
-  // ── rates card (set state) ──
-  ratesCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: theme.radius.card,
-    borderWidth: 1,
-    borderColor: '#EC4899' + '55',
-    backgroundColor: theme.colors.accentSoft,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.md,
-  },
-  ratesInner: {
-    flex: 1,
-    gap: theme.spacing.sm,
-  },
-  ratesLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    color: '#EC4899',
-  },
-  ratesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.lg,
-  },
-  rateDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   // ── settings group ──
   sectionHeader: {
