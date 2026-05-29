@@ -12,6 +12,8 @@ type Props = {
   onLongPress: () => void;
   /** Override the secondary name shown below the campaign title (e.g. creator name for brand view). */
   nameLabel?: string | null;
+  avatarImageUri?: string | null;
+  avatarName?: string | null;
 };
 
 function formatTimestamp(iso: string): string {
@@ -26,23 +28,41 @@ function formatTimestamp(iso: string): string {
 
 function previewText(item: InboxItem): string {
   const msg = item.latestMessage;
-  if (!msg) return 'No messages yet';
-  if (msg.message_type === 'attachment') return '📎 Attachment';
-  if (msg.message_type === 'booking_card') return 'Booking created';
+  if (!msg) return 'Start the conversation from this campaign thread.';
+  if (msg.message_type === 'attachment') return msg.content || 'A file was shared';
+  if (msg.message_type === 'booking_card') return msg.content || 'Booking details were created';
   if (msg.message_type === 'system') return msg.content;
   return msg.content;
 }
 
-export function ConversationRow({ item, index, onPress, onLongPress, nameLabel }: Props) {
-  const brandName =
+export function ConversationRow({
+  item,
+  index,
+  onPress,
+  onLongPress,
+  nameLabel,
+  avatarImageUri,
+  avatarName,
+}: Props) {
+  const participantName =
     nameLabel !== undefined ? nameLabel : item.campaign.business_profile?.brand_name;
-  const avatarName = item.campaign.business_profile?.brand_name ?? item.campaign.title;
-  const avatarImageUri =
+  const resolvedAvatarName =
+    avatarName ??
+    item.campaign.business_profile?.brand_name ??
+    participantName ??
+    item.campaign.title;
+  const resolvedAvatarImageUri =
+    avatarImageUri ??
     item.campaign.business_profile?.profile_photo_url ??
     item.campaign.business_profile?.ig_profile_picture_url ??
     item.campaign.business_profile?.avatar_url ??
     null;
   const timestamp = item.latestMessage?.created_at;
+  const title = participantName || item.campaign.title;
+  const secondaryLine =
+    participantName && participantName.trim() !== item.campaign.title.trim()
+      ? item.campaign.title
+      : null;
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 30).duration(300)}>
@@ -53,21 +73,26 @@ export function ConversationRow({ item, index, onPress, onLongPress, nameLabel }
         accessibilityRole="button"
         accessibilityLabel={`${item.campaign.title} conversation`}
       >
-        {/* Avatar */}
-        <BrandAvatar imageUri={avatarImageUri} name={avatarName} />
+        <View style={styles.avatarWrap}>
+          <BrandAvatar
+            imageUri={resolvedAvatarImageUri}
+            name={resolvedAvatarName}
+            size={56}
+            textSize={18}
+          />
+        </View>
 
-        {/* Body */}
         <View style={styles.body}>
           <View style={styles.topRow}>
-            <Text style={styles.campaignTitle} numberOfLines={1} ellipsizeMode="tail">
-              {item.campaign.title}
+            <Text style={styles.primaryTitle} numberOfLines={1} ellipsizeMode="tail">
+              {title}
             </Text>
             {timestamp ? <Text style={styles.timestamp}>{formatTimestamp(timestamp)}</Text> : null}
           </View>
 
-          {brandName ? (
-            <Text style={styles.brandName} numberOfLines={1}>
-              {brandName}
+          {secondaryLine ? (
+            <Text style={styles.secondaryLine} numberOfLines={1} ellipsizeMode="tail">
+              {secondaryLine}
             </Text>
           ) : null}
 
@@ -97,37 +122,54 @@ export function ConversationRow({ item, index, onPress, onLongPress, nameLabel }
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    minHeight: 72,
-    gap: 12,
+    minHeight: 88,
+    gap: 14,
   },
   rowPressed: {
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
+  avatarWrap: {
+    width: 56,
+    minHeight: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   body: {
     flex: 1,
-    gap: 2,
+    minWidth: 0,
+    gap: 4,
+    paddingTop: 2,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  campaignTitle: {
+  primaryTitle: {
     ...theme.typography.cardTitle,
     color: theme.colors.foreground,
     flex: 1,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '700',
   },
   timestamp: {
     ...theme.typography.label,
-    color: 'rgba(255,255,255,0.35)',
+    color: 'rgba(255,255,255,0.42)',
     flexShrink: 0,
+    fontSize: 12,
+    lineHeight: 16,
+    fontVariant: ['tabular-nums'],
   },
-  brandName: {
+  secondaryLine: {
     ...theme.typography.label,
-    color: 'rgba(255,255,255,0.45)',
+    color: 'rgba(255,255,255,0.42)',
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   bottomRow: {
     flexDirection: 'row',
@@ -136,9 +178,11 @@ const styles = StyleSheet.create({
   },
   preview: {
     ...theme.typography.body,
-    color: 'rgba(255,255,255,0.40)',
+    color: 'rgba(255,255,255,0.66)',
     flex: 1,
     fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '500',
   },
   badge: {
     borderRadius: 999,

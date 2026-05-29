@@ -2,6 +2,7 @@ import { CAMPAIGN_CARD_CORNER_RADIUS } from '@/constants/campaign-card-frame';
 import { theme } from '@/constants/theme';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { Influencer } from '@plugoh/contracts';
+import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
@@ -143,22 +144,33 @@ export function CreatorSwipeCard({ creator, cardWidth, cardHeight, style, onView
         />
 
         <View style={[styles.topRow, { padding: px(20) }]} pointerEvents="none">
-          <View
+          <BlurView
+            tint="systemUltraThinMaterialDark"
+            intensity={72}
             style={[
               styles.categoryPill,
               {
                 minHeight: px(34),
                 borderRadius: px(17),
-                paddingHorizontal: px(11),
-                gap: px(6),
               },
             ]}
           >
-            <Ionicons name="sparkles" size={px(14)} color="#F5C0A6" />
-            <Text style={[styles.categoryText, { fontSize: px(12) }]} numberOfLines={1}>
-              {category}
-            </Text>
-          </View>
+            <View
+              style={[
+                styles.categoryPillInner,
+                {
+                  minHeight: px(34),
+                  paddingHorizontal: px(11),
+                  gap: px(6),
+                },
+              ]}
+            >
+              <Ionicons name="sparkles" size={px(14)} color="rgba(255,255,255,0.94)" />
+              <Text style={[styles.categoryText, { fontSize: px(12) }]} numberOfLines={1}>
+                {category}
+              </Text>
+            </View>
+          </BlurView>
         </View>
 
         <View
@@ -296,16 +308,20 @@ const styles = StyleSheet.create({
   },
   categoryPill: {
     maxWidth: '72%',
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.055)',
+  },
+  categoryPillInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(10,12,16,0.52)',
   },
   categoryText: {
-    color: '#F5C0A6',
-    fontWeight: '800',
+    color: 'rgba(255,255,255,0.94)',
+    fontWeight: '700',
     letterSpacing: 0,
   },
   content: {

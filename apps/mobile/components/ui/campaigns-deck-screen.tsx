@@ -80,7 +80,7 @@ export function CampaignsDeckScreen({
   return (
     <DeckBrowseScreen
       title="Campaigns"
-      presentation={role === 'business' ? 'premiumCampaigns' : 'default'}
+      presentation="premiumCampaigns"
       items={campaigns}
       isLoading={isLoading}
       profileImageUri={profileImageUri}
@@ -97,11 +97,9 @@ export function CampaignsDeckScreen({
       getVisibleItems={({ items, search, sort, filters }) =>
         getVisibleCampaigns({ items, search, sort, filters, searchMatcher })
       }
-      renderFilterSheet={
-        role === 'business'
-          ? (input) => <PremiumCampaignFilterSheet {...input} amountBounds={campaignAmountBounds} />
-          : undefined
-      }
+      renderFilterSheet={(input) => (
+        <PremiumCampaignFilterSheet {...input} amountBounds={campaignAmountBounds} />
+      )}
       renderFilterSections={({ draftFilters, setDraftFilters }) => (
         <>
           <FilterSheetSection title="Status">

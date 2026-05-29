@@ -33,10 +33,10 @@ const TAB_BAR_CLEARANCE = 12;
 function SkeletonRow() {
   return (
     <View style={styles.skeletonRow}>
-      <ShimmerCircle size={44} />
+      <ShimmerCircle size={56} />
       <View style={styles.skeletonBody}>
-        <ShimmerText width="60%" height={14} />
-        <ShimmerText width="35%" height={11} />
+        <ShimmerText width="64%" height={16} />
+        <ShimmerText width="46%" height={12} />
         <ShimmerText width="80%" height={11} />
       </View>
     </View>
@@ -137,8 +137,8 @@ export default function InboxScreen() {
         style={[
           styles.headerBlock,
           {
-            paddingTop: insets.top + theme.spacing.lg,
-            paddingHorizontal: theme.spacing.xxl,
+            paddingTop: insets.top + theme.spacing.md,
+            paddingHorizontal: theme.spacing.lg,
             paddingBottom: theme.spacing.md,
           },
         ]}
@@ -155,6 +155,7 @@ export default function InboxScreen() {
             size={44}
             symbolSize={20}
             imageUri={influencerProfile.data?.profile_photo_url}
+            glassRendering="blur"
             onPress={() => {
               router.push('/(app)/profile');
             }}
@@ -172,12 +173,16 @@ export default function InboxScreen() {
           <View style={styles.filterButtonWrap}>
             <NativeIconButton
               symbol="line.3.horizontal.decrease.circle"
-              fallbackIcon="options-outline"
+              fallbackIcon="filter"
+              fallbackIconFamily="foundation"
+              preferFallbackIcon
               variant="glass"
-              haptic="light"
-              size={44}
-              symbolSize={20}
+              haptic="selection"
+              size={46}
+              symbolSize={21}
+              fallbackSize={22}
               accessibilityLabel="Open filters"
+              glassRendering="blur"
               onPress={() => {
                 setFiltersVisible(true);
               }}
@@ -216,6 +221,7 @@ export default function InboxScreen() {
 
       <InboxFilterSheet
         visible={filtersVisible}
+        presentation="premium"
         filters={filters}
         sort={sort}
         onCancel={() => {
@@ -243,12 +249,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: theme.spacing.md,
+    minHeight: 48,
+    paddingHorizontal: 2,
   },
   headerTitle: {
-    ...theme.typography.title,
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: 0,
     color: theme.colors.foreground,
     flex: 1,
     minWidth: 0,
+    includeFontPadding: false,
   },
   searchRow: {
     flexDirection: 'row',
@@ -261,26 +273,32 @@ const styles = StyleSheet.create({
   },
   filterButtonWrap: {
     position: 'relative',
+    width: 46,
+    height: 46,
   },
   activeBadge: {
     position: 'absolute',
-    right: -3,
+    right: -4,
     top: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    backgroundColor: theme.colors.pink,
-    borderWidth: 1,
-    borderColor: theme.colors.background,
+    paddingHorizontal: 5,
+    backgroundColor: '#FF453A',
+    shadowColor: '#FF453A',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.34,
+    shadowRadius: 8,
+    elevation: 6,
   },
   activeBadgeText: {
     ...theme.typography.label,
-    color: theme.colors.background,
+    color: theme.colors.foreground,
     fontSize: 10,
-    lineHeight: 12,
+    lineHeight: 13,
+    fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
   list: {
@@ -292,7 +310,8 @@ const styles = StyleSheet.create({
   separator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(255,255,255,0.07)',
-    marginLeft: 76,
+    marginLeft: 90,
+    marginRight: 20,
   },
   emptyWrap: {
     flex: 1,
@@ -315,10 +334,10 @@ const styles = StyleSheet.create({
   },
   skeletonRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: theme.spacing.xxl,
-    paddingVertical: 14,
-    gap: 12,
+    paddingVertical: 13,
+    gap: 14,
   },
   skeletonBody: {
     flex: 1,

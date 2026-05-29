@@ -32,10 +32,23 @@ import type {
   CampaignSort,
   CampaignStatusFilter,
 } from '@/lib/filters/campaigns';
+import {
+  creatorFilterError,
+  DEFAULT_CREATOR_FILTERS,
+  type CreatorFilterDraft,
+  type CreatorSort,
+} from '@/lib/filters/creators';
 import { type DeckFilterSheetRenderInput, type DeckSortOption } from './deck-browse-screen';
 
 type Props = DeckFilterSheetRenderInput<CampaignSort, CampaignFilterDraft> & {
   amountBounds: {
+    min: number;
+    max: number;
+  };
+};
+
+type CreatorProps = DeckFilterSheetRenderInput<CreatorSort, CreatorFilterDraft> & {
+  priceBounds: {
     min: number;
     max: number;
   };
@@ -47,6 +60,13 @@ type StatusOption = {
   value: CampaignStatusFilter;
   label: string;
   description: string;
+};
+
+type FollowerOption = {
+  value: string;
+  label: string;
+  description: string;
+  min: string;
 };
 
 const SHEET_RADIUS = 34;
@@ -62,6 +82,14 @@ const STATUS_OPTIONS: StatusOption[] = [
     label: 'Needs attention',
     description: 'Disputed, declined, expired, or refunded',
   },
+];
+const FOLLOWER_OPTIONS: FollowerOption[] = [
+  { value: 'all', label: 'Any audience', description: 'Show every creator', min: '' },
+  { value: '10k', label: '10K+ followers', description: 'Growing creators', min: '10000' },
+  { value: '50k', label: '50K+ followers', description: 'Established reach', min: '50000' },
+  { value: '100k', label: '100K+ followers', description: 'Large audience', min: '100000' },
+  { value: '500k', label: '500K+ followers', description: 'Premium creators', min: '500000' },
+  { value: '1m', label: '1M+ followers', description: 'Top-tier reach', min: '1000000' },
 ];
 
 type HeaderIconName = 'chevron-back' | 'close';
@@ -86,12 +114,34 @@ function formatAmount(value: number) {
   return String(Math.round(value));
 }
 
-function selectedSortLabel(options: DeckSortOption<CampaignSort>[], value: CampaignSort) {
+function formatCompactNumber(value: number) {
+  return Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(
+    value,
+  );
+}
+
+function selectedSortLabel<TSort extends string>(options: DeckSortOption<TSort>[], value: TSort) {
   return options.find((option) => option.value === value)?.label ?? 'Newest first';
 }
 
 function selectedStatusLabel(value: CampaignStatusFilter) {
   return STATUS_OPTIONS.find((option) => option.value === value)?.label ?? 'All campaigns';
+}
+
+function selectedFollowerLabel(filters: CreatorFilterDraft) {
+  const min = filters.followers.min.trim();
+  const max = filters.followers.max.trim();
+  if (!min && !max) return FOLLOWER_OPTIONS[0].label;
+  const matching = FOLLOWER_OPTIONS.find((option) => option.min === min && !max);
+  if (matching) return matching.label;
+
+  const parsedMin = Number(min);
+  const parsedMax = Number(max);
+  if (Number.isFinite(parsedMin) && !max) return `${formatCompactNumber(parsedMin)}+`;
+  if (Number.isFinite(parsedMin) && Number.isFinite(parsedMax)) {
+    return `${formatCompactNumber(parsedMin)}-${formatCompactNumber(parsedMax)}`;
+  }
+  return 'Custom audience';
 }
 
 function LiquidHeaderIconButton({
@@ -407,6 +457,285 @@ export function PremiumCampaignFilterSheet({
   );
 }
 
+export function PremiumCreatorFilterSheet({
+  visible,
+  activeCount,
+  resultCount,
+  sortOptions,
+  draftSort,
+  setDraftSort,
+  draftFilters,
+  setDraftFilters,
+  applyDisabled,
+  applyError,
+  onCancel,
+  onClear,
+  onApply,
+  priceBounds,
+}: CreatorProps) {
+  const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
+  const [mounted, setMounted] = useState(visible);
+  const [page, setPage] = useState<'main' | 'sort' | 'followers'>('main');
+  const translateY = useRef(new RNAnimated.Value(HIDDEN_OFFSET)).current;
+  const opacity = useRef(new RNAnimated.Value(0)).current;
+  const pageOpacity = useRef(new RNAnimated.Value(1)).current;
+  const pageTranslateX = useRef(new RNAnimated.Value(0)).current;
+  const sheetHeight = Math.round(
+    Math.min(window.height * 0.85, Math.max(window.height * 0.72, 600)),
+  );
+
+  const normalizedPriceBounds = useMemo(
+    () => ({
+      min: Math.max(0, priceBounds.min),
+      max: Math.max(1000, roundedAmountMax(priceBounds.max)),
+    }),
+    [priceBounds.max, priceBounds.min],
+  );
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      setPage('main');
+      RNAnimated.parallel([
+        RNAnimated.timing(opacity, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        RNAnimated.spring(translateY, {
+          toValue: 0,
+          speed: 22,
+          bounciness: 4,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
+    RNAnimated.parallel([
+      RNAnimated.timing(opacity, {
+        toValue: 0,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(translateY, {
+        toValue: HIDDEN_OFFSET,
+        duration: 170,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) setMounted(false);
+    });
+  }, [opacity, translateY, visible]);
+
+  function navigate(nextPage: 'main' | 'sort' | 'followers') {
+    RNAnimated.parallel([
+      RNAnimated.timing(pageOpacity, {
+        toValue: 0,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(pageTranslateX, {
+        toValue: nextPage === 'main' ? 14 : -14,
+        duration: 90,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setPage(nextPage);
+      pageTranslateX.setValue(nextPage === 'main' ? -10 : 10);
+      RNAnimated.parallel([
+        RNAnimated.timing(pageOpacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        RNAnimated.timing(pageTranslateX, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  }
+
+  if (!mounted) return null;
+
+  const priceError = creatorFilterError({
+    ...draftFilters,
+    followers: DEFAULT_CREATOR_FILTERS.followers,
+  });
+  const clearLabel = activeCount > 0 ? `Clear all (${activeCount})` : 'Clear all';
+  const showLabel = `Show ${resultCount}`;
+  return (
+    <Modal
+      visible={mounted}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={onCancel}
+    >
+      <View style={styles.modalRoot}>
+        <RNAnimated.View style={[StyleSheet.absoluteFill, { opacity }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close creator filters"
+            style={StyleSheet.absoluteFill}
+            onPress={onCancel}
+          >
+            <BlurView
+              intensity={Platform.OS === 'android' ? 16 : 26}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.scrim} />
+          </Pressable>
+        </RNAnimated.View>
+
+        <RNAnimated.View
+          style={[
+            styles.sheetFrame,
+            {
+              height: sheetHeight,
+              transform: [{ translateY }],
+            },
+          ]}
+        >
+          <BlurView tint="systemUltraThinMaterialDark" intensity={92} style={styles.surface}>
+            <View style={styles.surfaceTint} />
+            <View style={styles.handle} />
+
+            <View style={styles.headerRow}>
+              {page === 'main' ? (
+                <View style={styles.headerSide} />
+              ) : (
+                <LiquidHeaderIconButton
+                  icon="chevron-back"
+                  accessibilityLabel="Back to filters"
+                  onPress={() => {
+                    navigate('main');
+                  }}
+                />
+              )}
+              <Text style={styles.title} numberOfLines={1}>
+                Filter & Sort
+              </Text>
+              <LiquidHeaderIconButton
+                icon="close"
+                accessibilityLabel="Close creator filters"
+                onPress={onCancel}
+              />
+            </View>
+
+            <RNAnimated.View
+              style={[
+                styles.pageWrap,
+                {
+                  opacity: pageOpacity,
+                  transform: [{ translateX: pageTranslateX }],
+                },
+              ]}
+            >
+              {page === 'main' ? (
+                <CreatorMainFilterPage
+                  sortLabel={selectedSortLabel(sortOptions, draftSort)}
+                  followerLabel={selectedFollowerLabel(draftFilters)}
+                  filters={draftFilters}
+                  priceBounds={normalizedPriceBounds}
+                  priceError={priceError ?? applyError}
+                  onOpenSort={() => {
+                    navigate('sort');
+                  }}
+                  onOpenFollowers={() => {
+                    navigate('followers');
+                  }}
+                  onPriceMinChange={(value) => {
+                    setDraftFilters({
+                      ...draftFilters,
+                      price: { ...draftFilters.price, min: value },
+                    });
+                  }}
+                  onPriceMaxChange={(value) => {
+                    setDraftFilters({
+                      ...draftFilters,
+                      price: { ...draftFilters.price, max: value },
+                    });
+                  }}
+                />
+              ) : page === 'sort' ? (
+                <OptionPage
+                  options={sortOptions.map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                  }))}
+                  selected={draftSort}
+                  onSelect={(value) => {
+                    setDraftSort(value as CreatorSort);
+                  }}
+                />
+              ) : (
+                <OptionPage
+                  options={FOLLOWER_OPTIONS}
+                  selected={
+                    FOLLOWER_OPTIONS.find(
+                      (option) =>
+                        option.min === draftFilters.followers.min.trim() &&
+                        !draftFilters.followers.max.trim(),
+                    )?.value ?? 'custom'
+                  }
+                  onSelect={(value) => {
+                    const option = FOLLOWER_OPTIONS.find((item) => item.value === value);
+                    if (!option) return;
+                    setDraftFilters({
+                      ...draftFilters,
+                      followers: { min: option.min, max: '' },
+                    });
+                  }}
+                />
+              )}
+            </RNAnimated.View>
+
+            <View
+              style={[
+                styles.footer,
+                { paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + theme.spacing.sm },
+              ]}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={clearLabel}
+                disabled={activeCount === 0}
+                onPress={onClear}
+                style={({ pressed }) => [
+                  styles.clearButton,
+                  pressed && activeCount > 0 && styles.buttonPressed,
+                  activeCount === 0 && styles.disabled,
+                ]}
+              >
+                <Text style={styles.clearText}>{clearLabel}</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={showLabel}
+                disabled={applyDisabled}
+                onPress={onApply}
+                style={({ pressed }) => [
+                  styles.showButton,
+                  pressed && !applyDisabled && styles.buttonPressed,
+                  applyDisabled && styles.disabled,
+                ]}
+              >
+                <Text style={styles.showText}>{showLabel}</Text>
+              </Pressable>
+            </View>
+          </BlurView>
+        </RNAnimated.View>
+      </View>
+    </Modal>
+  );
+}
+
 function MainFilterPage({
   sortLabel,
   statusLabel,
@@ -456,6 +785,7 @@ function MainFilterPage({
             label="Minimum campaign amount"
             value={filters.amount.min}
             placeholder="Min"
+            prefix="₹"
             onChangeText={onMinChange}
           />
           <Text style={styles.amountSeparator}>-</Text>
@@ -463,10 +793,79 @@ function MainFilterPage({
             label="Maximum campaign amount"
             value={filters.amount.max}
             placeholder="Max"
+            prefix="₹"
             onChangeText={onMaxChange}
           />
         </View>
         {applyError ? <Text style={styles.errorText}>{applyError}</Text> : null}
+      </View>
+    </ScrollView>
+  );
+}
+
+function CreatorMainFilterPage({
+  sortLabel,
+  followerLabel,
+  filters,
+  priceBounds,
+  priceError,
+  onOpenSort,
+  onOpenFollowers,
+  onPriceMinChange,
+  onPriceMaxChange,
+}: {
+  sortLabel: string;
+  followerLabel: string;
+  filters: CreatorFilterDraft;
+  priceBounds: { min: number; max: number };
+  priceError: string | null;
+  onOpenSort: () => void;
+  onOpenFollowers: () => void;
+  onPriceMinChange: (value: string) => void;
+  onPriceMaxChange: (value: string) => void;
+}) {
+  return (
+    <ScrollView
+      style={styles.content}
+      contentContainerStyle={[styles.contentInner, styles.mainContentInner]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.groupCard}>
+        <FilterNavigationRow label="Sort" value={sortLabel} onPress={onOpenSort} />
+        <View style={styles.divider} />
+        <FilterNavigationRow label="Followers" value={followerLabel} onPress={onOpenFollowers} />
+      </View>
+
+      <View style={styles.rangeCard}>
+        <Text style={styles.cardTitle}>Starting price</Text>
+        <RangeSlider
+          minBound={priceBounds.min}
+          maxBound={priceBounds.max}
+          minValue={filters.price.min}
+          maxValue={filters.price.max}
+          valuePrefix="₹"
+          onMinChange={onPriceMinChange}
+          onMaxChange={onPriceMaxChange}
+        />
+        <View style={styles.amountInputRow}>
+          <AmountInput
+            label="Minimum starting price"
+            value={filters.price.min}
+            placeholder="Min"
+            prefix="₹"
+            onChangeText={onPriceMinChange}
+          />
+          <Text style={styles.amountSeparator}>-</Text>
+          <AmountInput
+            label="Maximum starting price"
+            value={filters.price.max}
+            placeholder="Max"
+            prefix="₹"
+            onChangeText={onPriceMaxChange}
+          />
+        </View>
+        {priceError ? <Text style={styles.errorText}>{priceError}</Text> : null}
       </View>
     </ScrollView>
   );
@@ -503,16 +902,18 @@ function AmountInput({
   label,
   value,
   placeholder,
+  prefix,
   onChangeText,
 }: {
   label: string;
   value: string;
   placeholder: string;
+  prefix: string;
   onChangeText: (value: string) => void;
 }) {
   return (
     <View style={styles.amountInputShell}>
-      <Text style={styles.currencyPrefix}>₹</Text>
+      {prefix ? <Text style={styles.currencyPrefix}>{prefix}</Text> : null}
       <TextInput
         accessibilityLabel={label}
         value={value}
@@ -622,6 +1023,7 @@ function RangeSlider({
   maxBound,
   minValue,
   maxValue,
+  valuePrefix = '₹',
   onMinChange,
   onMaxChange,
 }: {
@@ -629,6 +1031,7 @@ function RangeSlider({
   maxBound: number;
   minValue: string;
   maxValue: string;
+  valuePrefix?: string;
   onMinChange: (value: string) => void;
   onMaxChange: (value: string) => void;
 }) {
@@ -720,8 +1123,14 @@ function RangeSlider({
         </GestureDetector>
       </View>
       <View style={styles.rangeScaleRow}>
-        <Text style={styles.rangeScaleText}>₹{formatAmount(minBound)}</Text>
-        <Text style={styles.rangeScaleText}>₹{formatAmount(usableMax)}</Text>
+        <Text style={styles.rangeScaleText}>
+          {valuePrefix}
+          {formatAmount(minBound)}
+        </Text>
+        <Text style={styles.rangeScaleText}>
+          {valuePrefix}
+          {formatAmount(usableMax)}
+        </Text>
       </View>
     </View>
   );

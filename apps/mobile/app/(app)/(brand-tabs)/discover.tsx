@@ -1,6 +1,6 @@
 import { CreatorSwipeCard } from '@/components/ui/creator-swipe-card';
 import { DeckBrowseScreen, type DeckSortOption } from '@/components/ui/deck-browse-screen';
-import { FilterRange, FilterSheetSection } from '@/components/ui/filter-sheet';
+import { PremiumCreatorFilterSheet } from '@/components/ui/premium-campaign-filter-sheet';
 import { SnapCardDeck } from '@/components/ui/snap-card-deck';
 import { useBusinessProfile, useInfluencerDiscovery } from '@/hooks/use-marketplace';
 import { businessProfileImageUri } from '@/lib/brand/profile-image';
@@ -14,7 +14,7 @@ import {
 import type { Influencer } from '@plugoh/contracts';
 import { impactAsync, ImpactFeedbackStyle } from 'expo-haptics';
 import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 const SORT_OPTIONS: DeckSortOption<CreatorSort>[] = [
   { value: 'followers_desc', label: 'Top followers' },
@@ -27,8 +27,21 @@ export default function BrandDiscoverScreen() {
   const [sort, setSort] = useState<CreatorSort>('followers_desc');
   const profile = useBusinessProfile();
   const discovery = useInfluencerDiscovery({ search, sort, limit: 50, offset: 0 });
-  const creators = discovery.data?.items ?? [];
+  const creators = useMemo(() => discovery.data?.items ?? [], [discovery.data?.items]);
   const profileImageUri = businessProfileImageUri(profile.data);
+  const priceBounds = useMemo(() => {
+    const priceValues = creators
+      .map((creator) => creator.starterPrice)
+      .filter(
+        (value): value is number =>
+          typeof value === 'number' && Number.isFinite(value) && value > 0,
+      );
+
+    return {
+      min: 0,
+      max: priceValues.length > 0 ? Math.max(...priceValues) : 100000,
+    };
+  }, [creators]);
 
   const handleCreatorPress = useCallback(async (id: string) => {
     await impactAsync(ImpactFeedbackStyle.Light);
@@ -37,7 +50,8 @@ export default function BrandDiscoverScreen() {
 
   return (
     <DeckBrowseScreen
-      title="Find Creators"
+      title="Discover"
+      presentation="premiumCampaigns"
       items={creators}
       isLoading={discovery.isLoading}
       profileImageUri={profileImageUri}
@@ -56,60 +70,8 @@ export default function BrandDiscoverScreen() {
       getActiveFilterCount={creatorActiveFilterCount}
       validateFilters={creatorFilterError}
       getVisibleItems={({ items, filters }) => getVisibleCreators(items, filters)}
-      renderFilterSections={({ draftFilters, setDraftFilters }) => (
-        <>
-          <FilterSheetSection title="Audience">
-            <FilterRange
-              label="Follower range"
-              minValue={draftFilters.followers.min}
-              maxValue={draftFilters.followers.max}
-              minPlaceholder="Min followers"
-              maxPlaceholder="Max followers"
-              error={creatorFilterError({
-                ...draftFilters,
-                price: DEFAULT_CREATOR_FILTERS.price,
-              })}
-              onMinChange={(value) => {
-                setDraftFilters({
-                  ...draftFilters,
-                  followers: { ...draftFilters.followers, min: value },
-                });
-              }}
-              onMaxChange={(value) => {
-                setDraftFilters({
-                  ...draftFilters,
-                  followers: { ...draftFilters.followers, max: value },
-                });
-              }}
-            />
-          </FilterSheetSection>
-
-          <FilterSheetSection title="Pricing">
-            <FilterRange
-              label="Starting price"
-              minValue={draftFilters.price.min}
-              maxValue={draftFilters.price.max}
-              minPlaceholder="₹ min"
-              maxPlaceholder="₹ max"
-              error={creatorFilterError({
-                ...draftFilters,
-                followers: DEFAULT_CREATOR_FILTERS.followers,
-              })}
-              onMinChange={(value) => {
-                setDraftFilters({
-                  ...draftFilters,
-                  price: { ...draftFilters.price, min: value },
-                });
-              }}
-              onMaxChange={(value) => {
-                setDraftFilters({
-                  ...draftFilters,
-                  price: { ...draftFilters.price, max: value },
-                });
-              }}
-            />
-          </FilterSheetSection>
-        </>
+      renderFilterSheet={(input) => (
+        <PremiumCreatorFilterSheet {...input} priceBounds={priceBounds} />
       )}
       renderDeck={({ items, frame, search, activeFilterCount }) => (
         <SnapCardDeck<Influencer>

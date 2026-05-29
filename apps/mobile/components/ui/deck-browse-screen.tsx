@@ -285,18 +285,27 @@ export function DeckBrowseScreen<
           >
             <NativeIconButton
               symbol="line.3.horizontal.decrease.circle"
-              fallbackIcon="options-outline"
+              fallbackIcon={isPremiumCampaigns ? 'filter' : 'options-outline'}
+              fallbackIconFamily={isPremiumCampaigns ? 'foundation' : 'ionicons'}
+              preferFallbackIcon={isPremiumCampaigns}
               variant="glass"
               haptic="selection"
               size={isPremiumCampaigns ? 46 : 44}
-              symbolSize={isPremiumCampaigns ? 20 : 20}
+              symbolSize={isPremiumCampaigns ? 21 : 20}
+              fallbackSize={isPremiumCampaigns ? 22 : undefined}
               accessibilityLabel="Open filters"
               glassRendering={isPremiumCampaigns ? 'blur' : 'native'}
               onPress={handleFilterPress}
             />
             {appliedFilterCount > 0 ? (
               <View style={isPremiumCampaigns ? styles.premiumActiveBadge : styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>{appliedFilterCount}</Text>
+                <Text
+                  style={
+                    isPremiumCampaigns ? styles.premiumActiveBadgeText : styles.activeBadgeText
+                  }
+                >
+                  {appliedFilterCount}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -455,23 +464,34 @@ const styles = StyleSheet.create({
   },
   premiumActiveBadge: {
     position: 'absolute',
-    right: -2,
-    top: -3,
-    minWidth: 19,
-    height: 19,
-    borderRadius: 10,
+    right: -4,
+    top: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 5,
-    backgroundColor: theme.colors.pink,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: '#FF453A',
+    shadowColor: '#FF453A',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.34,
+    shadowRadius: 8,
+    elevation: 6,
   },
   activeBadgeText: {
     ...theme.typography.label,
     color: theme.colors.background,
     fontSize: 10,
     lineHeight: 12,
+    fontVariant: ['tabular-nums'],
+  },
+  premiumActiveBadgeText: {
+    ...theme.typography.label,
+    color: theme.colors.foreground,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
 });

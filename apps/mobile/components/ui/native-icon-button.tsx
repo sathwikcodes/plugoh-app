@@ -1,19 +1,26 @@
 import { theme } from '@/constants/theme';
+import Foundation from '@expo/vector-icons/Foundation';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { impactAsync, ImpactFeedbackStyle, selectionAsync } from 'expo-haptics';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
+import type { ComponentProps } from 'react';
 import { Platform, Pressable, View, type ViewStyle } from 'react-native';
 import type { SFSymbol } from 'sf-symbols-typescript';
 
 type Variant = 'glass' | 'surface' | 'tile';
 type HapticFlavor = 'light' | 'medium' | 'rigid' | 'selection';
+type FallbackIconFamily = 'ionicons' | 'foundation';
+type IoniconsName = ComponentProps<typeof Ionicons>['name'];
+type FoundationName = ComponentProps<typeof Foundation>['name'];
 
 type Props = {
   symbol: SFSymbol;
-  fallbackIcon?: React.ComponentProps<typeof Ionicons>['name'];
+  fallbackIcon?: IoniconsName | FoundationName;
+  fallbackIconFamily?: FallbackIconFamily;
+  preferFallbackIcon?: boolean;
   fallbackSize?: number;
   symbolSize?: number;
   tintColor?: string;
@@ -53,6 +60,8 @@ async function triggerHaptic(flavor: HapticFlavor) {
 export function NativeIconButton({
   symbol,
   fallbackIcon,
+  fallbackIconFamily = 'ionicons',
+  preferFallbackIcon = false,
   fallbackSize,
   symbolSize,
   tintColor,
@@ -79,6 +88,30 @@ export function NativeIconButton({
 
   const resolvedUri = typeof imageUri === 'string' ? imageUri.trim() : '';
   const showPhoto = resolvedUri.length > 0;
+  const fallbackIconNode = fallbackIcon ? (
+    <View
+      style={{
+        width: iconSize,
+        height: iconSize,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {fallbackIconFamily === 'foundation' ? (
+        <Foundation
+          name={fallbackIcon as FoundationName}
+          size={fallbackSize ?? iconSize}
+          color={iconColor}
+        />
+      ) : (
+        <Ionicons
+          name={fallbackIcon as IoniconsName}
+          size={fallbackSize ?? iconSize}
+          color={iconColor}
+        />
+      )}
+    </View>
+  ) : undefined;
 
   const icon = showPhoto ? (
     <Image
@@ -91,26 +124,15 @@ export function NativeIconButton({
       contentFit="cover"
       transition={200}
     />
+  ) : preferFallbackIcon && fallbackIconNode ? (
+    fallbackIconNode
   ) : (
     <SymbolView
       name={symbol}
       size={iconSize}
       tintColor={iconColor}
       type="monochrome"
-      fallback={
-        fallbackIcon ? (
-          <View
-            style={{
-              width: iconSize,
-              height: iconSize,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons name={fallbackIcon} size={fallbackSize ?? iconSize} color={iconColor} />
-          </View>
-        ) : undefined
-      }
+      fallback={fallbackIconNode}
     />
   );
 

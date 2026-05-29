@@ -7,6 +7,7 @@ import { theme } from '@/constants/theme';
 import { useBootstrap, useEarnings, useInfluencerProfile } from '@/hooks/use-marketplace';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import appIcon from '@/assets/images/icon.png';
+import Foundation from '@expo/vector-icons/Foundation';
 import { Ionicons } from '@expo/vector-icons';
 import type { EarningsSummary } from '@plugoh/contracts';
 import { BlurView } from 'expo-blur';
@@ -561,7 +562,7 @@ function RecentTransactionsSection({ transactions }: { transactions: EarningsTra
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
         </View>
         <View style={styles.filterIcon}>
-          <Ionicons name="options-outline" size={16} color="rgba(255,255,255,0.55)" />
+          <Foundation name="filter" size={17} color="rgba(255,255,255,0.72)" />
         </View>
       </View>
 
@@ -711,11 +712,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: theme.spacing.md,
+    minHeight: 48,
+    paddingHorizontal: 2,
   },
   headerTitle: {
-    ...theme.typography.title,
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: 0,
     color: theme.colors.foreground,
     flex: 1,
+    minWidth: 0,
+    includeFontPadding: false,
   },
   threeCardGrid: {
     flexDirection: 'row',
