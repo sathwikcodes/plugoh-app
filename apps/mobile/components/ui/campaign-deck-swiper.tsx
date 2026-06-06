@@ -1,5 +1,6 @@
 import type { CampaignListItem } from '@plugoh/contracts';
 import { memo } from 'react';
+import { CampaignDeckEmptyState } from './campaign-empty-state';
 import { CampaignSwipeCard } from './campaign-swipe-card';
 import { SnapCardDeck } from './snap-card-deck';
 
@@ -97,6 +98,9 @@ export function CampaignDeckSwiper({
       viewportWidth={viewportWidth}
       emptyTitle={emptyTitle}
       emptySubtitle={emptySubtitle}
+      renderEmptyState={({ cardWidth: emptyCardWidth, cardHeight: emptyCardHeight }) => (
+        <CampaignDeckEmptyState cardWidth={emptyCardWidth} cardHeight={emptyCardHeight} />
+      )}
       keyExtractor={(campaign) => campaign.id}
       renderCard={({ item: campaign }) => (
         <CarouselCard

@@ -72,7 +72,7 @@ async function ensureBusinessProfile(store: SupabaseDataStore, businessId: strin
     args['business-name']?.trim() ??
     args['event-name']?.trim() ??
     'Plugoh Test Brand';
-  const brandType = args['brand-type']?.trim() ?? 'Restaurant/Cafe';
+  const brandCategory = args['brand-category']?.trim() ?? 'restaurant_cafe';
   const brandLocation = args['brand-location']?.trim() ?? args.location?.trim() ?? 'Hyderabad';
   const brandSummary =
     args['brand-summary']?.trim() ??
@@ -84,7 +84,7 @@ async function ensureBusinessProfile(store: SupabaseDataStore, businessId: strin
     await store.insert('business_profiles', {
       user_id: businessId,
       brand_name: brandName,
-      brand_type: brandType,
+      brand_category: brandCategory,
       brand_location: brandLocation,
       brand_summary: brandSummary,
       tagline,
@@ -94,7 +94,7 @@ async function ensureBusinessProfile(store: SupabaseDataStore, businessId: strin
 
   const patch = {
     brand_name: valueOrDefault(existing.brand_name, brandName),
-    brand_type: valueOrDefault(existing.brand_type, brandType),
+    brand_category: valueOrDefault(existing.brand_category, brandCategory),
     brand_location: valueOrDefault(existing.brand_location, brandLocation),
     brand_summary: valueOrDefault(existing.brand_summary, brandSummary),
     tagline: valueOrDefault(existing.tagline, tagline),
@@ -130,13 +130,13 @@ async function main() {
     {
       influencer_profile_id: influencerProfileId,
       influencer_id: influencerId,
-      package_type: args['package-type'] ?? 'reel',
+      package_type: args['package-type'] ?? 'instagram_reel',
       objective: args.objective ?? 'feature_product',
       timing_mode: args['timing-mode'] ?? 'asap',
       due_date: args['due-date'],
-      event_name: args['event-name'],
-      contact_email: args['contact-email'] ?? 'ops@plugoh.app',
-      contact_phone: args['contact-phone'] ?? '+910000000000',
+      place_name: args['place-name'] ?? args['event-name'],
+      business_contact_email: args['contact-email'] ?? 'ops@plugoh.app',
+      business_contact_phone: args['contact-phone'] ?? '+910000000000',
     },
     {},
     { skipCreative: true },

@@ -17,7 +17,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2E2E2E',
     paddingHorizontal: 16,
-    fontSize: 16,
     color: '#FFFFFF',
   },
 });

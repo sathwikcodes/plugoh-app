@@ -347,9 +347,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   avatarInitial: {
+    ...theme.typography.title,
     color: '#111522',
-    fontSize: 28,
-    lineHeight: 34,
     fontWeight: '900',
   },
   heroCopy: {
@@ -358,12 +357,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   brandName: {
+    ...theme.typography.metric,
     color: '#FFFFFF',
-    fontFamily: theme.typography.display.fontFamily,
-    fontSize: 32,
-    lineHeight: 36,
     fontWeight: '900',
-    letterSpacing: 0,
   },
   tagline: {
     ...theme.typography.body,
@@ -385,12 +381,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
   },
   signalValue: {
+    ...theme.typography.metricSmall,
     color: '#FFFFFF',
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 19,
-    lineHeight: 24,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
   },
   signalLabel: {
     ...theme.typography.label,
@@ -409,7 +401,6 @@ const styles = StyleSheet.create({
     ...theme.typography.label,
     color: 'rgba(255,255,255,0.42)',
     textTransform: 'uppercase',
-    letterSpacing: 0,
     paddingHorizontal: theme.spacing.xs,
   },
   infoRows: {

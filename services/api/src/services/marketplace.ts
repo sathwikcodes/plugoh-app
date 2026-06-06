@@ -110,50 +110,42 @@ function futureIso(ms: number) {
   return new Date(Date.now() + ms).toISOString();
 }
 
-function paise(rupees: number) {
-  return Math.round(rupees * 100);
+function moneyPaise(value: unknown) {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? Math.round(amount) : 0;
 }
 
-function platformFee(price: number) {
-  return Number((price * PLATFORM_FEE_RATE).toFixed(2));
+function platformFeePaise(pricePaise: number) {
+  return Math.round(pricePaise * PLATFORM_FEE_RATE);
 }
 
 function matchesSearch(profile: Row, term: string) {
-  return ['display_name', 'instagram_handle', 'ig_username', 'bio', 'category', 'city'].some(
-    (key) =>
-      String(profile[key] ?? '')
-        .toLowerCase()
-        .includes(term),
+  return ['display_name', 'instagram_username', 'bio', 'category', 'city'].some((key) =>
+    String(profile[key] ?? '')
+      .toLowerCase()
+      .includes(term),
   );
 }
 
 function starterPrice(profile: Row) {
-  return Math.min(
-    profile.price_per_reel ?? Number.POSITIVE_INFINITY,
-    profile.price_per_post ?? Number.POSITIVE_INFINITY,
-    profile.price_per_story ?? Number.POSITIVE_INFINITY,
-  );
+  return Number(profile.price_per_reel_paise ?? Number.POSITIVE_INFINITY);
 }
 
-function packagePrice(profile: Row, packageType: string) {
-  const reel = Number(profile.price_per_reel ?? Number.NaN);
-  const post = Number(profile.price_per_post ?? Number.NaN);
-  const story = Number(profile.price_per_story ?? Number.NaN);
-  const prices: Record<string, number> = {
-    reel,
-    post,
-    story,
-    'reel+story': reel + story,
-    'reel+post': reel + post,
-  };
-  const price = Number(prices[packageType]);
-  if (!Number.isFinite(price) || price <= 0) {
+function packagePricePaise(profile: Row, packageType: string) {
+  if (packageType !== 'instagram_reel') {
     throw badRequest(
       'PACKAGE_UNAVAILABLE',
       `${packageType} pricing is not available for this creator`,
     );
   }
-  return price;
+  const pricePaise = Number(profile.price_per_reel_paise ?? Number.NaN);
+  if (!Number.isFinite(pricePaise) || pricePaise <= 0) {
+    throw badRequest(
+      'PACKAGE_UNAVAILABLE',
+      `${packageType} pricing is not available for this creator`,
+    );
+  }
+  return Math.round(pricePaise);
 }
 
 function paginateRows<T>(rows: T[], query: Row) {
@@ -174,18 +166,20 @@ function hasInfluencerBasics(profile?: Row | null) {
 
 function hasBusinessProfileDetails(profile?: Row | null) {
   return Boolean(
-    String(profile?.brand_name ?? '').trim() && String(profile?.brand_type ?? '').trim(),
+    String(profile?.brand_name ?? '').trim() && String(profile?.brand_category ?? '').trim(),
   );
 }
 
 function hasInstagramConnection(profile?: Row | null) {
-  return Boolean(profile?.access_token || profile?.ig_username || profile?.instagram_connected_at);
+  return Boolean(profile?.instagram_username || profile?.instagram_connected_at);
 }
 
 function withBusinessProfileImage(profile?: Row | null, account?: Row | null) {
   if (!profile) return null;
   const instagramPhoto =
-    typeof profile.ig_profile_picture_url === 'string' ? profile.ig_profile_picture_url.trim() : '';
+    typeof profile.instagram_profile_picture_url === 'string'
+      ? profile.instagram_profile_picture_url.trim()
+      : '';
   const accountAvatar = typeof account?.avatar_url === 'string' ? account.avatar_url.trim() : '';
   const profilePhoto = instagramPhoto || accountAvatar || undefined;
 
@@ -223,12 +217,7 @@ function campaignCreativePath(campaignId: string, mimeType: 'image/png' | 'image
 }
 
 function hasGeneratedInfluencerFields(profile?: Row | null) {
-  return Boolean(
-    profile?.category &&
-    (profile.price_per_reel != null ||
-      profile.price_per_post != null ||
-      profile.price_per_story != null),
-  );
+  return Boolean(profile?.category && profile.price_per_reel_paise != null);
 }
 
 function assertUser(user?: AuthUser): AuthUser {
@@ -365,12 +354,12 @@ function notificationTitle(type: NotificationType) {
       return 'Delivery submitted';
     case 'booking_completed':
       return 'Campaign completed';
-    case 'booking_rejected':
+    case 'booking_declined':
       return 'Campaign declined';
     case 'booking_expired':
       return 'Campaign expired';
-    case 'delivery_disputed':
-      return 'Delivery disputed';
+    case 'changes_requested':
+      return 'Changes requested';
     default:
       return 'Plugoh update';
   }
@@ -387,8 +376,8 @@ function notificationBody(type: NotificationType, data: Row) {
       return `${title} is waiting for approval.`;
     case 'booking_completed':
       return `${title} has been completed.`;
-    case 'delivery_disputed':
-      return `${title} needs revision or review.`;
+    case 'changes_requested':
+      return `${title} needs revisions.`;
     default:
       return `${title} has a new update.`;
   }
@@ -408,7 +397,7 @@ export class DiscoveryService {
     const searchOptions = query.search
       ? {
           ...baseOptions,
-          or: ['display_name', 'instagram_handle', 'ig_username', 'bio', 'category', 'city']
+          or: ['display_name', 'instagram_username', 'bio', 'category', 'city']
             .map(
               (field) =>
                 `${field}.ilike.%${String(query.search).replaceAll('%', '\\%').replaceAll('_', '\\_')}%`,
@@ -429,15 +418,11 @@ export class DiscoveryService {
       profiles = profiles.filter((profile) => starterPrice(profile) <= Number(query.price_max));
     profiles = profiles.map((profile) => ({
       ...profile,
-      starterPrice: Number.isFinite(starterPrice(profile)) ? starterPrice(profile) : null,
+      starter_price_paise: Number.isFinite(starterPrice(profile)) ? starterPrice(profile) : null,
     }));
     switch (query.sort) {
       case 'followers_desc':
-        profiles.sort(
-          (a, b) =>
-            (b.follower_count ?? b.ig_followers_count ?? 0) -
-            (a.follower_count ?? a.ig_followers_count ?? 0),
-        );
+        profiles.sort((a, b) => (b.follower_count ?? 0) - (a.follower_count ?? 0));
         break;
       case 'engagement_asc':
         profiles.sort((a, b) => (a.avg_likes_per_reel ?? 0) - (b.avg_likes_per_reel ?? 0));
@@ -446,10 +431,12 @@ export class DiscoveryService {
         profiles.sort((a, b) => (b.avg_likes_per_reel ?? 0) - (a.avg_likes_per_reel ?? 0));
         break;
       case 'price_asc':
-        profiles.sort((a, b) => (a.starterPrice ?? Infinity) - (b.starterPrice ?? Infinity));
+        profiles.sort(
+          (a, b) => (a.starter_price_paise ?? Infinity) - (b.starter_price_paise ?? Infinity),
+        );
         break;
       case 'price_desc':
-        profiles.sort((a, b) => (b.starterPrice ?? 0) - (a.starterPrice ?? 0));
+        profiles.sort((a, b) => (b.starter_price_paise ?? 0) - (a.starter_price_paise ?? 0));
         break;
     }
     return paginateRows(profiles, query);
@@ -486,8 +473,16 @@ export class ProfileService {
       const messages = campaignIds.length
         ? await this.store.list<Row>('campaign_messages', { in: { campaign_id: campaignIds } })
         : [];
+      const messageIds = messages.map((message) => String(message.id)).filter(Boolean);
+      const reads = messageIds.length
+        ? await this.store.list<Row>('campaign_message_reads', {
+            eq: { user_id: user.id },
+            in: { message_id: messageIds },
+          })
+        : [];
+      const readIds = new Set(reads.map((read) => read.message_id));
       inboxUnread = messages.filter(
-        (message) => !Array.isArray(message.read_by) || !message.read_by.includes(user.id),
+        (message) => message.sender_id !== user.id && !readIds.has(message.id),
       ).length;
     }
 
@@ -609,7 +604,7 @@ export class ProfileService {
     const values = {
       user_id: user.id,
       brand_name: input.brand_name,
-      brand_type: input.brand_type,
+      brand_category: input.brand_category,
       brand_location: input.brand_location ?? input.location,
       brand_summary: input.brand_summary,
       tagline: input.tagline,
@@ -640,12 +635,12 @@ export class ProfileService {
   }
 
   async getPayout(user: AuthUser) {
-    return this.store.findOne<Row>('influencer_payout_details', { eq: { user_id: user.id } });
+    return this.store.findOne<Row>('influencer_payout_accounts', { eq: { user_id: user.id } });
   }
 
   async upsertPayout(user: AuthUser, input: Row) {
     return this.store.upsert<Row>(
-      'influencer_payout_details',
+      'influencer_payout_accounts',
       { ...input, user_id: user.id, updated_at: nowIso() },
       'user_id',
     );
@@ -676,7 +671,7 @@ export class ProfileService {
     const profile = await this.store.findOne<Row>('business_profiles', { eq: { user_id: userId } });
     if (!profile) throw forbidden('Business profile required before booking');
     const hasName = String(profile.brand_name ?? '').trim().length > 0;
-    const hasIdentity = Boolean(profile.ig_username || profile.brand_type);
+    const hasIdentity = Boolean(profile.instagram_username || profile.brand_category);
     if (!hasName || !hasIdentity) throw forbidden('Business profile is incomplete');
     return profile;
   }
@@ -703,16 +698,18 @@ export class CampaignService {
       eq: { id: input.influencer_profile_id, is_active: true },
     });
     if (!influencer) throw notFound('Influencer profile');
-    const price = packagePrice(influencer, input.package_type);
+    const pricePaise = packagePricePaise(influencer, input.package_type);
     if (input.influencer_id && input.influencer_id !== influencer.user_id)
       throw badRequest('INFLUENCER_MISMATCH', 'Influencer does not match profile');
-    const fee = platformFee(price);
-    const title = `${input.objective.replaceAll('_', ' ')} with ${influencer.display_name ?? influencer.ig_username ?? 'influencer'}`;
+    const feePaise = platformFeePaise(pricePaise);
+    const title = `${input.objective.replaceAll('_', ' ')} with ${
+      influencer.display_name ?? influencer.instagram_username ?? 'influencer'
+    }`;
     const brief = [
       `Objective: ${input.objective}`,
       `Package: ${input.package_type}`,
       `Timing: ${input.timing_mode}${input.due_date ? ` (${input.due_date})` : ''}`,
-      input.event_name ? `Venue: ${input.event_name}` : undefined,
+      input.place_name ? `Place: ${input.place_name}` : undefined,
     ]
       .filter(Boolean)
       .join('\n');
@@ -723,36 +720,54 @@ export class CampaignService {
       title,
       brief,
       package_type: input.package_type,
-      price_offered: price,
-      advance_amount: 0,
-      status: paymentInput.status ?? 'requested',
-      payment_status: paymentInput.payment_status ?? 'unpaid',
-      payment_method: paymentInput.payment_method,
-      razorpay_order_id: paymentInput.razorpay_order_id,
-      razorpay_payment_id: paymentInput.razorpay_payment_id,
-      platform_fee_amount: fee,
-      total_charged_amount: price + fee,
-      business_contact_email: input.contact_email,
-      business_contact_phone: input.contact_phone,
-      expires_at: paymentInput.expires_at ?? futureIso(48 * HOUR_MS),
-      payment_captured_at: paymentInput.payment_captured_at,
+      objective: input.objective,
+      timing_mode: input.timing_mode,
+      due_date: input.due_date,
+      place_name: input.place_name,
+      price_offered_paise: pricePaise,
+      platform_fee_paise: feePaise,
+      status: paymentInput.status ?? 'pre_authorized',
+      business_contact_email: input.business_contact_email,
+      business_contact_phone: input.business_contact_phone,
+      pre_authorized_at: nowIso(),
+      expires_at: paymentInput.expires_at ?? futureIso(24 * HOUR_MS),
       created_at: nowIso(),
       updated_at: nowIso(),
     });
+    if (paymentInput.provider_order_id) {
+      await this.store.insert('payment_orders', {
+        campaign_id: campaign.id,
+        provider: 'razorpay',
+        provider_order_id: paymentInput.provider_order_id,
+        provider_payment_id: paymentInput.provider_payment_id,
+        payment_method: paymentInput.payment_method ?? 'card',
+        status: paymentInput.payment_order_status ?? 'authorized',
+        amount_paise: campaign.total_charged_paise ?? pricePaise + feePaise,
+        currency: 'INR',
+        authorized_at: paymentInput.authorized_at ?? nowIso(),
+        metadata: {},
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      });
+    }
     await this.notifications.create(
       influencer.user_id,
       'new_booking',
       this.notificationData(campaign, influencer),
     );
-    await this.store.insert('campaign_messages', {
+    const message = await this.store.insert<Row>('campaign_messages', {
       campaign_id: campaign.id,
       sender_id: user.id,
       message_type: 'booking_card',
       content: title,
       metadata: { campaignId: campaign.id },
-      read_by: [user.id],
       created_at: nowIso(),
     });
+    await this.store.upsert(
+      'campaign_message_reads',
+      { message_id: message.id, user_id: user.id, read_at: nowIso() },
+      'message_id,user_id',
+    );
     if (!options.skipCreative) {
       await this.generateCreative(campaign.id);
     }
@@ -785,15 +800,15 @@ export class CampaignService {
       case 'amount_desc':
         campaigns.sort(
           (a, b) =>
-            Number(b.total_charged_amount ?? b.price_offered ?? 0) -
-            Number(a.total_charged_amount ?? a.price_offered ?? 0),
+            Number(b.total_charged_paise ?? b.price_offered_paise ?? 0) -
+            Number(a.total_charged_paise ?? a.price_offered_paise ?? 0),
         );
         break;
       case 'amount_asc':
         campaigns.sort(
           (a, b) =>
-            Number(a.total_charged_amount ?? a.price_offered ?? 0) -
-            Number(b.total_charged_amount ?? b.price_offered ?? 0),
+            Number(a.total_charged_paise ?? a.price_offered_paise ?? 0) -
+            Number(b.total_charged_paise ?? b.price_offered_paise ?? 0),
         );
         break;
       default:
@@ -885,24 +900,37 @@ export class CampaignService {
   }
 
   async accept(user: AuthUser, id: string) {
-    const campaign = await this.store.rpc<Row>('accept_campaign', {
+    const accepted = await this.store.rpc<Row>('accept_campaign', {
       p_campaign_id: id,
       p_actor: user.id,
     });
-    if (
-      campaign.status === 'in_escrow' &&
-      campaign.payment_method === 'card' &&
-      campaign.razorpay_payment_id
-    ) {
-      await this.payment?.capturePayment(
-        campaign.razorpay_payment_id,
-        paise(campaign.total_charged_amount),
-      );
-    }
     await this.notifications.create(
-      campaign.business_id,
+      accepted.business_id,
       'booking_accepted',
-      this.notificationData(campaign),
+      this.notificationData(accepted),
+    );
+
+    const paymentOrder = await this.store.findOne<Row>('payment_orders', {
+      eq: { campaign_id: id },
+    });
+    if (!paymentOrder?.provider_payment_id) {
+      return { ok: true };
+    }
+
+    await this.payment?.capturePayment(
+      String(paymentOrder.provider_payment_id),
+      moneyPaise(paymentOrder.amount_paise),
+    );
+    const captured = await this.store.rpc<Row>('confirm_campaign_capture', {
+      p_campaign_id: id,
+      p_actor: user.id,
+      p_provider_payment_id: paymentOrder.provider_payment_id,
+      p_payment_method: paymentOrder.payment_method ?? 'card',
+    });
+    await this.notifications.create(
+      captured.influencer_id,
+      'payment_secured',
+      this.notificationData(captured),
     );
     return { ok: true };
   }
@@ -921,17 +949,15 @@ export class CampaignService {
     }
     await this.notifications.create(
       campaign.business_id,
-      'booking_rejected',
+      'booking_declined',
       this.notificationData(campaign),
     );
     return { ok: true };
   }
 
   async approve(user: AuthUser, id: string) {
-    const campaign = await this.store.rpc<Row>('approve_delivery', {
-      p_campaign_id: id,
-      p_actor: user.id,
-    });
+    const campaign = await requireCampaignRole(this.store, id, user.id, 'business');
+    requireStatus(campaign, ['delivery_submitted', 'completed']);
     await this.release(campaign, user.id);
     return { ok: true };
   }
@@ -939,16 +965,15 @@ export class CampaignService {
   async dispute(user: AuthUser, id: string, reason: string) {
     const campaign = await requireCampaignRole(this.store, id, user.id, 'business');
     requireStatus(campaign, ['delivery_submitted']);
-    await this.store.update(
-      'deliveries',
-      { eq: { campaign_id: id } },
-      { dispute_reason: reason, disputed_at: nowIso() },
-    );
-    await this.store.update('campaigns', { eq: { id } }, { status: 'disputed' });
+    const transitioned = await this.store.rpc<Row>('request_delivery_changes', {
+      p_campaign_id: id,
+      p_actor: user.id,
+      p_change_request_note: reason,
+    });
     await this.notifications.createForMany(
       [campaign.business_id, campaign.influencer_id],
-      'delivery_disputed',
-      this.notificationData(campaign),
+      'changes_requested',
+      this.notificationData(transitioned),
     );
     return { ok: true };
   }
@@ -958,39 +983,13 @@ export class CampaignService {
       p_campaign_id: campaign.id,
       p_actor: approvedBy ?? null,
     });
-    const existingLedger = await this.store.list<Row>('escrow_transactions', {
+    const existingLedger = await this.store.list<Row>('escrow_ledger_entries', {
       eq: { campaign_id: transitioned.id },
-      in: { type: ['payout_influencer', 'platform_fee'] },
+      in: { entry_type: ['payout_influencer', 'platform_fee'] },
     });
-    const hasPayout = existingLedger.some((row) => row.type === 'payout_influencer');
-    const hasPlatformFee = existingLedger.some((row) => row.type === 'platform_fee');
-    if (transitioned.status === 'completed' && hasPayout && hasPlatformFee)
-      return { alreadyReleased: true };
-
-    await this.store.update(
-      'deliveries',
-      { eq: { campaign_id: transitioned.id } },
-      { approved_at: nowIso(), approved_by: approvedBy },
-    );
-    if (!hasPayout) {
-      await this.store.insert('escrow_transactions', {
-        campaign_id: transitioned.id,
-        type: 'payout_influencer',
-        amount_paise: paise(transitioned.price_offered),
-        status: 'pending',
-        created_at: nowIso(),
-      });
-    }
-    if (!hasPlatformFee) {
-      await this.store.insert('escrow_transactions', {
-        campaign_id: transitioned.id,
-        type: 'platform_fee',
-        amount_paise: paise(transitioned.platform_fee_amount),
-        platform_fee_paise: paise(transitioned.platform_fee_amount),
-        status: 'success',
-        created_at: nowIso(),
-      });
-    }
+    const alreadyReleased =
+      existingLedger.some((row) => row.entry_type === 'payout_influencer') &&
+      existingLedger.some((row) => row.entry_type === 'platform_fee');
     if (notify && campaign.status !== 'completed') {
       await this.notifications.create(
         transitioned.influencer_id,
@@ -998,7 +997,7 @@ export class CampaignService {
         this.notificationData(transitioned),
       );
     }
-    return { alreadyReleased: false };
+    return { alreadyReleased };
   }
 
   async withProfiles(campaign: Row) {
@@ -1060,7 +1059,7 @@ export class CampaignService {
       campaignId: campaign.id,
       campaignTitle: campaign.title,
       influencerName: influencer?.display_name,
-      amount: campaign.price_offered,
+      amount_paise: campaign.price_offered_paise,
     };
   }
 }
@@ -1082,33 +1081,44 @@ export class PaymentService {
 
   async createEscrowOrder(user: AuthUser, campaignId: string) {
     const campaign = await requireCampaignRole(this.store, campaignId, user.id, 'business');
-    requireStatus(campaign, ['payment_pending']);
+    requireStatus(campaign, ['pre_authorized']);
     const provider = this.requirePayment();
-    const order = campaign.razorpay_order_id
-      ? await provider.fetchOrder(campaign.razorpay_order_id)
+    const existing = await this.store.findOne<Row>('payment_orders', {
+      eq: { campaign_id: campaign.id },
+    });
+    const order = existing?.provider_order_id
+      ? await provider.fetchOrder(String(existing.provider_order_id))
       : await provider.createOrder({
-          amount: paise(campaign.total_charged_amount),
+          amount: moneyPaise(campaign.total_charged_paise),
           currency: 'INR',
           receipt: campaign.id,
+          payment_capture: 0,
         });
-    if (!campaign.razorpay_order_id)
-      await this.store.update(
-        'campaigns',
-        { eq: { id: campaign.id } },
-        { razorpay_order_id: order.id },
-      );
+    if (!existing?.provider_order_id) {
+      await this.store.insert('payment_orders', {
+        campaign_id: campaign.id,
+        provider: 'razorpay',
+        provider_order_id: order.id,
+        status: 'created',
+        amount_paise: order.amount,
+        currency: order.currency,
+        metadata: {},
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      });
+    }
     return { orderId: order.id, amount: order.amount, currency: order.currency };
   }
 
   async verifyEscrow(user: AuthUser, input: Row) {
     const campaign = await requireCampaignRole(this.store, input.campaign_id, user.id, 'business');
-    if (
-      campaign.status === 'in_escrow' &&
-      campaign.razorpay_payment_id === input.razorpay_payment_id
-    ) {
+    const existingOrder = await this.store.findOne<Row>('payment_orders', {
+      eq: { campaign_id: campaign.id, provider_payment_id: input.razorpay_payment_id },
+    });
+    if (campaign.status === 'in_escrow' && existingOrder) {
       return { success: true, campaignId: campaign.id };
     }
-    requireStatus(campaign, ['payment_pending']);
+    requireStatus(campaign, ['capture_pending']);
     const provider = this.requirePayment();
     if (
       !provider.verifySignature({
@@ -1120,11 +1130,11 @@ export class PaymentService {
       throw forbidden('Invalid Razorpay signature');
     }
     const payment = await provider.fetchPayment(input.razorpay_payment_id);
-    const transitioned = await this.store.rpc<Row>('verify_escrow', {
+    const transitioned = await this.store.rpc<Row>('confirm_campaign_capture', {
       p_campaign_id: campaign.id,
       p_actor: user.id,
-      p_payment_id: input.razorpay_payment_id,
-      p_method: payment.method,
+      p_provider_payment_id: input.razorpay_payment_id,
+      p_payment_method: payment.method,
     });
     await this.notifications.create(
       transitioned.influencer_id,
@@ -1142,11 +1152,11 @@ export class PaymentService {
       input.influencer_profile_id,
     );
     if (!influencer || influencer.is_active !== true) throw notFound('Influencer profile');
-    const price = packagePrice(influencer, input.package_type);
-    const fee = platformFee(price);
-    const total = price + fee;
+    const pricePaise = packagePricePaise(influencer, input.package_type);
+    const feePaise = platformFeePaise(pricePaise);
+    const totalPaise = pricePaise + feePaise;
     const order = await this.requirePayment().createOrder({
-      amount: paise(total),
+      amount: totalPaise,
       currency: 'INR',
       payment_capture: 0,
     });
@@ -1155,17 +1165,17 @@ export class PaymentService {
       keyId: this.config.razorpayKeyId,
       amount: order.amount,
       currency: order.currency,
-      priceOffered: price,
-      platformFee: fee,
-      total,
+      price_offered_paise: pricePaise,
+      platform_fee_paise: feePaise,
+      total_charged_paise: totalPaise,
     };
   }
 
   async verifyBookingPayment(user: AuthUser, input: Row) {
-    const existing = await this.store.findOne<Row>('campaigns', {
-      eq: { razorpay_order_id: input.razorpay_order_id },
+    const existingOrder = await this.store.findOne<Row>('payment_orders', {
+      eq: { provider: 'razorpay', provider_order_id: input.razorpay_order_id },
     });
-    if (existing) return { success: true, campaignId: existing.id };
+    if (existingOrder) return { success: true, campaignId: existingOrder.campaign_id };
     const provider = this.requirePayment();
     if (
       !provider.verifySignature({
@@ -1181,11 +1191,11 @@ export class PaymentService {
       input.influencer_profile_id,
     );
     if (!influencer || influencer.is_active !== true) throw notFound('Influencer profile');
-    const price = packagePrice(influencer, input.package_type);
+    const pricePaise = packagePricePaise(influencer, input.package_type);
     if (input.influencer_id && input.influencer_id !== influencer.user_id)
       throw badRequest('INFLUENCER_MISMATCH', 'Influencer does not match profile');
     const order = await provider.fetchOrder(input.razorpay_order_id);
-    const expectedAmount = paise(price + platformFee(price));
+    const expectedAmount = pricePaise + platformFeePaise(pricePaise);
     if (order.amount !== expectedAmount) {
       throw conflict(
         'PAYMENT_AMOUNT_MISMATCH',
@@ -1193,31 +1203,23 @@ export class PaymentService {
       );
     }
     const payment = await provider.fetchPayment(input.razorpay_payment_id);
+    if (payment.method !== 'card') {
+      throw badRequest('UNSUPPORTED_PAYMENT_METHOD', 'Only card pre-authorization is supported');
+    }
     const created = await this.campaigns.create(
       user,
       { ...input, influencer_id: influencer.user_id },
       {
         status: 'pre_authorized',
-        payment_status: payment.method === 'upi' ? 'paid' : 'authorized',
-        payment_method: payment.method,
-        razorpay_order_id: input.razorpay_order_id,
-        razorpay_payment_id: input.razorpay_payment_id,
-        payment_captured_at: payment.method === 'upi' ? nowIso() : undefined,
+        provider_order_id: input.razorpay_order_id,
+        provider_payment_id: input.razorpay_payment_id,
+        payment_method: 'card',
+        payment_order_status: 'authorized',
+        authorized_at: nowIso(),
         expires_at: futureIso(24 * HOUR_MS),
       },
       { skipCreative: true },
     );
-    const campaign = await this.store.getById<Row>('campaigns', created.campaignId);
-    await this.store.insert('escrow_transactions', {
-      campaign_id: created.campaignId,
-      type: 'escrow_lock',
-      amount_paise: paise(campaign?.total_charged_amount ?? 0),
-      platform_fee_paise: paise(campaign?.platform_fee_amount ?? 0),
-      razorpay_order_id: input.razorpay_order_id,
-      razorpay_payment_id: input.razorpay_payment_id,
-      status: payment.method === 'upi' ? 'success' : 'pending',
-      created_at: nowIso(),
-    });
     await this.campaigns.generateCreative(created.campaignId);
     return { success: true, campaignId: created.campaignId };
   }
@@ -1225,12 +1227,20 @@ export class PaymentService {
   async captureBookingPayment(campaignId: string) {
     const campaign = await this.store.getById<Row>('campaigns', campaignId);
     if (!campaign) throw notFound('Campaign');
-    if (campaign.payment_method === 'card') {
-      await this.requirePayment().capturePayment(
-        campaign.razorpay_payment_id,
-        paise(campaign.total_charged_amount),
-      );
-    }
+    const paymentOrder = await this.store.findOne<Row>('payment_orders', {
+      eq: { campaign_id: campaignId },
+    });
+    if (!paymentOrder?.provider_payment_id) throw notFound('Payment order');
+    await this.requirePayment().capturePayment(
+      String(paymentOrder.provider_payment_id),
+      moneyPaise(paymentOrder.amount_paise),
+    );
+    await this.store.rpc<Row>('confirm_campaign_capture', {
+      p_campaign_id: campaignId,
+      p_actor: null,
+      p_provider_payment_id: paymentOrder.provider_payment_id,
+      p_payment_method: paymentOrder.payment_method ?? 'card',
+    });
     return { ok: true };
   }
 
@@ -1262,9 +1272,9 @@ export class PaymentService {
       const orderId = event.payload?.payment?.entity?.order_id;
       if (orderId) {
         await this.store.update(
-          'campaigns',
-          { eq: { razorpay_order_id: orderId } },
-          { payment_status: 'unpaid' },
+          'payment_orders',
+          { eq: { provider: 'razorpay', provider_order_id: orderId } },
+          { status: 'failed', failure_reason: 'Razorpay payment failed', updated_at: nowIso() },
         );
       }
     }
@@ -1272,9 +1282,9 @@ export class PaymentService {
       const refund = event.payload?.refund?.entity;
       if (refund?.id) {
         await this.store.update(
-          'escrow_transactions',
-          { eq: { razorpay_refund_id: refund.id } },
-          { status: 'success' },
+          'escrow_ledger_entries',
+          { eq: { provider_refund_id: refund.id } },
+          { status: 'succeeded', updated_at: nowIso() },
         );
       }
     }
@@ -1312,15 +1322,15 @@ export class DeliveryService {
     const ext = file.name.split('.').pop() ?? 'bin';
     const path = `${campaignId}/${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
     const storagePath = await this.storage.uploadDelivery({ path, file });
-    return { storagePath };
+    return { storage_path: storagePath };
   }
 
   async submit(user: AuthUser, id: string, input: Row) {
     const campaign = await this.store.rpc<Row>('submit_delivery', {
       p_campaign_id: id,
       p_actor: user.id,
-      p_storage_path: input.storagePath,
-      p_notes: input.notes ?? null,
+      p_storage_path: input.storage_path,
+      p_creator_note: input.creator_note ?? null,
     });
     await this.notifications.create(campaign.business_id, 'delivery_submitted', {
       campaignId: id,
@@ -1335,7 +1345,7 @@ export class DeliveryService {
     if (!delivery) throw notFound('Delivery');
     if (!this.storage)
       throw badRequest('STORAGE_PROVIDER_UNAVAILABLE', 'Storage provider is not configured');
-    const signedUrl = await this.storage.signedUrl(delivery.content_url, 3600);
+    const signedUrl = await this.storage.signedUrl(delivery.storage_path, 3600);
     return { signedUrl, expiresAt: new Date(Date.now() + HOUR_MS).toISOString() };
   }
 }
@@ -1363,6 +1373,14 @@ export class MessagingService {
           order: { column: 'created_at', ascending: false },
         })
       : [];
+    const messageIds = messages.map((message) => String(message.id)).filter(Boolean);
+    const reads = messageIds.length
+      ? await this.store.list<Row>('campaign_message_reads', {
+          eq: { user_id: user.id },
+          in: { message_id: messageIds },
+        })
+      : [];
+    const readIds = new Set(reads.map((read) => read.message_id));
     const [businessProfiles, businessAccounts, influencerProfiles, influencerAccounts] =
       await Promise.all([
         businessIds.length
@@ -1393,7 +1411,7 @@ export class MessagingService {
         const campaignMessages = messagesByCampaignId.get(campaign.id) ?? [];
         const latest = campaignMessages[0] ?? null;
         const unread = campaignMessages.filter(
-          (message) => !Array.isArray(message.read_by) || !message.read_by.includes(user.id),
+          (message) => message.sender_id !== user.id && !readIds.has(message.id),
         ).length;
         return {
           campaign: {
@@ -1420,29 +1438,46 @@ export class MessagingService {
 
   async messages(user: AuthUser, id: string) {
     await campaignForParticipant(this.store, id, user.id);
-    return this.store.list<Row>('campaign_messages', {
+    const messages = await this.store.list<Row>('campaign_messages', {
       eq: { campaign_id: id },
       order: { column: 'created_at', ascending: true },
     });
+    const messageIds = messages.map((message) => String(message.id)).filter(Boolean);
+    const reads = messageIds.length
+      ? await this.store.list<Row>('campaign_message_reads', {
+          eq: { user_id: user.id },
+          in: { message_id: messageIds },
+        })
+      : [];
+    const readsByMessageId = new Map(reads.map((read) => [read.message_id, read.read_at]));
+    return messages.map((message) => ({
+      ...message,
+      read_at: readsByMessageId.get(message.id) ?? null,
+    }));
   }
 
   async send(user: AuthUser, id: string, input: Row) {
     const campaign = await campaignForParticipant(this.store, id, user.id);
-    requireStatus(campaign, ['in_escrow', 'delivery_submitted', 'completed', 'disputed']);
-    return this.store.insert<Row>('campaign_messages', {
+    requireStatus(campaign, ['in_escrow', 'delivery_submitted', 'changes_requested', 'completed']);
+    const message = await this.store.insert<Row>('campaign_messages', {
       campaign_id: id,
       sender_id: user.id,
       message_type: input.message_type,
       content: input.content,
       metadata: {},
-      read_by: [user.id],
       created_at: nowIso(),
     });
+    await this.store.upsert(
+      'campaign_message_reads',
+      { message_id: message.id, user_id: user.id, read_at: nowIso() },
+      'message_id,user_id',
+    );
+    return message;
   }
 
   async sendAttachment(user: AuthUser, id: string, input: { caption?: string; file: File }) {
     const campaign = await campaignForParticipant(this.store, id, user.id);
-    requireStatus(campaign, ['in_escrow', 'delivery_submitted', 'completed', 'disputed']);
+    requireStatus(campaign, ['in_escrow', 'delivery_submitted', 'changes_requested', 'completed']);
     if (!this.storage)
       throw badRequest('STORAGE_PROVIDER_UNAVAILABLE', 'Storage provider is not configured');
     if (input.file.size > MAX_MESSAGE_ATTACHMENT_SIZE) {
@@ -1460,12 +1495,28 @@ export class MessagingService {
       message_type: 'attachment',
       content: input.caption?.trim() || input.file.name,
       metadata: {
-        storagePath,
+        storage_path: storagePath,
         fileName: input.file.name,
         mimeType: input.file.type,
         fileSize: input.file.size,
       },
-      read_by: [user.id],
+      created_at: nowIso(),
+    });
+    await this.store.upsert(
+      'campaign_message_reads',
+      { message_id: message.id, user_id: user.id, read_at: nowIso() },
+      'message_id,user_id',
+    );
+    await this.store.insert('campaign_files', {
+      campaign_id: id,
+      message_id: message.id,
+      uploaded_by: user.id,
+      file_type: 'message_attachment',
+      storage_bucket: 'campaign-messages',
+      storage_path: storagePath,
+      file_name: input.file.name,
+      file_size: input.file.size,
+      mime_type: input.file.type,
       created_at: nowIso(),
     });
     return message;
@@ -1475,22 +1526,20 @@ export class MessagingService {
     await campaignForParticipant(this.store, id, user.id);
     const messages = await this.store.list<Row>('campaign_messages', { eq: { campaign_id: id } });
     await Promise.all(
-      messages.map((message) => {
-        const readBy = new Set<string>(Array.isArray(message.read_by) ? message.read_by : []);
-        readBy.add(user.id);
-        return this.store.update(
-          'campaign_messages',
-          { eq: { id: message.id } },
-          { read_by: [...readBy] },
-        );
-      }),
+      messages.map((message) =>
+        this.store.upsert(
+          'campaign_message_reads',
+          { message_id: message.id, user_id: user.id, read_at: nowIso() },
+          'message_id,user_id',
+        ),
+      ),
     );
     return { ok: true };
   }
 
   async requestCall(user: AuthUser, campaignId: string) {
     const campaign = await campaignForParticipant(this.store, campaignId, user.id);
-    requireStatus(campaign, ['in_escrow', 'delivery_submitted', 'completed', 'disputed']);
+    requireStatus(campaign, ['in_escrow', 'delivery_submitted', 'changes_requested', 'completed']);
     const recent = await this.store.findOne<Row>('campaign_messages', {
       eq: {
         campaign_id: campaignId,
@@ -1501,15 +1550,19 @@ export class MessagingService {
     });
     if (recent && Date.parse(recent.created_at) > Date.now() - 6 * HOUR_MS)
       throw tooManyRequests('Call already requested in the last 6 hours');
-    await this.store.insert('campaign_messages', {
+    const message = await this.store.insert<Row>('campaign_messages', {
       campaign_id: campaignId,
       sender_id: user.id,
       message_type: 'system',
       content: 'call_requested',
       metadata: {},
-      read_by: [user.id],
       created_at: nowIso(),
     });
+    await this.store.upsert(
+      'campaign_message_reads',
+      { message_id: message.id, user_id: user.id, read_at: nowIso() },
+      'message_id,user_id',
+    );
     if (this.email) {
       const otherUserId =
         campaign.business_id === user.id ? campaign.influencer_id : campaign.business_id;
@@ -1559,18 +1612,40 @@ export class InstagramService {
     ];
     const token = await this.instagram.exchangeCode(input.code);
     const profile = await this.instagram.fetchProfile(token.accessToken);
+    await this.store.upsert(
+      'instagram_connections',
+      {
+        user_id: userId,
+        role,
+        ig_user_id: profile.ig_user_id,
+        username: profile.username,
+        biography: profile.biography,
+        profile_picture_url: profile.profile_picture_url,
+        followers_count: profile.followers_count,
+        follows_count: profile.follows_count,
+        media_count: profile.media_count,
+        access_token: token.accessToken,
+        token_expires_at: token.expiresAt,
+        connected_at: nowIso(),
+        last_synced_at: nowIso(),
+        updated_at: nowIso(),
+      },
+      'user_id',
+    );
     if (role === 'influencer') {
       const media = await this.instagram.fetchMedia(token.accessToken);
       await this.store.upsert(
         'influencer_profiles',
         {
           user_id: userId,
-          ...profile,
+          instagram_username: profile.username,
+          profile_photo_url: profile.profile_picture_url,
+          instagram_profile_picture_url: profile.profile_picture_url,
+          follower_count: profile.followers_count,
           ...instagramAverages(media),
-          access_token: token.accessToken,
-          token_expires_at: token.expiresAt,
           is_active: true,
           instagram_connected_at: nowIso(),
+          updated_at: nowIso(),
         },
         'user_id',
       );
@@ -1596,10 +1671,11 @@ export class InstagramService {
       'business_profiles',
       {
         user_id: userId,
-        ...profile,
-        access_token: token.accessToken,
-        token_expires_at: token.expiresAt,
+        instagram_username: profile.username,
+        instagram_profile_picture_url: profile.profile_picture_url,
+        instagram_followers_count: profile.followers_count,
         instagram_connected_at: nowIso(),
+        updated_at: nowIso(),
       },
       'user_id',
     );
@@ -1617,19 +1693,42 @@ export class InstagramService {
     if (!this.instagram)
       throw badRequest('INSTAGRAM_PROVIDER_UNAVAILABLE', 'Instagram provider is not configured');
     const table = role === 'business' ? 'business_profiles' : 'influencer_profiles';
-    const profile = await this.store.findOne<Row>(table, { eq: { user_id: user.id } });
-    if (!profile?.access_token)
+    const connection = await this.store.findOne<Row>('instagram_connections', {
+      eq: { user_id: user.id, role },
+    });
+    if (!connection?.access_token)
       throw badRequest('INSTAGRAM_NOT_CONNECTED', 'Instagram is not connected');
     if (role === 'business') {
-      const latestProfile = await this.instagram.fetchProfile(profile.access_token);
+      const latestProfile = await this.instagram.fetchProfile(String(connection.access_token));
+      await this.store.upsert(
+        'instagram_connections',
+        {
+          ...connection,
+          username: latestProfile.username,
+          biography: latestProfile.biography,
+          profile_picture_url: latestProfile.profile_picture_url,
+          followers_count: latestProfile.followers_count,
+          follows_count: latestProfile.follows_count,
+          media_count: latestProfile.media_count,
+          last_synced_at: nowIso(),
+          updated_at: nowIso(),
+        },
+        'user_id',
+      );
       await this.store.update(
         table,
         { eq: { user_id: user.id } },
-        { ...latestProfile, instagram_connected_at: nowIso() },
+        {
+          instagram_username: latestProfile.username,
+          instagram_profile_picture_url: latestProfile.profile_picture_url,
+          instagram_followers_count: latestProfile.followers_count,
+          instagram_connected_at: nowIso(),
+          updated_at: nowIso(),
+        },
       );
       return { synced: 1 };
     }
-    const media = await this.instagram.fetchMedia(profile.access_token);
+    const media = await this.instagram.fetchMedia(String(connection.access_token));
     await Promise.all(
       media.map((item) =>
         this.store.upsert(
@@ -1642,7 +1741,16 @@ export class InstagramService {
     await this.store.update(
       'influencer_profiles',
       { eq: { user_id: user.id } },
-      instagramAverages(media),
+      {
+        ...instagramAverages(media),
+        instagram_connected_at: nowIso(),
+        updated_at: nowIso(),
+      },
+    );
+    await this.store.update(
+      'instagram_connections',
+      { eq: { user_id: user.id, role } },
+      { last_synced_at: nowIso(), updated_at: nowIso() },
     );
     return { synced: media.length };
   }
@@ -1653,11 +1761,11 @@ export class InstagramService {
       table,
       { eq: { user_id: user.id } },
       {
-        access_token: null,
-        token_expires_at: null,
-        ig_username: null,
+        instagram_username: null,
+        instagram_profile_picture_url: null,
         instagram_connected_at: null,
         ...(role === 'influencer' ? { is_active: false } : {}),
+        updated_at: nowIso(),
       },
     );
     if (!profile) throw notFound(`${role === 'business' ? 'Business' : 'Influencer'} profile`);
@@ -1729,7 +1837,10 @@ export class EarningsService {
     const pending = relevant.filter((campaign) =>
       ['in_escrow', 'delivery_submitted'].includes(campaign.status),
     );
-    const total = completed.reduce((sum, campaign) => sum + Number(campaign.price_offered ?? 0), 0);
+    const total = completed.reduce(
+      (sum, campaign) => sum + Number(campaign.price_offered_paise ?? 0),
+      0,
+    );
     const currentMonth = new Date().toISOString().slice(0, 7);
     const lastMonthDate = new Date();
     lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
@@ -1737,14 +1848,14 @@ export class EarningsService {
     const byMonth = new Map<string, number>();
     for (const campaign of completed) {
       const month = String(campaign.completed_at ?? campaign.created_at).slice(0, 7);
-      byMonth.set(month, (byMonth.get(month) ?? 0) + Number(campaign.price_offered ?? 0));
+      byMonth.set(month, (byMonth.get(month) ?? 0) + Number(campaign.price_offered_paise ?? 0));
     }
     const thisMonth = byMonth.get(currentMonth) ?? 0;
     const lastMonth = byMonth.get(lastMonthKey) ?? 0;
     return {
       total_earnings: total,
       pending_earnings: pending.reduce(
-        (sum, campaign) => sum + Number(campaign.price_offered ?? 0),
+        (sum, campaign) => sum + Number(campaign.price_offered_paise ?? 0),
         0,
       ),
       this_month: thisMonth,
@@ -1755,19 +1866,26 @@ export class EarningsService {
       transactions: completed.map((campaign) => ({
         campaignId: campaign.id,
         title: campaign.title,
-        amount: campaign.price_offered,
+        amount_paise: campaign.price_offered_paise,
         status: campaign.status,
         date: campaign.completed_at,
       })),
-      tier: total >= 500000 ? 'macro' : total >= 100000 ? 'mid' : total >= 10000 ? 'micro' : 'nano',
+      tier:
+        total >= 50_000_000
+          ? 'macro'
+          : total >= 10_000_000
+            ? 'mid'
+            : total >= 1_000_000
+              ? 'micro'
+              : 'nano',
       tier_progress:
-        total >= 500000
+        total >= 50_000_000
           ? 1
-          : total >= 100000
-            ? total / 500000
-            : total >= 10000
-              ? total / 100000
-              : total / 10000,
+          : total >= 10_000_000
+            ? total / 50_000_000
+            : total >= 1_000_000
+              ? total / 10_000_000
+              : total / 1_000_000,
     };
   }
 }
@@ -1797,25 +1915,14 @@ export class CronService {
       );
       autoReleased += 1;
     }
-    for (const status of ['requested', 'payment_pending', 'pre_authorized'] as const) {
+    for (const status of ['pre_authorized', 'capture_pending'] as const) {
       const rows = await this.store.list<Row>('campaigns', {
         eq: { status },
         lt: { expires_at: nowIso() },
       });
       for (const campaign of rows) {
-        if (
-          status === 'pre_authorized' &&
-          campaign.payment_method === 'upi' &&
-          campaign.razorpay_payment_id
-        ) {
-          await issueRefund(this.store, this.payment, campaign, 'expired');
-        }
-        // Card pre-auth is intentionally left alone; Razorpay auto-voids the hold after expiry.
-        await this.store.update('campaigns', { eq: { id: campaign.id } }, { status: 'expired' });
-        const recipients =
-          status === 'requested'
-            ? [campaign.business_id]
-            : [campaign.business_id, campaign.influencer_id];
+        await this.store.rpc<Row>('expire_campaign_authorization', { p_campaign_id: campaign.id });
+        const recipients = [campaign.business_id, campaign.influencer_id];
         await this.notifications.createForMany(recipients, 'booking_expired', {
           campaignId: campaign.id,
         });
@@ -1832,23 +1939,20 @@ async function issueRefund(
   campaign: Row,
   reason: 'declined' | 'expired',
 ) {
-  if (!campaign.razorpay_payment_id) return;
+  const paymentOrder = await store.findOne<Row>('payment_orders', {
+    eq: { campaign_id: campaign.id },
+  });
+  if (!paymentOrder?.provider_payment_id) return;
   const refund = await payment?.refundPayment(
-    campaign.razorpay_payment_id,
-    paise(campaign.total_charged_amount),
+    String(paymentOrder.provider_payment_id),
+    moneyPaise(campaign.total_charged_paise),
   );
-  await store.insert('escrow_transactions', {
-    campaign_id: campaign.id,
-    type: 'refund',
-    amount_paise: paise(campaign.total_charged_amount),
-    razorpay_payment_id: campaign.razorpay_payment_id,
-    razorpay_order_id: campaign.razorpay_order_id,
-    razorpay_refund_id: refund?.id,
-    status: refund?.id ? 'pending' : 'failed',
-    failure_reason: refund?.id
-      ? undefined
-      : `Refund provider unavailable during campaign ${reason}`,
-    created_at: nowIso(),
+  await store.rpc<Row>('record_campaign_refund', {
+    p_campaign_id: campaign.id,
+    p_actor: null,
+    p_provider_refund_id: refund?.id ?? null,
+    p_amount_paise: moneyPaise(campaign.total_charged_paise),
+    p_reason: reason,
   });
 }
 

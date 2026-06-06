@@ -4,6 +4,7 @@ import {
   useInfluencerProfile,
   useMarketplaceMutations,
 } from '@/hooks/use-marketplace';
+import labImage from '@/assets/images/lab.png';
 import type { CampaignListItem } from '@plugoh/contracts';
 import { router } from 'expo-router';
 import { useCallback } from 'react';
@@ -59,7 +60,8 @@ export default function CampaignsScreen() {
       profileSymbol="person.circle"
       profileFallbackIcon="person-circle-outline"
       profileRoute="/(app)/profile"
-      searchPlaceholder="Search campaigns or brands"
+      filterIconSource={labImage}
+      searchPlaceholder="Search campaigns"
       searchMatcher={matchesInfluencerCampaign}
       onOpenCampaign={handleOpenCampaign}
       onAcceptCampaign={(id) => {

@@ -57,6 +57,5 @@ const styles = StyleSheet.create({
   },
   label: {
     ...authTypography.bodyStrong,
-    fontSize: 17,
   },
 });

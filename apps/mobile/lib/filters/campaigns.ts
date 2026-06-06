@@ -20,6 +20,22 @@ export const DEFAULT_CAMPAIGN_FILTERS: CampaignFilterDraft = {
   status: 'all',
 };
 
+export const FALLBACK_CAMPAIGN_AMOUNT_MAX = 100000;
+
+export function roundedCampaignAmountMax(max: number) {
+  if (!Number.isFinite(max) || max <= 0) return FALLBACK_CAMPAIGN_AMOUNT_MAX;
+  if (max <= 10000) return Math.ceil(max / 1000) * 1000;
+  if (max <= 100000) return Math.ceil(max / 5000) * 5000;
+  return Math.ceil(max / 10000) * 10000;
+}
+
+export function campaignAmountFilterForBounds(bounds: { min: number; max: number }) {
+  return {
+    min: String(Math.max(0, Math.round(bounds.min))),
+    max: String(Math.max(1000, roundedCampaignAmountMax(bounds.max))),
+  };
+}
+
 const ACTIVE_STATUSES = new Set<CampaignStatus>([
   'requested',
   'payment_pending',

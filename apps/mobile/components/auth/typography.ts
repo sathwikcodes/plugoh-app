@@ -1,44 +1,42 @@
-import { fontBody, fontDisplay, fontMono } from '@/constants/app-fonts';
-import { TextStyle } from 'react-native';
-
-const displayTracking = (size: number) => -(size * 0.06);
+import { theme } from '@/constants/theme';
+import type { TextStyle } from 'react-native';
 
 export const authTypography = {
   displayLg: {
-    fontFamily: fontDisplay,
-    fontWeight: '700',
-    letterSpacing: displayTracking(32),
+    ...theme.typography.display,
   } satisfies TextStyle,
   displayMd: {
-    fontFamily: fontDisplay,
-    fontWeight: '700',
-    letterSpacing: displayTracking(26),
+    ...theme.typography.title,
   } satisfies TextStyle,
   displaySm: {
-    fontFamily: fontDisplay,
-    fontWeight: '700',
-    letterSpacing: displayTracking(22),
+    ...theme.typography.headline,
+  } satisfies TextStyle,
+  section: {
+    ...theme.typography.section,
+  } satisfies TextStyle,
+  cardTitle: {
+    ...theme.typography.cardTitle,
   } satisfies TextStyle,
   body: {
-    fontFamily: fontBody,
-    fontWeight: '400',
+    ...theme.typography.body,
   } satisfies TextStyle,
   bodyStrong: {
-    fontFamily: fontBody,
-    fontWeight: '600',
+    ...theme.typography.bodyStrong,
+  } satisfies TextStyle,
+  callout: {
+    ...theme.typography.callout,
+  } satisfies TextStyle,
+  caption: {
+    ...theme.typography.caption,
   } satisfies TextStyle,
   labelUpper: {
-    fontFamily: fontBody,
-    fontWeight: '600',
-    letterSpacing: 0.7,
+    ...theme.typography.label,
     textTransform: 'uppercase',
   } satisfies TextStyle,
   fine: {
-    fontFamily: fontBody,
-    fontWeight: '400',
+    ...theme.typography.caption,
   } satisfies TextStyle,
   mono: {
-    fontFamily: fontMono,
-    fontWeight: '600',
+    ...theme.typography.mono,
   } satisfies TextStyle,
 };

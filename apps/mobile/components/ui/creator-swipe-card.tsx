@@ -322,7 +322,6 @@ const styles = StyleSheet.create({
   categoryText: {
     color: 'rgba(255,255,255,0.94)',
     fontWeight: '700',
-    letterSpacing: 0,
   },
   content: {
     position: 'absolute',
@@ -351,7 +350,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: theme.typography.display.fontFamily,
     fontWeight: '400',
-    letterSpacing: 0,
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.42)',
     textShadowOffset: { width: 0, height: 2 },
@@ -360,7 +358,6 @@ const styles = StyleSheet.create({
   handle: {
     color: 'rgba(255,255,255,0.82)',
     fontWeight: '700',
-    letterSpacing: 0,
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.36)',
     textShadowOffset: { width: 0, height: 1 },
@@ -369,7 +366,6 @@ const styles = StyleSheet.create({
   positioning: {
     color: 'rgba(255,255,255,0.66)',
     fontWeight: '500',
-    letterSpacing: 0,
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.36)',
     textShadowOffset: { width: 0, height: 1 },
@@ -390,13 +386,11 @@ const styles = StyleSheet.create({
   signalLabel: {
     color: 'rgba(255,255,255,0.7)',
     fontWeight: '700',
-    letterSpacing: 0,
   },
   signalValue: {
     color: '#FFFFFF',
     fontFamily: theme.typography.mono.fontFamily,
     fontWeight: '700',
-    letterSpacing: 0,
     fontVariant: ['tabular-nums'],
   },
 });

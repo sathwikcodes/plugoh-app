@@ -28,13 +28,18 @@ function mergePressableStyle(
   return [baseStyle, style];
 }
 
-export function Screen({ children, contentContainerStyle, ...props }: ScrollViewProps) {
+export function Screen({
+  children,
+  contentContainerStyle,
+  contentInsetAdjustmentBehavior = 'automatic',
+  ...props
+}: ScrollViewProps) {
   return (
     <ScrollView
       {...props}
       style={[styles.screen, props.style]}
       contentContainerStyle={[styles.screenContent, contentContainerStyle]}
-      contentInsetAdjustmentBehavior="automatic"
+      contentInsetAdjustmentBehavior={contentInsetAdjustmentBehavior}
       showsVerticalScrollIndicator={false}
     >
       {children}

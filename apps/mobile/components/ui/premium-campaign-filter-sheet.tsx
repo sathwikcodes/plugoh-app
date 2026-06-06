@@ -32,6 +32,7 @@ import type {
   CampaignSort,
   CampaignStatusFilter,
 } from '@/lib/filters/campaigns';
+import { roundedCampaignAmountMax } from '@/lib/filters/campaigns';
 import {
   creatorFilterError,
   DEFAULT_CREATOR_FILTERS,
@@ -71,7 +72,6 @@ type FollowerOption = {
 
 const SHEET_RADIUS = 34;
 const HIDDEN_OFFSET = 720;
-const FALLBACK_MAX_AMOUNT = 100000;
 const FOOTER_CLEARANCE = 104;
 const STATUS_OPTIONS: StatusOption[] = [
   { value: 'all', label: 'All campaigns', description: 'Every campaign state' },
@@ -101,13 +101,6 @@ function parseAmount(value: string, fallback: number) {
 
 function clampAmount(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
-}
-
-function roundedAmountMax(max: number) {
-  if (!Number.isFinite(max) || max <= 0) return FALLBACK_MAX_AMOUNT;
-  if (max <= 10000) return Math.ceil(max / 1000) * 1000;
-  if (max <= 100000) return Math.ceil(max / 5000) * 5000;
-  return Math.ceil(max / 10000) * 10000;
 }
 
 function formatAmount(value: number) {
@@ -221,7 +214,7 @@ export function PremiumCampaignFilterSheet({
   const rangeBounds = useMemo(
     () => ({
       min: Math.max(0, amountBounds.min),
-      max: Math.max(1000, roundedAmountMax(amountBounds.max)),
+      max: Math.max(1000, roundedCampaignAmountMax(amountBounds.max)),
     }),
     [amountBounds.max, amountBounds.min],
   );
@@ -488,7 +481,7 @@ export function PremiumCreatorFilterSheet({
   const normalizedPriceBounds = useMemo(
     () => ({
       min: Math.max(0, priceBounds.min),
-      max: Math.max(1000, roundedAmountMax(priceBounds.max)),
+      max: Math.max(1000, roundedCampaignAmountMax(priceBounds.max)),
     }),
     [priceBounds.max, priceBounds.min],
   );
@@ -1238,11 +1231,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
+    ...theme.typography.section,
     color: '#FFFFFF',
-    fontSize: 22,
-    lineHeight: 26,
-    fontWeight: '700',
-    letterSpacing: 0,
     includeFontPadding: false,
   },
   pageWrap: {
@@ -1278,11 +1268,8 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   rowLabel: {
+    ...theme.typography.bodyStrong,
     color: '#FFFFFF',
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: '600',
-    letterSpacing: 0,
   },
   rowValueWrap: {
     flex: 1,
@@ -1293,11 +1280,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   rowValue: {
+    ...theme.typography.caption,
     color: 'rgba(255,255,255,0.62)',
-    fontSize: 14,
-    lineHeight: 19,
     fontWeight: '600',
-    letterSpacing: 0,
     flexShrink: 1,
   },
   divider: {
@@ -1318,11 +1303,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.07)',
   },
   cardTitle: {
+    ...theme.typography.bodyStrong,
     color: '#FFFFFF',
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: '600',
-    letterSpacing: 0,
   },
   rangeShell: {
     paddingTop: theme.spacing.sm,
@@ -1404,25 +1386,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.16)',
   },
   currencyPrefix: {
+    ...theme.typography.callout,
     color: '#FFFFFF',
-    fontSize: 15,
-    lineHeight: 20,
     fontWeight: '600',
   },
   amountInput: {
+    ...theme.typography.mono,
     flex: 1,
     minHeight: 54,
     color: '#FFFFFF',
-    fontSize: 15,
-    lineHeight: 19,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
     includeFontPadding: false,
   },
   amountSeparator: {
+    ...theme.typography.cardTitle,
     color: 'rgba(255,255,255,0.72)',
-    fontSize: 18,
-    lineHeight: 22,
     fontWeight: '800',
   },
   errorText: {
@@ -1443,17 +1420,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   optionLabel: {
+    ...theme.typography.callout,
     color: '#FFFFFF',
-    fontSize: 15,
-    lineHeight: 20,
     fontWeight: '600',
-    letterSpacing: 0,
   },
   optionDescription: {
+    ...theme.typography.label,
     color: 'rgba(255,255,255,0.48)',
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '500',
   },
   optionCircle: {
     width: 24,
@@ -1495,15 +1468,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   clearText: {
+    ...theme.typography.bodyStrong,
     color: '#FFFFFF',
-    fontSize: 15,
-    lineHeight: 19,
     fontWeight: '700',
   },
   showText: {
+    ...theme.typography.bodyStrong,
     color: '#050509',
-    fontSize: 15,
-    lineHeight: 19,
     fontWeight: '700',
   },
   pressed: {

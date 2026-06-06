@@ -1,0 +1,2 @@
+Migration report:
+  manual_migrated: .codex/config.toml - Migrated .claude/settings.json enabledPlugins entry expo@claude-plugins-official into project Codex plugin config.

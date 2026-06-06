@@ -187,15 +187,11 @@ const styles = StyleSheet.create({
   },
   heading: {
     ...authTypography.displaySm,
-    fontSize: 22,
-    lineHeight: 30,
     color: '#FFFFFF',
     marginBottom: 8,
   },
   body: {
     ...authTypography.body,
-    fontSize: 14,
-    lineHeight: 21,
     color: '#FFFFFF',
     marginBottom: 20,
   },
@@ -212,7 +208,6 @@ const styles = StyleSheet.create({
   emailButtonText: {
     ...authTypography.bodyStrong,
     color: '#FFFFFF',
-    fontSize: 17,
   },
   socialRow: {
     marginTop: 2,
@@ -234,15 +229,11 @@ const styles = StyleSheet.create({
   },
   socialText: {
     ...authTypography.bodyStrong,
-    fontSize: 16,
-    lineHeight: 20,
     color: '#FFFFFF',
   },
   footnote: {
     ...authTypography.fine,
     textAlign: 'center',
-    fontSize: 11.5,
-    lineHeight: 16,
     color: '#FFFFFF',
   },
 });

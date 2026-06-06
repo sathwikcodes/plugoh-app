@@ -1,5 +1,5 @@
 import { GlassCard } from '@/components/ui/glass-card';
-import { GlassCircleButton } from '@/components/ui/glass-circle-button';
+import { BackHeader } from '@/components/ui/app-header';
 import { Screen } from '@/components/ui/primitives';
 import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
@@ -15,22 +15,28 @@ import {
   registerForPushNotificationsAsync,
 } from '@/lib/notifications/register';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
+import bellImage from '@/assets/images/bell.png';
+import cardImage from '@/assets/images/card.png';
+import coinImage from '@/assets/images/coin.png';
+import ghostImage from '@/assets/images/ghost.png';
+import instagramImage from '@/assets/images/instagram.png';
 import { Ionicons } from '@expo/vector-icons';
 import type { PayoutUpsert } from '@plugoh/contracts';
 import * as Notifications from 'expo-notifications';
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   AppState,
   type AppStateStatus,
-  Image,
   Platform,
   Pressable,
   StyleSheet,
   Switch,
   Text,
   View,
+  type ImageSourcePropType,
 } from 'react-native';
 
 /** Grouped settings under Account / Preferences — matches shell corner radius. */
@@ -53,10 +59,10 @@ function initials(name?: string) {
 }
 
 function payoutSubtitle(data?: PayoutUpsert | null): string {
-  if (!data) return 'Not set up';
+  if (!data) return 'Add payout destination';
   if (data.upi_id) return `UPI · ${data.upi_id}`;
   if (data.bank_account_no) return `Bank · ····${data.bank_account_no.slice(-4)}`;
-  return 'Not set up';
+  return 'Add payout destination';
 }
 
 const fmtINR = (n?: number) =>
@@ -69,19 +75,23 @@ const fmtINR = (n?: number) =>
       }).format(n)
     : '—';
 
+function profileLocationLine(data?: { city?: string | null }) {
+  const city = data?.city?.trim();
+  if (!city) return '';
+  return /india$/i.test(city) ? city : `${city}, India`;
+}
+
 // ─── SettingRow ───────────────────────────────────────────────────────────────
 
 function SettingRow({
-  iconName,
-  iconBg,
+  iconSource,
   title,
   subtitle,
   subtitleLoading,
   onPress,
   first,
 }: {
-  iconName: string;
-  iconBg: string;
+  iconSource: ImageSourcePropType;
   title: string;
   subtitle?: string;
   subtitleLoading?: boolean;
@@ -95,8 +105,13 @@ function SettingRow({
         onPress={onPress}
         style={({ pressed }) => [styles.settingRow, pressed && styles.rowPressed]}
       >
-        <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
-          <Ionicons name={iconName as never} size={17} color="#fff" />
+        <View style={styles.assetIconSlot}>
+          <Image
+            source={iconSource}
+            style={styles.assetIcon}
+            contentFit="contain"
+            accessibilityIgnoresInvertColors
+          />
         </View>
         <View style={styles.settingBody}>
           <Text style={styles.settingTitle}>{title}</Text>
@@ -175,8 +190,13 @@ function NotificationToggleRow() {
 
   return (
     <View style={styles.settingRow}>
-      <View style={[styles.iconBox, { backgroundColor: theme.colors.pending }]}>
-        <Ionicons name="notifications-outline" size={17} color="#fff" />
+      <View style={styles.assetIconSlot}>
+        <Image
+          source={bellImage}
+          style={styles.assetIcon}
+          contentFit="contain"
+          accessibilityIgnoresInvertColors
+        />
       </View>
       <View style={styles.settingBody}>
         <Text style={styles.settingTitle}>Notifications</Text>
@@ -213,11 +233,13 @@ export default function ProfileScreen() {
   const bootstrapLoading = shouldShowInitialLoader(bootstrap);
   const profileLoading = bootstrapLoading || shouldShowInitialLoader(profile);
   const payoutLoading = bootstrapLoading || shouldShowInitialLoader(payout);
+  const email = bootstrap.data?.user.email?.trim();
 
   const pricingSet = !!(data?.price_per_reel || data?.price_per_post || data?.price_per_story);
   const pricingSubtitle = pricingSet
-    ? `From ${fmtINR(data.price_per_story ?? data.price_per_post ?? data.price_per_reel)}`
-    : 'Set your rates';
+    ? `Starts at ${fmtINR(data.price_per_story ?? data.price_per_post ?? data.price_per_reel)}`
+    : 'Add your rates';
+  const profileLocation = profileLocationLine(data);
 
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
@@ -238,22 +260,13 @@ export default function ProfileScreen() {
   return (
     <Screen>
       {/* ── page heading: liquid-glass back + title ── */}
-      <View style={styles.pageHeaderRow}>
-        <View style={styles.pageBackShadow}>
-          <GlassCircleButton
-            symbol="chevron.left"
-            fallbackIcon="chevron-back"
-            tintColor="#FFFFFF"
-            size={38}
-            symbolSize={17}
-            accessibilityLabel="Go back"
-            onPress={() => {
-              router.back();
-            }}
-          />
-        </View>
-        <Text style={styles.pageTitle}>Profile</Text>
-      </View>
+      <BackHeader
+        title="Profile"
+        onBack={() => {
+          router.back();
+        }}
+        style={styles.pageHeaderRow}
+      />
 
       {/* ── profile row ── */}
       <View style={styles.profileRow}>
@@ -276,12 +289,17 @@ export default function ProfileScreen() {
             shimmerWidth="62%"
             shimmerHeight={22}
           />
-          {data?.ig_username ? (
-            <Text style={styles.profileSub} numberOfLines={1}>
-              @{data.ig_username}
+          {email ? (
+            <Text style={styles.profileEmail} numberOfLines={1} selectable>
+              {email}
             </Text>
-          ) : profileLoading ? (
-            <ShimmerText width="38%" height={14} />
+          ) : bootstrapLoading ? (
+            <ShimmerText width="58%" height={14} />
+          ) : null}
+          {profileLocation ? (
+            <Text style={styles.profileSub} numberOfLines={1}>
+              {profileLocation}
+            </Text>
           ) : null}
         </View>
       </View>
@@ -292,10 +310,9 @@ export default function ProfileScreen() {
       <Text style={styles.sectionHeader}>Account</Text>
       <GlassCard style={styles.glassSettingsShell} contentStyle={styles.settingsGroupInner}>
         <SettingRow
-          iconName="person-outline"
-          iconBg={theme.colors.info}
-          title="Edit Profile"
-          subtitle={data?.display_name ?? 'Add your name'}
+          iconSource={ghostImage}
+          title="Personal Information"
+          subtitle={data?.display_name || 'Add your name'}
           subtitleLoading={profileLoading}
           onPress={() => {
             router.push('/(app)/profile/edit');
@@ -303,8 +320,7 @@ export default function ProfileScreen() {
           first
         />
         <SettingRow
-          iconName="pricetag-outline"
-          iconBg={theme.colors.accentStrong}
+          iconSource={coinImage}
           title="Pricing"
           subtitle={pricingSubtitle}
           subtitleLoading={profileLoading}
@@ -313,11 +329,12 @@ export default function ProfileScreen() {
           }}
         />
         <SettingRow
-          iconName="logo-instagram"
-          iconBg="#C13584"
+          iconSource={instagramImage}
           title="Instagram"
           subtitle={
-            data?.instagram_connected && data.ig_username ? `@${data.ig_username}` : 'Not connected'
+            data?.instagram_connected && data.ig_username
+              ? `Connected as @${data.ig_username}`
+              : 'Connect to unlock discovery'
           }
           subtitleLoading={profileLoading}
           onPress={() => {
@@ -325,9 +342,8 @@ export default function ProfileScreen() {
           }}
         />
         <SettingRow
-          iconName="card-outline"
-          iconBg={theme.colors.success}
-          title="Payout"
+          iconSource={cardImage}
+          title="Payment & Payouts"
           subtitle={payoutSubtitle(payout.data)}
           subtitleLoading={payoutLoading}
           onPress={() => {
@@ -366,28 +382,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   pageHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.xl,
     marginBottom: theme.spacing.xs,
-  },
-  pageBackShadow: {
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.28,
-        shadowRadius: 8,
-      },
-      default: {
-        elevation: 8,
-      },
-    }),
-  },
-  pageTitle: {
-    ...theme.typography.display,
-    flex: 1,
-    color: theme.colors.foreground,
   },
   profileRow: {
     flexDirection: 'row',
@@ -412,7 +407,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarInitials: {
-    fontSize: 24,
+    ...theme.typography.headline,
     fontWeight: '700',
     color: theme.colors.rose,
   },
@@ -422,12 +417,15 @@ const styles = StyleSheet.create({
   },
   profileName: {
     ...theme.typography.cardTitle,
-    fontSize: 18,
     color: theme.colors.foreground,
   },
   profileSub: {
     ...theme.typography.label,
     color: 'rgba(255,255,255,0.5)',
+  },
+  profileEmail: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.62)',
   },
   sectionDivider: {
     height: 1,
@@ -435,7 +433,7 @@ const styles = StyleSheet.create({
   },
   // ── settings group ──
   sectionHeader: {
-    fontSize: 15,
+    ...theme.typography.callout,
     fontWeight: '700',
     color: theme.colors.foreground,
     marginTop: theme.spacing.xs,
@@ -471,6 +469,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
+  assetIconSlot: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  assetIcon: {
+    width: 34,
+    height: 34,
+  },
   settingBody: {
     flex: 1,
     gap: theme.spacing.xs,
@@ -487,7 +496,7 @@ const styles = StyleSheet.create({
   insetDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(255,255,255,0.12)',
-    marginLeft: theme.spacing.xl + 36 + theme.spacing.lg,
+    marginHorizontal: theme.spacing.xxl,
   },
   // ── sign out (glass tab, danger tint) ──
   signOutRow: {

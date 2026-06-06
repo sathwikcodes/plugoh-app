@@ -7,7 +7,7 @@ import { impactAsync, ImpactFeedbackStyle, selectionAsync } from 'expo-haptics';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import type { ComponentProps } from 'react';
-import { Platform, Pressable, View, type ViewStyle } from 'react-native';
+import { Platform, Pressable, View, type ImageSourcePropType, type ViewStyle } from 'react-native';
 import type { SFSymbol } from 'sf-symbols-typescript';
 
 type Variant = 'glass' | 'surface' | 'tile';
@@ -32,6 +32,9 @@ type Props = {
   haptic?: HapticFlavor;
   /** When set, shows this image (e.g. profile photo) instead of the SF Symbol */
   imageUri?: string | null;
+  /** Static local image used as the button icon. Ignored when imageUri is present. */
+  imageSource?: ImageSourcePropType;
+  imageSize?: number;
   accessibilityLabel?: string;
   glassRendering?: 'native' | 'blur';
 };
@@ -72,6 +75,8 @@ export function NativeIconButton({
   style,
   haptic = 'light',
   imageUri,
+  imageSource,
+  imageSize,
   accessibilityLabel,
   glassRendering = 'native',
 }: Props) {
@@ -88,6 +93,7 @@ export function NativeIconButton({
 
   const resolvedUri = typeof imageUri === 'string' ? imageUri.trim() : '';
   const showPhoto = resolvedUri.length > 0;
+  const iconImageSize = imageSize ?? fallbackSize ?? iconSize;
   const fallbackIconNode = fallbackIcon ? (
     <View
       style={{
@@ -123,6 +129,13 @@ export function NativeIconButton({
       }}
       contentFit="cover"
       transition={200}
+    />
+  ) : imageSource ? (
+    <Image
+      source={imageSource}
+      style={{ width: iconImageSize, height: iconImageSize }}
+      contentFit="contain"
+      accessibilityIgnoresInvertColors
     />
   ) : preferFallbackIcon && fallbackIconNode ? (
     fallbackIconNode

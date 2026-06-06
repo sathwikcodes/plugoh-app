@@ -184,8 +184,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   attachmentSize: {
-    ...theme.typography.label,
+    ...theme.typography.labelSmall,
     color: 'rgba(255,255,255,0.60)',
-    fontSize: 11,
   },
 });

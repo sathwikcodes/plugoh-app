@@ -174,8 +174,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    ...authTypography.bodyStrong,
-    fontSize: 18,
+    ...authTypography.cardTitle,
     color: '#FFFFFF',
   },
 });

@@ -74,16 +74,13 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   input: {
+    ...theme.typography.body,
     flex: 1,
     height: SEARCH_HEIGHT,
     padding: 0,
     margin: 0,
     backgroundColor: 'transparent',
     color: SEARCH_TEXT,
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 17,
-    fontWeight: '400',
-    letterSpacing: 0,
     textAlignVertical: 'center',
   },
   clearButton: {

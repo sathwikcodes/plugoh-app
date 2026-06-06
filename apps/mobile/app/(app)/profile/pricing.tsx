@@ -1,5 +1,5 @@
 import { GlassCard } from '@/components/ui/glass-card';
-import { GlassCircleButton } from '@/components/ui/glass-circle-button';
+import { BackHeader } from '@/components/ui/app-header';
 import { PrimaryButton } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
 import { useInfluencerProfile, useMarketplaceMutations } from '@/hooks/use-marketplace';
@@ -9,16 +9,7 @@ import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import {
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
@@ -44,11 +35,16 @@ const packages: {
   icon: keyof typeof Ionicons.glyphMap;
   tone: string;
 }[] = [
-  { field: 'price_per_reel', title: 'Reel Package', icon: 'videocam-outline', tone: '#E76A92' },
-  { field: 'price_per_post', title: 'Post Package', icon: 'image-outline', tone: '#5C84D6' },
+  {
+    field: 'price_per_reel',
+    title: 'Reel Collaboration',
+    icon: 'videocam-outline',
+    tone: '#E76A92',
+  },
+  { field: 'price_per_post', title: 'Feed Feature', icon: 'image-outline', tone: '#5C84D6' },
   {
     field: 'price_per_story',
-    title: 'Story Package',
+    title: 'Story Placement',
     icon: 'play-circle-outline',
     tone: '#2FA46F',
   },
@@ -176,7 +172,7 @@ export default function PricingScreen() {
       router.back();
     } catch (error) {
       Alert.alert(
-        'Could not update pricing',
+        'Could not update rate card',
         error instanceof Error ? error.message : 'Try again.',
       );
     }
@@ -194,24 +190,13 @@ export default function PricingScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.pageHeaderRow}>
-          <View style={styles.pageBackShadow}>
-            <GlassCircleButton
-              symbol="chevron.left"
-              fallbackIcon="chevron-back"
-              tintColor="#FFFFFF"
-              size={44}
-              symbolSize={19}
-              accessibilityLabel="Go back"
-              onPress={() => {
-                router.back();
-              }}
-            />
-          </View>
-          <View style={styles.headerCopy}>
-            <Text style={styles.pageTitle}>Pricing</Text>
-          </View>
-        </View>
+        <BackHeader
+          title="Pricing"
+          onBack={() => {
+            router.back();
+          }}
+          style={styles.pageHeaderRow}
+        />
 
         <View style={styles.packageColumn}>
           {packages.map((item) => (
@@ -238,7 +223,7 @@ export default function PricingScreen() {
         ]}
       >
         <PrimaryButton
-          label={mutations.updatePricing.isPending ? 'Saving...' : 'Save pricing'}
+          label={mutations.updatePricing.isPending ? 'Saving...' : 'Save rate card'}
           disabled={mutations.updatePricing.isPending}
           onPress={onSubmit}
           style={styles.saveButton}
@@ -262,32 +247,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.section,
   },
   pageHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.lg,
     marginBottom: theme.spacing.xs,
-  },
-  pageBackShadow: {
-    flexShrink: 0,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.32,
-        shadowRadius: 10,
-      },
-      default: {
-        elevation: 8,
-      },
-    }),
-  },
-  headerCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  pageTitle: {
-    ...theme.typography.display,
-    color: theme.colors.foreground,
   },
   packageColumn: {
     gap: theme.spacing.xl,
@@ -321,7 +281,6 @@ const styles = StyleSheet.create({
   packageTitle: {
     ...theme.typography.cardTitle,
     color: theme.colors.foreground,
-    fontSize: 17,
   },
   packageAmount: {
     ...theme.typography.mono,
@@ -360,17 +319,17 @@ const styles = StyleSheet.create({
     backgroundColor: FIELD_WASH,
   },
   currencyPrefix: {
+    ...theme.typography.body,
     position: 'absolute',
     left: theme.spacing.xl,
     top: 0,
     bottom: 0,
     zIndex: 1,
     color: 'rgba(255,255,255,0.58)',
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 17,
     lineHeight: PRICE_INPUT_HEIGHT,
   },
   priceInput: {
+    ...theme.typography.body,
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
     paddingLeft: theme.spacing.xxl + theme.spacing.lg,
@@ -381,9 +340,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     backgroundColor: 'transparent',
     color: theme.colors.foreground,
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 17,
-    fontWeight: '400',
     textAlignVertical: 'center',
   },
   footer: {

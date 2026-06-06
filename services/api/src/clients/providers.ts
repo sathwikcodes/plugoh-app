@@ -263,12 +263,12 @@ export class MetaInstagramProvider implements InstagramProvider {
     const username = textValue(profile.username);
     return {
       ig_user_id: profile.id,
-      ig_username: profile.username,
-      ig_biography: profile.biography,
-      ig_profile_picture_url: profile.profile_picture_url,
-      ig_followers_count: profile.followers_count,
-      ig_follows_count: profile.follows_count,
-      ig_media_count: profile.media_count,
+      username: profile.username,
+      biography: profile.biography,
+      profile_picture_url: profile.profile_picture_url,
+      followers_count: profile.followers_count,
+      follows_count: profile.follows_count,
+      media_count: profile.media_count,
       instagram_url: username ? `https://instagram.com/${username}` : undefined,
     };
   }
@@ -298,7 +298,7 @@ export class MetaInstagramProvider implements InstagramProvider {
       media_url: item.media_url,
       thumbnail_url: item.thumbnail_url,
       permalink: item.permalink,
-      timestamp: item.timestamp,
+      published_at: item.timestamp,
       like_count: item.like_count,
       comments_count: item.comments_count,
       engagement: Number(item.like_count ?? 0) + Number(item.comments_count ?? 0),
@@ -500,7 +500,7 @@ export class ExternalAiProvider implements AiProvider {
     media: Record<string, unknown>[];
   }) {
     const text = [
-      input.profile.ig_biography,
+      input.profile.biography,
       input.profile.bio,
       ...input.media.map((item) => item.caption),
     ]
@@ -508,7 +508,7 @@ export class ExternalAiProvider implements AiProvider {
       .join(' ')
       .toLowerCase();
     const followerCount = Number(
-      input.profile.ig_followers_count ?? input.profile.follower_count ?? 0,
+      input.profile.followers_count ?? input.profile.follower_count ?? 0,
     );
     const avgEngagement = average(input.media.map((item) => Number(item.engagement ?? 0)));
     const category = inferInfluencerCategory(text);
@@ -524,12 +524,12 @@ export class ExternalAiProvider implements AiProvider {
   }
 
   private generateBusinessHeuristic(input: { profile: Record<string, unknown> }) {
-    const biography = textValue(input.profile.ig_biography);
+    const biography = textValue(input.profile.biography);
     const brandName = textValue(
       input.profile.brand_name,
-      textValue(input.profile.ig_username, 'Brand'),
+      textValue(input.profile.instagram_username, 'Brand'),
     );
-    const brandType = textValue(input.profile.brand_type, inferBusinessType(biography));
+    const brandType = textValue(input.profile.brand_category, inferBusinessType(biography));
     const summary = buildBusinessSummary(brandName, brandType, biography);
     return {
       brand_summary: summary,
@@ -543,7 +543,7 @@ export class ExternalAiProvider implements AiProvider {
   }) {
     const response = await this.callAnthropic(
       [
-        'Return strict JSON with keys: category, languages, bio, price_per_reel, price_per_post, price_per_story.',
+        'Return strict JSON with keys: category, languages, bio, price_per_reel_paise.',
         `Profile: ${JSON.stringify(input.profile)}`,
         `Media: ${JSON.stringify(input.media.slice(0, 20))}`,
       ].join('\n'),
@@ -551,14 +551,12 @@ export class ExternalAiProvider implements AiProvider {
     );
     const parsed = parseAnthropicJson(response);
     return {
-      category: textValue(parsed.category, 'Other'),
+      category: textValue(parsed.category, 'other'),
       languages: Array.isArray(parsed.languages)
         ? parsed.languages.map((item) => String(item))
         : ['English'],
       bio: textValue(parsed.bio),
-      price_per_reel: Number(parsed.price_per_reel ?? 1500),
-      price_per_post: Number(parsed.price_per_post ?? 1000),
-      price_per_story: Number(parsed.price_per_story ?? 500),
+      price_per_reel_paise: Number(parsed.price_per_reel_paise ?? 150000),
     };
   }
 
@@ -918,7 +916,7 @@ function buildCampaignCreativeTitle(input: CampaignCreativeInput) {
   const packageName = packageLabel(input.campaign.package_type);
   const influencerName = textValue(
     input.influencerProfile?.display_name,
-    textValue(input.influencerProfile?.ig_username),
+    textValue(input.influencerProfile?.instagram_username),
   );
   const packageVibe =
     packageName.toLowerCase().includes('reel') || packageName.toLowerCase().includes('video')
@@ -938,7 +936,7 @@ function buildCampaignCreativeTitle(input: CampaignCreativeInput) {
 
 function buildCampaignImagePrompt(input: CampaignCreativeInput, title: string) {
   const brandName = textValue(input.businessProfile?.brand_name, 'the brand');
-  const brandType = textValue(input.businessProfile?.brand_type, 'lifestyle brand');
+  const brandType = textValue(input.businessProfile?.brand_category, 'lifestyle brand');
   const brandSummary = textValue(input.businessProfile?.brand_summary);
   const tagline = textValue(input.businessProfile?.tagline);
   const location = textValue(
@@ -947,11 +945,11 @@ function buildCampaignImagePrompt(input: CampaignCreativeInput, title: string) {
   );
   const packageName = packageLabel(input.campaign.package_type);
   const objective = textValue(input.campaign.objective, textValue(input.campaign.brief));
-  const eventName = textValue(input.campaign.event_name);
+  const eventName = textValue(input.campaign.place_name);
   const dueDate = textValue(input.campaign.due_date);
   const influencerName = textValue(
     input.influencerProfile?.display_name,
-    textValue(input.influencerProfile?.ig_username, 'the creator'),
+    textValue(input.influencerProfile?.instagram_username, 'the creator'),
   );
   return [
     'Single full-bleed vertical premium mobile image, tall 9:14 aspect ratio, no UI frame.',
@@ -990,20 +988,20 @@ function average(values: number[]) {
 
 function inferInfluencerCategory(text: string) {
   const categoryMatchers: Record<(typeof INFLUENCER_CATEGORIES)[number], string[]> = {
-    Food: ['food', 'recipe', 'restaurant', 'cafe', 'meal', 'biryani', 'coffee'],
-    Fitness: ['fitness', 'gym', 'workout', 'health', 'trainer', 'exercise', 'protein'],
-    Beauty: ['beauty', 'makeup', 'skincare', 'cosmetic', 'glow', 'haircare'],
-    Lifestyle: ['lifestyle', 'daily', 'routine', 'self care', 'life update'],
-    Travel: ['travel', 'trip', 'vacation', 'hotel', 'flight', 'destination'],
-    Education: ['education', 'study', 'learn', 'tutorial', 'guide', 'career'],
-    Tech: ['tech', 'software', 'app', 'gadget', 'review', 'ai', 'startup'],
-    Fashion: ['fashion', 'style', 'outfit', 'lookbook', 'wardrobe'],
-    Other: [],
+    food: ['food', 'recipe', 'restaurant', 'cafe', 'meal', 'biryani', 'coffee'],
+    fitness: ['fitness', 'gym', 'workout', 'health', 'trainer', 'exercise', 'protein'],
+    beauty: ['beauty', 'makeup', 'skincare', 'cosmetic', 'glow', 'haircare'],
+    lifestyle: ['lifestyle', 'daily', 'routine', 'self care', 'life update'],
+    travel: ['travel', 'trip', 'vacation', 'hotel', 'flight', 'destination'],
+    education: ['education', 'study', 'learn', 'tutorial', 'guide', 'career'],
+    tech: ['tech', 'software', 'app', 'gadget', 'review', 'ai', 'startup'],
+    fashion: ['fashion', 'style', 'outfit', 'lookbook', 'wardrobe'],
+    other: [],
   };
   for (const [category, keywords] of Object.entries(categoryMatchers)) {
     if (keywords.some((keyword) => text.includes(keyword))) return category;
   }
-  return 'Other';
+  return 'other';
 }
 
 function inferLanguages(text: string) {
@@ -1024,7 +1022,10 @@ function buildInfluencerBio(
   category: string,
   languages: string[],
 ) {
-  const displayName = textValue(profile.display_name, textValue(profile.ig_username, 'Creator'));
+  const displayName = textValue(
+    profile.display_name,
+    textValue(profile.instagram_username, 'Creator'),
+  );
   const city = textValue(profile.city);
   const location = city ? ` based in ${city}` : '';
   const languageLabel = languages.slice(0, 2).join(' & ');
@@ -1036,9 +1037,7 @@ function estimateInfluencerPricing(followerCount: number, avgEngagement: number)
   const engagementMultiplier = avgEngagement > 0 ? Math.max(1, avgEngagement / 100) : 1;
   const reel = roundToNearestHundred((safeFollowers * 0.12 + engagementMultiplier * 250) / 10);
   return {
-    price_per_reel: Math.max(1500, reel),
-    price_per_post: Math.max(1000, roundToNearestHundred(reel * 0.75)),
-    price_per_story: Math.max(500, roundToNearestHundred(reel * 0.35)),
+    price_per_reel_paise: Math.max(150000, reel * 100),
   };
 }
 
@@ -1049,19 +1048,19 @@ function roundToNearestHundred(value: number) {
 function inferBusinessType(bio: string) {
   const normalized = bio.toLowerCase();
   const businessMatchers: Record<(typeof BUSINESS_TYPES)[number], string[]> = {
-    'Restaurant/Cafe': ['restaurant', 'cafe', 'food', 'dining', 'bistro'],
-    'D2C Brand': ['brand', 'shop', 'product', 'storefront'],
-    'Local Business': ['local', 'service', 'studio', 'clinic', 'salon'],
-    'E-commerce': ['e-commerce', 'ecommerce', 'online store', 'shipping'],
-    'SaaS/Tech': ['software', 'saas', 'tech', 'platform', 'app'],
-    Agency: ['agency', 'marketing', 'creative'],
-    'Personal Brand': ['coach', 'founder', 'creator', 'consultant'],
-    Other: [],
+    restaurant_cafe: ['restaurant', 'cafe', 'food', 'dining', 'bistro'],
+    d2c_brand: ['brand', 'shop', 'product', 'storefront'],
+    local_business: ['local', 'service', 'studio', 'clinic', 'salon'],
+    ecommerce: ['e-commerce', 'ecommerce', 'online store', 'shipping'],
+    saas_tech: ['software', 'saas', 'tech', 'platform', 'app'],
+    agency: ['agency', 'marketing', 'creative'],
+    personal_brand: ['coach', 'founder', 'creator', 'consultant'],
+    other: [],
   };
   for (const [type, keywords] of Object.entries(businessMatchers)) {
     if (keywords.some((keyword) => normalized.includes(keyword))) return type;
   }
-  return 'Other';
+  return 'other';
 }
 
 function buildBusinessSummary(brandName: string, brandType: string, bio: string) {

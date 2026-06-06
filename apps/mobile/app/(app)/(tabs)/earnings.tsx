@@ -1,11 +1,12 @@
 import { GlassCard } from '@/components/ui/glass-card';
-import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { AppHeader, APP_HEADER_SCREEN_TOP_PADDING } from '@/components/ui/app-header';
 import { PremiumEarningsGradientCard } from '@/components/ui/premium-earnings-gradient-card';
-import { EmptyState, ErrorState, Screen } from '@/components/ui/primitives';
+import { ErrorState, Screen } from '@/components/ui/primitives';
 import { ShimmerBlock, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
 import { useBootstrap, useEarnings, useInfluencerProfile } from '@/hooks/use-marketplace';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
+import coinImage from '@/assets/images/coin.png';
 import appIcon from '@/assets/images/icon.png';
 import Foundation from '@expo/vector-icons/Foundation';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ import { router } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +31,9 @@ const fmt = (n: number) =>
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(n);
+
+const fmtAmount = (n: number) =>
+  new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
@@ -187,7 +192,15 @@ function EarningsCard3D({ data, displayName }: { data: EarningsSummary; displayN
         </View>
 
         <View style={c3d.amountRow}>
-          <Text style={c3d.amount}>{fmt(data.total_earnings)}</Text>
+          <Image
+            source={coinImage}
+            style={c3d.amountCoin}
+            contentFit="contain"
+            accessibilityIgnoresInvertColors
+          />
+          <Text style={c3d.amount} numberOfLines={1} adjustsFontSizeToFit>
+            {fmtAmount(data.total_earnings)}
+          </Text>
         </View>
 
         <View style={c3d.bottomRow}>
@@ -239,20 +252,26 @@ const c3d = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'flex-start',
-    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
     paddingTop: theme.spacing.xl,
   },
+  amountCoin: {
+    width: 40,
+    height: 40,
+    flexShrink: 0,
+  },
   amount: {
+    fontFamily: theme.typography.metric.fontFamily,
     fontSize: 40,
     fontWeight: '800',
     lineHeight: 46,
     color: '#FFFFFF',
     fontVariant: ['tabular-nums'],
-    letterSpacing: -1,
     textAlign: 'left',
-    width: '100%',
+    flex: 1,
+    minWidth: 0,
   },
   bottomRow: {
     flexDirection: 'row',
@@ -261,12 +280,11 @@ const c3d = StyleSheet.create({
     flexShrink: 0,
   },
   holderName: {
-    fontSize: 13,
+    ...theme.typography.caption,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.82)',
     flex: 1,
     marginRight: theme.spacing.md,
-    letterSpacing: 1.2,
   },
   tierBadgeOuter: {
     width: 48,
@@ -288,14 +306,13 @@ const c3d = StyleSheet.create({
     left: 20,
   },
   tierBadgeLabel: {
+    ...theme.typography.labelSmall,
     position: 'absolute',
     width: 48,
     textAlign: 'center',
-    top: 8,
-    fontSize: 8,
+    top: 7,
     fontWeight: '800',
     color: '#fff',
-    letterSpacing: 0.3,
     zIndex: 1,
   },
 });
@@ -344,7 +361,7 @@ const totalEarned = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   sub: {
-    fontSize: 11,
+    ...theme.typography.caption,
     fontWeight: '600',
   },
 });
@@ -381,12 +398,9 @@ const activity = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: {
-    fontFamily: theme.typography.cardTitle.fontFamily,
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: theme.typography.cardTitle.fontWeight,
+    ...theme.typography.caption,
+    fontWeight: '700',
     color: 'rgba(255,255,255,0.88)',
-    letterSpacing: 0.2,
   },
   chartWrap: {
     flexGrow: 1,
@@ -567,7 +581,12 @@ function RecentTransactionsSection({ transactions }: { transactions: EarningsTra
       </View>
 
       {visibleTransactions.length === 0 ? (
-        <EmptyState title="No earnings yet" subtitle="Complete a campaign to get paid" />
+        <GlassCard
+          style={styles.txListShell}
+          contentStyle={[styles.txListInner, styles.txEmptyInner]}
+        >
+          <Text style={styles.txEmptyText}>No earnings yet.</Text>
+        </GlassCard>
       ) : (
         <GlassCard style={styles.txListShell} contentStyle={styles.txListInner}>
           {visibleTransactions.map((transaction, index) => (
@@ -628,7 +647,7 @@ const avtr = StyleSheet.create({
     flexShrink: 0,
   },
   letter: {
-    fontSize: 16,
+    ...theme.typography.bodyStrong,
     fontWeight: '800',
   },
 });
@@ -636,6 +655,7 @@ const avtr = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function EarningsScreen() {
+  const insets = useSafeAreaInsets();
   const influencerProfile = useInfluencerProfile();
   const bootstrap = useBootstrap();
   const earnings = useEarnings();
@@ -650,33 +670,34 @@ export default function EarningsScreen() {
   }, []);
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Earnings</Text>
-        <NativeIconButton
-          symbol="person.circle"
-          fallbackIcon="person-circle-outline"
-          variant="glass"
-          haptic="light"
-          size={44}
-          symbolSize={20}
-          imageUri={influencerProfile.data?.profile_photo_url}
-          onPress={() => {
+    <Screen
+      contentInsetAdjustmentBehavior="never"
+      contentContainerStyle={{ paddingTop: insets.top + APP_HEADER_SCREEN_TOP_PADDING }}
+    >
+      <AppHeader
+        title="Earnings"
+        profile={{
+          imageUri: influencerProfile.data?.profile_photo_url,
+          onPress: () => {
             router.push('/(app)/profile');
-          }}
-        />
-      </View>
+          },
+        }}
+      />
 
       {earningsLoading ? (
-        <EarningsSkeleton />
+        <View style={styles.homeAlignedBody}>
+          <EarningsSkeleton />
+        </View>
       ) : earnings.isError ? (
-        <ErrorState
-          title="Couldn't load earnings"
-          subtitle="Check your connection and try again"
-          onRetry={() => void earnings.refetch()}
-        />
+        <View style={styles.homeAlignedBody}>
+          <ErrorState
+            title="Couldn't load earnings"
+            subtitle="Check your connection and try again"
+            onRetry={() => void earnings.refetch()}
+          />
+        </View>
       ) : earnings.data ? (
-        <>
+        <View style={styles.homeAlignedBody}>
           <Animated.View entering={FadeInDown.delay(0).duration(500)}>
             <EarningsCard3D
               data={earnings.data}
@@ -698,7 +719,7 @@ export default function EarningsScreen() {
           </Animated.View>
 
           <RecentTransactionsSection transactions={earnings.data.transactions} />
-        </>
+        </View>
       ) : null}
     </Screen>
   );
@@ -707,23 +728,9 @@ export default function EarningsScreen() {
 // ─── styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
-    minHeight: 48,
-    paddingHorizontal: 2,
-  },
-  headerTitle: {
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '800',
-    letterSpacing: 0,
-    color: theme.colors.foreground,
-    flex: 1,
-    minWidth: 0,
-    includeFontPadding: false,
+  homeAlignedBody: {
+    gap: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
   },
   threeCardGrid: {
     flexDirection: 'row',
@@ -789,6 +796,17 @@ const styles = StyleSheet.create({
   },
   txListInner: {
     paddingVertical: theme.spacing.sm,
+  },
+  txEmptyInner: {
+    minHeight: 116,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.xl,
+  },
+  txEmptyText: {
+    ...theme.typography.cardTitle,
+    color: theme.colors.foreground,
+    textAlign: 'center',
   },
   txListRow: {
     position: 'relative',

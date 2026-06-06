@@ -11,6 +11,7 @@ import {
   getVisibleCreators,
   type CreatorSort,
 } from '@/lib/filters/creators';
+import labImage from '@/assets/images/lab.png';
 import type { Influencer } from '@plugoh/contracts';
 import { impactAsync, ImpactFeedbackStyle } from 'expo-haptics';
 import { router } from 'expo-router';
@@ -58,6 +59,7 @@ export default function BrandDiscoverScreen() {
       profileSymbol="person.circle"
       profileFallbackIcon="person-circle-outline"
       profileRoute="/(app)/brand-profile"
+      filterIconSource={labImage}
       searchPlaceholder="Search by name, handle, city"
       sortTitle="Sort creators"
       sortOptions={SORT_OPTIONS}

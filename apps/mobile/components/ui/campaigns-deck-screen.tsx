@@ -1,14 +1,16 @@
 import {
-  campaignActiveFilterCount,
   campaignFilterError,
   DEFAULT_CAMPAIGN_FILTERS,
+  campaignAmountFilterForBounds,
   getVisibleCampaigns,
+  type CampaignFilterDraft,
   type CampaignSort,
   type CampaignStatusFilter,
 } from '@/lib/filters/campaigns';
 import type { CampaignListItem } from '@plugoh/contracts';
 import type { Href } from 'expo-router';
-import { useMemo, type ComponentProps } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
+import type { ImageSourcePropType } from 'react-native';
 import { CampaignDeckSwiper, type CampaignDeckRole } from './campaign-deck-swiper';
 import { DeckBrowseScreen, type DeckSortOption } from './deck-browse-screen';
 import { FilterOption, FilterRange, FilterSheetSection } from './filter-sheet';
@@ -33,6 +35,23 @@ const STATUS_OPTIONS: { value: CampaignStatusFilter; label: string; description:
   },
 ];
 
+function amountFilterEquals(
+  left: CampaignFilterDraft['amount'],
+  right: CampaignFilterDraft['amount'],
+) {
+  return left.min.trim() === right.min.trim() && left.max.trim() === right.max.trim();
+}
+
+function activeFilterCountForDefault(
+  filters: CampaignFilterDraft,
+  defaultFilters: CampaignFilterDraft,
+) {
+  return (
+    (amountFilterEquals(filters.amount, defaultFilters.amount) ? 0 : 1) +
+    (filters.status !== 'all' ? 1 : 0)
+  );
+}
+
 type Props = {
   role: CampaignDeckRole;
   campaigns: CampaignListItem[];
@@ -41,6 +60,7 @@ type Props = {
   profileSymbol: ComponentProps<typeof NativeIconButton>['symbol'];
   profileFallbackIcon: ComponentProps<typeof NativeIconButton>['fallbackIcon'];
   profileRoute: Href;
+  filterIconSource?: ImageSourcePropType;
   searchPlaceholder: string;
   searchMatcher: (campaign: CampaignListItem, query: string) => boolean;
   onOpenCampaign: (id: string) => void;
@@ -58,6 +78,7 @@ export function CampaignsDeckScreen({
   profileSymbol,
   profileFallbackIcon,
   profileRoute,
+  filterIconSource,
   searchPlaceholder,
   searchMatcher,
   onOpenCampaign,
@@ -76,6 +97,25 @@ export function CampaignsDeckScreen({
       max: amounts.length > 0 ? Math.max(...amounts) : 100000,
     };
   }, [campaigns]);
+  const initialCampaignFilters = useMemo(
+    () => ({
+      ...DEFAULT_CAMPAIGN_FILTERS,
+      amount: campaignAmountFilterForBounds(campaignAmountBounds),
+    }),
+    [campaignAmountBounds],
+  );
+  const [campaignFilters, setCampaignFilters] = useState(initialCampaignFilters);
+  const previousInitialFiltersRef = useRef(initialCampaignFilters);
+
+  useEffect(() => {
+    const previousInitialFilters = previousInitialFiltersRef.current;
+    setCampaignFilters((currentFilters) =>
+      activeFilterCountForDefault(currentFilters, previousInitialFilters) === 0
+        ? initialCampaignFilters
+        : currentFilters,
+    );
+    previousInitialFiltersRef.current = initialCampaignFilters;
+  }, [initialCampaignFilters]);
 
   return (
     <DeckBrowseScreen
@@ -87,12 +127,17 @@ export function CampaignsDeckScreen({
       profileSymbol={profileSymbol}
       profileFallbackIcon={profileFallbackIcon}
       profileRoute={profileRoute}
+      filterIconSource={filterIconSource}
       searchPlaceholder={searchPlaceholder}
       sortTitle="Sort campaigns"
       sortOptions={SORT_OPTIONS}
       initialSort="created_desc"
-      initialFilters={DEFAULT_CAMPAIGN_FILTERS}
-      getActiveFilterCount={campaignActiveFilterCount}
+      initialFilters={initialCampaignFilters}
+      filtersValue={campaignFilters}
+      onFiltersChange={setCampaignFilters}
+      getActiveFilterCount={(filters) =>
+        activeFilterCountForDefault(filters, initialCampaignFilters)
+      }
       validateFilters={campaignFilterError}
       getVisibleItems={({ items, search, sort, filters }) =>
         getVisibleCampaigns({ items, search, sort, filters, searchMatcher })

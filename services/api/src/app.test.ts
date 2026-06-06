@@ -39,7 +39,7 @@ function makeApp(seed = {}) {
         id: 'bp-1',
         user_id: businessId,
         brand_name: 'Plugoh Cafe',
-        brand_type: 'Restaurant/Cafe',
+        brand_category: 'restaurant_cafe',
         brand_location: 'Hyderabad',
       },
     ],
@@ -49,10 +49,10 @@ function makeApp(seed = {}) {
         user_id: influencerId,
         display_name: 'Creator One',
         city: 'Hyderabad',
-        category: 'Food',
-        price_per_reel: 10000,
-        price_per_post: 8000,
-        price_per_story: 3000,
+        category: 'food',
+        price_per_reel_paise: 10000,
+        price_per_reel_paise: 8000,
+        price_per_reel_paise: 3000,
         follower_count: 25000,
         avg_likes_per_reel: 500,
         is_active: true,
@@ -62,9 +62,9 @@ function makeApp(seed = {}) {
     campaign_messages: [],
     notifications: [],
     deliveries: [],
-    escrow_transactions: [],
+    escrow_ledger_entries: [],
     instagram_media: [],
-    influencer_payout_details: [],
+    influencer_payout_accounts: [],
     ...seed,
   });
   const payment = new FakePaymentProvider();
@@ -134,7 +134,7 @@ describe('Plugoh API', () => {
 
   it('lists and filters active influencers without auth', async () => {
     const { app } = makeApp();
-    const res = await app.request('/influencers?search=creator&category=Food&sort=price_asc');
+    const res = await app.request('/influencers?search=creator&category=food&sort=price_asc');
     const body = await json(res);
     expect(res.status).toBe(200);
     expect(body.data.items).toHaveLength(1);
@@ -151,8 +151,8 @@ describe('Plugoh API', () => {
           user_id: influencerId,
           display_name: 'Creator One',
           city: 'Hyderabad',
-          category: 'Food',
-          price_per_story: 3000,
+          category: 'food',
+          price_per_reel_paise: 3000,
           is_active: true,
         },
       ],
@@ -170,8 +170,8 @@ describe('Plugoh API', () => {
       user_id: `00000000-0000-4000-8000-${String(index + 101).padStart(12, '0')}`,
       display_name: `Creator ${index + 1}`,
       city: 'Hyderabad',
-      category: 'Food',
-      price_per_story: 2000 + index,
+      category: 'food',
+      price_per_reel_paise: 2000 + index,
       is_active: true,
     }));
     const { app } = makeApp({ influencer_profiles: rows });
@@ -278,7 +278,7 @@ describe('Plugoh API', () => {
         phone: '+919999999999',
         location: 'Hyderabad',
         brand_name: 'Plugoh Cafe',
-        brand_type: 'Restaurant/Cafe',
+        brand_category: 'restaurant_cafe',
       }),
     });
     expect(onboardingRes.status).toBe(200);
@@ -317,9 +317,9 @@ describe('Plugoh API', () => {
       campaign_messages: [],
       notifications: [],
       deliveries: [],
-      escrow_transactions: [],
+      escrow_ledger_entries: [],
       instagram_media: [],
-      influencer_payout_details: [],
+      influencer_payout_accounts: [],
     });
     const app = createApp({
       store,
@@ -335,7 +335,7 @@ describe('Plugoh API', () => {
         phone: '+919999999999',
         location: 'Hyderabad',
         brand_name: 'Plugoh Cafe',
-        brand_type: 'Restaurant/Cafe',
+        brand_category: 'restaurant_cafe',
       }),
     });
     expect(res.status).toBe(200);
@@ -352,14 +352,14 @@ describe('Plugoh API', () => {
       body: JSON.stringify({
         influencer_id: influencerId,
         influencer_profile_id: influencerProfileId,
-        package_type: 'reel',
-        price_offered: 10000,
+        package_type: 'instagram_reel',
+        price_offered_paise: 10000,
         objective: 'visit_place',
         timing_mode: 'choose_date',
         due_date: '2026-07-01',
-        event_name: 'Hyderabad',
-        contact_email: 'brand@test.dev',
-        contact_phone: '+919999999999',
+        place_name: 'Hyderabad',
+        business_contact_email: 'brand@test.dev',
+        business_contact_phone: '+919999999999',
       }),
     });
     expect(res.status).toBe(201);
@@ -381,14 +381,14 @@ describe('Plugoh API', () => {
       body: JSON.stringify({
         influencer_id: influencerId,
         influencer_profile_id: influencerProfileId,
-        package_type: 'reel',
-        price_offered: 10000,
+        package_type: 'instagram_reel',
+        price_offered_paise: 10000,
         objective: 'visit_place',
         timing_mode: 'choose_date',
         due_date: '2026-07-01',
-        event_name: 'Hyderabad',
-        contact_email: 'brand@test.dev',
-        contact_phone: '+919999999999',
+        place_name: 'Hyderabad',
+        business_contact_email: 'brand@test.dev',
+        business_contact_phone: '+919999999999',
       }),
     });
 
@@ -415,9 +415,9 @@ describe('Plugoh API', () => {
           id: 'bp-1',
           user_id: businessId,
           brand_name: 'Plugoh Cafe',
-          brand_type: 'Restaurant/Cafe',
+          brand_category: 'restaurant_cafe',
           brand_location: 'Hyderabad',
-          ig_profile_picture_url: 'https://cdn.test/brand-instagram.jpg',
+          instagram_profile_picture_url: 'https://cdn.test/brand-instagram.jpg',
         },
       ],
       campaigns: [
@@ -426,9 +426,9 @@ describe('Plugoh API', () => {
           business_id: businessId,
           influencer_id: influencerId,
           title: 'Booking',
-          status: 'requested',
-          price_offered: 10000,
-          package_type: 'reel',
+          status: 'pre_authorized',
+          price_offered_paise: 10000,
+          package_type: 'instagram_reel',
         },
       ],
     });
@@ -463,9 +463,9 @@ describe('Plugoh API', () => {
           id: 'bp-1',
           user_id: businessId,
           brand_name: 'Plugoh Cafe',
-          brand_type: 'Restaurant/Cafe',
+          brand_category: 'restaurant_cafe',
           brand_location: 'Hyderabad',
-          ig_profile_picture_url: 'https://cdn.test/brand-instagram.jpg',
+          instagram_profile_picture_url: 'https://cdn.test/brand-instagram.jpg',
         },
       ],
       campaigns: [
@@ -475,8 +475,8 @@ describe('Plugoh API', () => {
           influencer_id: influencerId,
           title: 'Booking',
           status: 'in_escrow',
-          price_offered: 10000,
-          package_type: 'reel',
+          price_offered_paise: 10000,
+          package_type: 'instagram_reel',
           created_at: '2026-05-16T00:00:00.000Z',
         },
       ],
@@ -515,18 +515,18 @@ describe('Plugoh API', () => {
       body: JSON.stringify({
         influencer_id: influencerId,
         influencer_profile_id: influencerProfileId,
-        package_type: 'reel',
-        price_offered: 10000,
+        package_type: 'instagram_reel',
+        price_offered_paise: 10000,
         objective: 'visit_place',
         timing_mode: 'asap',
-        contact_email: 'brand@test.dev',
-        contact_phone: '+919999999999',
+        business_contact_email: 'brand@test.dev',
+        business_contact_phone: '+919999999999',
       }),
     });
     expect(res.status).toBe(400);
   });
 
-  it('accepts a requested campaign into payment_pending', async () => {
+  it('accepts a pre_authorized campaign into capture_pending', async () => {
     const { app, store } = makeApp({
       campaigns: [
         {
@@ -534,10 +534,10 @@ describe('Plugoh API', () => {
           business_id: businessId,
           influencer_id: influencerId,
           title: 'Booking',
-          status: 'requested',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          status: 'pre_authorized',
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
         },
       ],
     });
@@ -546,7 +546,7 @@ describe('Plugoh API', () => {
       headers: { authorization: 'Bearer influencer' },
     });
     expect(res.status).toBe(200);
-    expect(store.tables.get('campaigns')?.[0].status).toBe('payment_pending');
+    expect(store.tables.get('campaigns')?.[0].status).toBe('capture_pending');
   });
 
   it('verifies escrow payment idempotently', async () => {
@@ -559,10 +559,10 @@ describe('Plugoh API', () => {
           business_id: businessId,
           influencer_id: influencerId,
           title: 'Booking',
-          status: 'payment_pending',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          status: 'capture_pending',
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
           razorpay_order_id: orderId,
         },
       ],
@@ -604,10 +604,10 @@ describe('Plugoh API', () => {
           business_id: businessId,
           influencer_id: influencerId,
           title: 'Booking',
-          status: 'payment_pending',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          status: 'capture_pending',
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
         },
       ],
     });
@@ -626,7 +626,7 @@ describe('Plugoh API', () => {
     expect((await json(first)).data.orderId).toBe((await json(second)).data.orderId);
   });
 
-  it('rejects booking verification when the paid Razorpay order amount does not match the requested booking amount', async () => {
+  it('rejects booking verification when the paid Razorpay order amount does not match the pre_authorized booking amount', async () => {
     const { app } = makeApp();
     const res = await app.request('/payment/verify-booking-payment', {
       method: 'POST',
@@ -644,8 +644,8 @@ describe('Plugoh API', () => {
         package_type: 'post',
         objective: 'feature_product',
         timing_mode: 'asap',
-        contact_email: 'brand@test.dev',
-        contact_phone: '+919999999999',
+        business_contact_email: 'brand@test.dev',
+        business_contact_phone: '+919999999999',
       }),
     });
     expect(res.status).toBe(409);
@@ -669,11 +669,11 @@ describe('Plugoh API', () => {
         razorpay_signature: signature(orderId, paymentId),
         influencer_id: influencerId,
         influencer_profile_id: influencerProfileId,
-        package_type: 'reel',
+        package_type: 'instagram_reel',
         objective: 'feature_product',
         timing_mode: 'asap',
-        contact_email: 'brand@test.dev',
-        contact_phone: '+919999999999',
+        business_contact_email: 'brand@test.dev',
+        business_contact_phone: '+919999999999',
       }),
     });
 
@@ -683,7 +683,7 @@ describe('Plugoh API', () => {
       .get('campaigns')
       ?.find((row) => row.id === campaignIdFromResponse);
     const escrow = store.tables
-      .get('escrow_transactions')
+      .get('escrow_ledger_entries')
       ?.find((row) => row.campaign_id === campaignIdFromResponse);
     expect(escrow?.type).toBe('escrow_lock');
     expect(campaign?.ai_title).toBe('Aura Weekend Reel');
@@ -698,7 +698,7 @@ describe('Plugoh API', () => {
           business_id: businessId,
           influencer_id: influencerId,
           title: 'Existing',
-          status: 'requested',
+          status: 'pre_authorized',
           creative_status: 'ready',
           card_image_url: 'https://cdn.test/existing.png',
         },
@@ -729,7 +729,7 @@ describe('Plugoh API', () => {
       headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
       body: JSON.stringify({
         influencer_profile_id: influencerProfileId,
-        package_type: 'reel+story',
+        package_type: 'instagram_reel',
       }),
     });
     const body = await json(res);
@@ -747,7 +747,7 @@ describe('Plugoh API', () => {
           id: 'bp-1',
           user_id: businessId,
           brand_name: '',
-          brand_type: 'Restaurant/Cafe',
+          brand_category: 'restaurant_cafe',
         },
       ],
     });
@@ -756,7 +756,7 @@ describe('Plugoh API', () => {
       headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
       body: JSON.stringify({
         influencer_profile_id: influencerProfileId,
-        package_type: 'reel',
+        package_type: 'instagram_reel',
       }),
     });
     expect(res.status).toBe(403);
@@ -770,10 +770,10 @@ describe('Plugoh API', () => {
           business_id: businessId,
           influencer_id: influencerId,
           title: 'Booking',
-          status: 'requested',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          status: 'pre_authorized',
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
         },
       ],
     });
@@ -794,16 +794,16 @@ describe('Plugoh API', () => {
           influencer_id: influencerId,
           title: 'Booking',
           status: 'in_escrow',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
         },
       ],
     });
     const submit = await app.request(`/campaigns/${campaignId}/deliver`, {
       method: 'POST',
       headers: { authorization: 'Bearer influencer', 'content-type': 'application/json' },
-      body: JSON.stringify({ storagePath: 'path/file.mp4', notes: 'done' }),
+      body: JSON.stringify({ storage_path: 'path/file.mp4', creator_note: 'done' }),
     });
     expect(submit.status).toBe(200);
     const approve = await app.request(`/campaigns/${campaignId}/approve`, {
@@ -823,9 +823,9 @@ describe('Plugoh API', () => {
           influencer_id: influencerId,
           title: 'Booking',
           status: 'in_escrow',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
         },
       ],
       deliveries: [
@@ -833,14 +833,14 @@ describe('Plugoh API', () => {
           id: 'delivery-1',
           campaign_id: campaignId,
           submitted_by: influencerId,
-          content_url: 'path/file.mp4',
+          storage_path: 'path/file.mp4',
         },
       ],
     });
     const res = await app.request(`/campaigns/${campaignId}/deliver`, {
       method: 'POST',
       headers: { authorization: 'Bearer influencer', 'content-type': 'application/json' },
-      body: JSON.stringify({ storagePath: 'path/file-2.mp4' }),
+      body: JSON.stringify({ storage_path: 'path/file-2.mp4' }),
     });
     expect(res.status).toBe(409);
   });
@@ -854,12 +854,12 @@ describe('Plugoh API', () => {
           influencer_id: influencerId,
           title: 'Booking',
           status: 'completed',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
         },
       ],
-      escrow_transactions: [
+      escrow_ledger_entries: [
         {
           id: 'tx-1',
           campaign_id: campaignId,
@@ -886,7 +886,7 @@ describe('Plugoh API', () => {
       body: JSON.stringify({ campaign_id: campaignId }),
     });
     expect(res.status).toBe(200);
-    expect(store.tables.get('escrow_transactions')).toHaveLength(2);
+    expect(store.tables.get('escrow_ledger_entries')).toHaveLength(2);
   });
 
   it('validates Razorpay webhook signatures', async () => {
@@ -896,7 +896,7 @@ describe('Plugoh API', () => {
           id: campaignId,
           business_id: businessId,
           influencer_id: influencerId,
-          status: 'payment_pending',
+          status: 'capture_pending',
           razorpay_order_id: 'order_failed',
           payment_status: 'authorized',
         },
@@ -958,9 +958,9 @@ describe('Plugoh API', () => {
           payment_method: 'upi',
           razorpay_payment_id: 'pay_upi',
           razorpay_order_id: 'order_upi',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
         },
       ],
     });
@@ -970,7 +970,9 @@ describe('Plugoh API', () => {
     });
     expect(declined.status).toBe(200);
     expect(payment.refunds).toHaveLength(1);
-    const refundRow = store.tables.get('escrow_transactions')?.find((row) => row.type === 'refund');
+    const refundRow = store.tables
+      .get('escrow_ledger_entries')
+      ?.find((row) => row.type === 'refund');
     expect(refundRow?.razorpay_refund_id).toBe(payment.refunds[0].id);
     expect(refundRow?.status).toBe('pending');
 
@@ -985,7 +987,7 @@ describe('Plugoh API', () => {
     });
     expect(webhook.status).toBe(200);
     expect(
-      store.tables.get('escrow_transactions')?.find((row) => row.type === 'refund')?.status,
+      store.tables.get('escrow_ledger_entries')?.find((row) => row.type === 'refund')?.status,
     ).toBe('success');
   });
 
@@ -1000,9 +1002,9 @@ describe('Plugoh API', () => {
           status: 'pre_authorized',
           payment_method: 'card',
           razorpay_payment_id: 'pay_card',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
         },
       ],
     });
@@ -1027,9 +1029,9 @@ describe('Plugoh API', () => {
           razorpay_payment_id: 'pay_upi',
           razorpay_order_id: 'order_upi',
           expires_at: '2020-01-01T00:00:00.000Z',
-          price_offered: 10000,
-          platform_fee_amount: 1200,
-          total_charged_amount: 11200,
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
         },
       ],
     });
@@ -1064,9 +1066,9 @@ describe('Plugoh API', () => {
           display_name: 'Creator One',
           city: 'Hyderabad',
           ig_biography: 'Food reels and restaurant reviews',
-          price_per_reel: null,
-          price_per_post: null,
-          price_per_story: null,
+          price_per_reel_paise: null,
+          price_per_reel_paise: null,
+          price_per_reel_paise: null,
           category: null,
           languages: null,
           bio: null,
@@ -1092,7 +1094,7 @@ describe('Plugoh API', () => {
     const profile = store.tables.get('influencer_profiles')?.[0];
     expect(profile?.category).toBeTruthy();
     expect(profile?.bio).toBeTruthy();
-    expect(profile?.price_per_reel).toBeTruthy();
+    expect(profile?.price_per_reel_paise).toBeTruthy();
   });
 
   it('applies generated AI fields to empty business profiles', async () => {
@@ -1102,7 +1104,7 @@ describe('Plugoh API', () => {
           id: 'bp-1',
           user_id: businessId,
           brand_name: 'Plugoh Cafe',
-          brand_type: 'Restaurant/Cafe',
+          brand_category: 'restaurant_cafe',
           ig_biography: 'Modern coffee and brunch spot in Hyderabad',
           brand_summary: null,
           tagline: null,

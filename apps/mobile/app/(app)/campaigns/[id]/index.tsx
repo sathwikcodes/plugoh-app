@@ -729,12 +729,11 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xs,
   },
   pageTitle: {
+    ...theme.typography.display,
     color: '#FFFFFF',
-    fontFamily: theme.typography.display.fontFamily,
     fontWeight: '900',
     alignSelf: 'stretch',
     textAlign: 'left',
-    letterSpacing: 0,
   },
   actionRow: {
     flexDirection: 'row',
@@ -760,11 +759,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   actionText: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 16,
-    lineHeight: 20,
+    ...theme.typography.bodyStrong,
     fontWeight: '700',
-    letterSpacing: 0,
   },
   infoGroup: {
     gap: theme.spacing.sm,
@@ -774,7 +770,6 @@ const styles = StyleSheet.create({
     ...theme.typography.label,
     color: 'rgba(255,255,255,0.42)',
     textTransform: 'uppercase',
-    letterSpacing: 0,
     paddingHorizontal: theme.spacing.xs,
   },
   infoRows: {
@@ -819,8 +814,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   brandAvatarInitial: {
+    ...theme.typography.cardTitle,
     color: '#111522',
-    fontSize: 18,
     fontWeight: '900',
   },
   brandOwnerName: {
@@ -887,9 +882,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   scheduleTime: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 17,
-    lineHeight: 22,
+    ...theme.typography.bodyStrong,
     fontWeight: '500',
     color: 'rgba(255,190,210,0.9)',
     fontVariant: ['tabular-nums'],
@@ -912,9 +905,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   scheduleLocationSecondary: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 16,
-    lineHeight: 21,
+    ...theme.typography.bodyStrong,
     fontWeight: '500',
     color: 'rgba(255,190,210,0.86)',
   },
@@ -989,23 +980,21 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '34deg' }],
   },
   mapCityLabel: {
+    ...theme.typography.section,
     position: 'absolute',
     top: 12,
     left: 92,
     right: 16,
     color: 'rgba(45,45,45,0.72)',
-    fontSize: 20,
-    lineHeight: 24,
     fontWeight: '800',
   },
   mapPlaceLabel: {
+    ...theme.typography.label,
     position: 'absolute',
     right: 12,
     bottom: 12,
     maxWidth: '50%',
     color: 'rgba(231,115,19,0.88)',
-    fontSize: 12,
-    lineHeight: 15,
     fontWeight: '800',
     textAlign: 'right',
   },
@@ -1035,9 +1024,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   mapBadgeText: {
+    ...theme.typography.bodyStrong,
     color: 'rgba(42,42,42,0.92)',
-    fontSize: 16,
-    lineHeight: 20,
     fontWeight: '700',
   },
   briefText: {

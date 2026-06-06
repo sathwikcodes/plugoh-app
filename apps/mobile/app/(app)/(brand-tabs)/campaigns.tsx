@@ -2,6 +2,7 @@ import { CampaignsDeckScreen } from '@/components/ui/campaigns-deck-screen';
 import { useBootstrap, useBusinessProfile, useCampaigns } from '@/hooks/use-marketplace';
 import { businessProfileImageUri } from '@/lib/brand/profile-image';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
+import labImage from '@/assets/images/lab.png';
 import type { CampaignListItem } from '@plugoh/contracts';
 import { router } from 'expo-router';
 import { useCallback } from 'react';
@@ -38,7 +39,8 @@ export default function BrandCampaignsScreen() {
       profileSymbol="person.circle"
       profileFallbackIcon="person-circle-outline"
       profileRoute="/(app)/brand-profile"
-      searchPlaceholder="Search Campaigns"
+      filterIconSource={labImage}
+      searchPlaceholder="Search campaigns"
       searchMatcher={matchesBrandCampaign}
       onOpenCampaign={handleOpenCampaign}
     />

@@ -585,11 +585,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
+    ...theme.typography.section,
     color: '#FFFFFF',
-    fontSize: 22,
-    lineHeight: 26,
-    fontWeight: '700',
-    letterSpacing: 0,
     includeFontPadding: false,
   },
   pageWrap: {
@@ -625,11 +622,8 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   rowLabel: {
+    ...theme.typography.bodyStrong,
     color: '#FFFFFF',
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: '600',
-    letterSpacing: 0,
   },
   rowValueWrap: {
     flex: 1,
@@ -640,11 +634,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   rowValue: {
+    ...theme.typography.caption,
     color: 'rgba(255,255,255,0.62)',
-    fontSize: 14,
-    lineHeight: 19,
     fontWeight: '600',
-    letterSpacing: 0,
     flexShrink: 1,
   },
   divider: {
@@ -667,17 +659,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   optionLabel: {
+    ...theme.typography.callout,
     color: '#FFFFFF',
-    fontSize: 15,
-    lineHeight: 20,
     fontWeight: '600',
-    letterSpacing: 0,
   },
   optionDescription: {
+    ...theme.typography.label,
     color: 'rgba(255,255,255,0.48)',
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '500',
   },
   optionCircle: {
     width: 24,
@@ -719,15 +707,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   clearText: {
+    ...theme.typography.bodyStrong,
     color: '#FFFFFF',
-    fontSize: 15,
-    lineHeight: 19,
     fontWeight: '700',
   },
   showText: {
+    ...theme.typography.bodyStrong,
     color: '#050509',
-    fontSize: 15,
-    lineHeight: 19,
     fontWeight: '700',
   },
   pressed: {

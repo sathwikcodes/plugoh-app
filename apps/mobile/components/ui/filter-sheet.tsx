@@ -364,9 +364,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   clearText: {
-    ...theme.typography.label,
+    ...theme.typography.caption,
     color: theme.colors.pink,
-    fontSize: 13,
   },
   content: {
     flex: 1,

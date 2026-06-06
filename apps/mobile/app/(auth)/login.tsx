@@ -117,8 +117,6 @@ const styles = StyleSheet.create({
   },
   brand: {
     ...authTypography.displaySm,
-    fontSize: 26,
-    lineHeight: 30,
     color: '#FFFFFF',
     textAlign: 'center',
   },
@@ -139,15 +137,11 @@ const styles = StyleSheet.create({
   },
   title: {
     ...authTypography.displayLg,
-    fontSize: 32,
-    lineHeight: 40,
     color: '#FFFFFF',
     textAlign: 'center',
   },
   subtitleMask: {
-    ...authTypography.bodyStrong,
-    fontSize: 20,
-    lineHeight: 26,
+    ...authTypography.section,
     textAlign: 'center',
   },
   subtitleHidden: {
@@ -166,8 +160,6 @@ const styles = StyleSheet.create({
   },
   ctaLabel: {
     ...authTypography.bodyStrong,
-    fontSize: 17,
-    lineHeight: 22,
     color: '#0D0D0D',
   },
 });

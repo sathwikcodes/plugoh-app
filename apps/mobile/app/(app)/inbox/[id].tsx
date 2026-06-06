@@ -461,8 +461,8 @@ export default function InboxThreadScreen() {
                 symbol="chevron.left"
                 fallbackIcon="chevron-back"
                 tintColor="#FFFFFF"
-                size={38}
-                symbolSize={17}
+                size={44}
+                symbolSize={20}
                 accessibilityLabel="Go back"
                 onPress={() => {
                   router.back();
@@ -507,8 +507,8 @@ export default function InboxThreadScreen() {
               symbol="info.circle"
               fallbackIcon="information-circle"
               tintColor="#FFFFFF"
-              size={38}
-              symbolSize={18}
+              size={44}
+              symbolSize={20}
               accessibilityLabel="Thread info"
               onPress={handleThreadInfo}
             />
@@ -607,12 +607,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   identityName: {
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: '600',
+    ...theme.typography.bodyStrong,
     color: '#FFFFFF',
     flexShrink: 1,
-    letterSpacing: 0.15,
     textShadowColor: 'rgba(0,0,0,0.45)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -659,7 +656,6 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: 'rgba(255,255,255,0.32)',
     textAlign: 'center',
-    lineHeight: 22,
   },
   compose: {
     flexDirection: 'row',
@@ -736,6 +732,5 @@ const styles = StyleSheet.create({
   disabledSubtitle: {
     ...theme.typography.body,
     color: 'rgba(255,255,255,0.42)',
-    lineHeight: 22,
   },
 });

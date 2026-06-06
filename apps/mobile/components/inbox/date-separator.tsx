@@ -47,9 +47,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.10)',
   },
   label: {
-    ...theme.typography.label,
+    ...theme.typography.labelSmall,
     color: 'rgba(255,255,255,0.40)',
     textAlign: 'center',
-    fontSize: 11,
   },
 });

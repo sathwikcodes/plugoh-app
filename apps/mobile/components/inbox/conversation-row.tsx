@@ -152,24 +152,16 @@ const styles = StyleSheet.create({
     ...theme.typography.cardTitle,
     color: theme.colors.foreground,
     flex: 1,
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: '700',
   },
   timestamp: {
     ...theme.typography.label,
     color: 'rgba(255,255,255,0.42)',
     flexShrink: 0,
-    fontSize: 12,
-    lineHeight: 16,
     fontVariant: ['tabular-nums'],
   },
   secondaryLine: {
-    ...theme.typography.label,
+    ...theme.typography.caption,
     color: 'rgba(255,255,255,0.42)',
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: '500',
   },
   bottomRow: {
     flexDirection: 'row',
@@ -177,11 +169,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   preview: {
-    ...theme.typography.body,
+    ...theme.typography.callout,
     color: 'rgba(255,255,255,0.66)',
     flex: 1,
-    fontSize: 14,
-    lineHeight: 19,
     fontWeight: '500',
   },
   badge: {
@@ -194,9 +184,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   badgeText: {
-    ...theme.typography.label,
+    ...theme.typography.labelSmall,
     color: '#FFFFFF',
-    fontSize: 11,
     fontVariant: ['tabular-nums'],
   },
 });

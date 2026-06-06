@@ -23,7 +23,11 @@ export class FakePaymentProvider implements PaymentProvider {
   }
 
   async fetchOrder(orderId: string) {
-    return { id: orderId, amount: 1120000, currency: 'INR' };
+    return {
+      id: orderId,
+      amount: orderId.includes('small_amount') ? 100 : 11200,
+      currency: 'INR',
+    };
   }
 
   async fetchPayment(paymentId: string) {
@@ -97,7 +101,7 @@ export class FakeInstagramProvider implements InstagramProvider {
   }
 
   async fetchProfile() {
-    return { ig_user_id: 'ig_1', ig_username: 'plugoh' };
+    return { ig_user_id: 'ig_1', username: 'plugoh' };
   }
 
   async fetchMedia() {
@@ -109,7 +113,7 @@ export class FakeAiProvider implements AiProvider {
   shouldFailCampaignCreative = false;
 
   async generateInfluencerProfile() {
-    return { bio: 'Generated bio', category: 'Lifestyle', price_per_reel: 10000 };
+    return { bio: 'Generated bio', category: 'lifestyle', price_per_reel_paise: 1000000 };
   }
 
   async generateBusinessProfile() {

@@ -1,5 +1,6 @@
 import { ConversationRow } from '@/components/inbox/conversation-row';
 import { InboxFilterSheet } from '@/components/inbox/inbox-filter-sheet';
+import { AppHeader, APP_HEADER_SCREEN_TOP_PADDING } from '@/components/ui/app-header';
 import { GlassSearchField } from '@/components/ui/glass-search-field';
 import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
@@ -20,10 +21,11 @@ import {
   type InboxSort,
 } from '@/lib/filters/inbox';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
-import { Ionicons } from '@expo/vector-icons';
+import labImage from '@/assets/images/lab.png';
+import mailImage from '@/assets/images/mail.png';
 import type { InboxItem } from '@plugoh/contracts';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,18 +45,19 @@ function SkeletonRow() {
   );
 }
 
-function EmptyInboxState({ title, subtitle }: { title: string; subtitle: string }) {
+function EmptyInboxState({ title }: { title: string }) {
   return (
     <View style={styles.emptyWrap}>
-      <SymbolView
-        name="bubble.left.and.bubble.right"
-        size={52}
-        tintColor="rgba(255,255,255,0.15)"
-        type="monochrome"
-        fallback={<Ionicons name="chatbubbles-outline" size={52} color="rgba(255,255,255,0.15)" />}
+      <Image
+        source={mailImage}
+        style={styles.emptyImage}
+        contentFit="contain"
+        accessibilityIgnoresInvertColors
       />
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptySubtitle}>{subtitle}</Text>
+      <View style={styles.emptyCopy}>
+        <Text style={styles.emptyTitle}>{title}</Text>
+        <Text style={styles.emptySubtitle}>New messages will appear here when they arrive</Text>
+      </View>
     </View>
   );
 }
@@ -158,46 +161,30 @@ export default function BrandInboxScreen() {
 
   const keyExtractor = useCallback((item: InboxItem) => item.campaign.id, []);
   const Separator = useCallback(() => <View style={styles.separator} />, []);
-  const emptyTitle =
-    query.trim().length > 0 || appliedFilterCount > 0
-      ? 'No campaign threads match'
-      : 'No campaign threads yet';
-  const emptySubtitle =
-    query.trim().length > 0 || appliedFilterCount > 0
-      ? 'Try another search or filter option.'
-      : 'Threads appear when a booking starts.';
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
       <View
         style={[
-          styles.headerBlock,
+          styles.topHeader,
           {
-            paddingTop: insets.top + theme.spacing.md,
-            paddingHorizontal: theme.spacing.lg,
-            paddingBottom: theme.spacing.md,
+            paddingTop: insets.top + APP_HEADER_SCREEN_TOP_PADDING,
+            paddingHorizontal: theme.spacing.xxl,
           },
         ]}
       >
-        <View style={styles.titleRow}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            Messages
-          </Text>
-          <NativeIconButton
-            symbol="person.circle"
-            fallbackIcon="person-circle-outline"
-            variant="glass"
-            haptic="light"
-            size={44}
-            symbolSize={20}
-            imageUri={profileImageUri}
-            glassRendering="blur"
-            onPress={() => {
+        <AppHeader
+          title="Messages"
+          profile={{
+            imageUri: profileImageUri,
+            onPress: () => {
               router.push('/(app)/brand-profile');
-            }}
-          />
-        </View>
+            },
+          }}
+        />
+      </View>
 
+      <View style={styles.searchBlock}>
         <View style={styles.searchRow}>
           <View style={styles.searchFieldWrap}>
             <GlassSearchField
@@ -212,6 +199,8 @@ export default function BrandInboxScreen() {
               fallbackIcon="filter"
               fallbackIconFamily="foundation"
               preferFallbackIcon
+              imageSource={labImage}
+              imageSize={30}
               variant="glass"
               haptic="selection"
               size={46}
@@ -243,7 +232,7 @@ export default function BrandInboxScreen() {
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           ItemSeparatorComponent={Separator}
-          ListEmptyComponent={<EmptyInboxState title={emptyTitle} subtitle={emptySubtitle} />}
+          ListEmptyComponent={<EmptyInboxState title="No messages" />}
           contentContainerStyle={{
             flexGrow: 1,
             paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE,
@@ -269,24 +258,11 @@ export default function BrandInboxScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  headerBlock: { gap: theme.spacing.md },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
-    minHeight: 48,
-    paddingHorizontal: 2,
-  },
-  headerTitle: {
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '800',
-    letterSpacing: 0,
-    color: theme.colors.foreground,
-    flex: 1,
-    minWidth: 0,
-    includeFontPadding: false,
+  topHeader: { flexShrink: 0 },
+  searchBlock: {
+    paddingHorizontal: theme.spacing.xxl,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
   },
   searchRow: {
     flexDirection: 'row',
@@ -317,10 +293,8 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   activeBadgeText: {
-    ...theme.typography.label,
+    ...theme.typography.labelSmall,
     color: theme.colors.foreground,
-    fontSize: 10,
-    lineHeight: 13,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
@@ -336,20 +310,27 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 32,
+    paddingHorizontal: theme.spacing.lg,
+    gap: theme.spacing.xl,
+  },
+  emptyImage: {
+    width: 118,
+    height: 118,
+  },
+  emptyCopy: {
+    alignItems: 'center',
+    gap: theme.spacing.sm,
   },
   emptyTitle: {
     ...theme.typography.section,
-    color: 'rgba(255,255,255,0.45)',
-    marginTop: 20,
+    color: theme.colors.foreground,
+    textAlign: 'center',
   },
   emptySubtitle: {
     ...theme.typography.body,
-    color: 'rgba(255,255,255,0.28)',
+    color: 'rgba(255,255,255,0.58)',
     textAlign: 'center',
-    marginTop: 8,
-    maxWidth: 240,
+    maxWidth: 260,
   },
   skeletonRow: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 import { GlassCard } from '@/components/ui/glass-card';
-import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { AppHeader } from '@/components/ui/app-header';
 import { ErrorState, PrimaryButton, Screen, StatusChip } from '@/components/ui/primitives';
 import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
@@ -264,6 +264,16 @@ export default function BrandHomeScreen() {
 
   return (
     <Screen contentContainerStyle={styles.screenContent}>
+      <AppHeader
+        title="Home"
+        profile={{
+          imageUri: profileImageUri,
+          onPress: () => {
+            router.push('/(app)/brand-profile');
+          },
+        }}
+      />
+
       <Animated2.View entering={FadeInDown.duration(320)} style={styles.header}>
         <View style={styles.heroCopy}>
           <Text style={styles.greeting}>{getGreeting()},</Text>
@@ -279,18 +289,6 @@ export default function BrandHomeScreen() {
             Track creator spend, campaign motion, and launch readiness from one place.
           </Text>
         </View>
-        <NativeIconButton
-          symbol="person.circle"
-          fallbackIcon="person-circle-outline"
-          variant="glass"
-          haptic="light"
-          size={44}
-          symbolSize={20}
-          imageUri={profileImageUri}
-          onPress={() => {
-            router.push('/(app)/brand-profile');
-          }}
-        />
       </Animated2.View>
 
       {campaigns.isError ? (
@@ -545,14 +543,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   monthLabel: {
-    ...theme.typography.label,
+    ...theme.typography.labelSmall,
     color: 'rgba(255,255,255,0.42)',
-    fontSize: 10,
   },
   monthValue: {
-    ...theme.typography.label,
+    ...theme.typography.labelSmall,
     color: 'rgba(255,255,255,0.68)',
-    fontSize: 10,
     fontVariant: ['tabular-nums'],
   },
   readinessPercent: {

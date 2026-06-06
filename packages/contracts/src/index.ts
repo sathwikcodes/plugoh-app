@@ -2,27 +2,27 @@ import { z } from 'zod';
 
 export const USER_ROLES = ['business', 'influencer'] as const;
 export const INFLUENCER_CATEGORIES = [
-  'Food',
-  'Fitness',
-  'Beauty',
-  'Lifestyle',
-  'Travel',
-  'Education',
-  'Tech',
-  'Fashion',
-  'Other',
+  'food',
+  'fitness',
+  'beauty',
+  'lifestyle',
+  'travel',
+  'education',
+  'tech',
+  'fashion',
+  'other',
 ] as const;
 export const BUSINESS_TYPES = [
-  'Restaurant/Cafe',
-  'D2C Brand',
-  'Local Business',
-  'E-commerce',
-  'SaaS/Tech',
-  'Agency',
-  'Personal Brand',
-  'Other',
+  'restaurant_cafe',
+  'd2c_brand',
+  'local_business',
+  'ecommerce',
+  'saas_tech',
+  'agency',
+  'personal_brand',
+  'other',
 ] as const;
-export const PACKAGE_TYPES = ['reel', 'post', 'story', 'reel+story', 'reel+post'] as const;
+export const PACKAGE_TYPES = ['instagram_reel'] as const;
 export const BOOKING_OBJECTIVES = [
   'visit_place',
   'feature_product',
@@ -30,7 +30,12 @@ export const BOOKING_OBJECTIVES = [
   'promote_offer',
   'brand_shoutout',
 ] as const;
-export const TURNAROUND_TIMES = ['24_hours', '2_3_days', '1_week', '2_weeks'] as const;
+export const TURNAROUND_TIMES = [
+  'within_24_hours',
+  'two_to_three_days',
+  'one_week',
+  'two_weeks',
+] as const;
 export const LANGUAGES = [
   'English',
   'Hindi',
@@ -58,30 +63,38 @@ export const CONTENT_TYPES = [
   'Brand Integration',
 ] as const;
 export const CAMPAIGN_STATUSES = [
-  'requested',
-  'payment_pending',
   'pre_authorized',
+  'capture_pending',
   'in_escrow',
   'delivery_submitted',
+  'changes_requested',
   'completed',
-  'disputed',
   'declined',
   'expired',
   'cancelled',
   'refunded',
 ] as const;
-export const PAYMENT_STATUSES = ['unpaid', 'authorized', 'paid'] as const;
-export const PAYMENT_METHODS = ['card', 'upi', 'other'] as const;
+export const PAYMENT_ORDER_STATUSES = [
+  'created',
+  'authorized',
+  'capture_pending',
+  'captured',
+  'voided',
+  'refunded',
+  'failed',
+] as const;
+export const PAYMENT_METHODS = ['card'] as const;
 export const NOTIFICATION_TYPES = [
   'new_booking',
   'booking_accepted',
-  'payment_confirmed',
   'payment_secured',
   'delivery_submitted',
+  'changes_requested',
   'booking_completed',
-  'booking_rejected',
+  'booking_declined',
+  'booking_cancelled',
   'booking_expired',
-  'delivery_disputed',
+  'refund_processed',
 ] as const;
 export const ONBOARDING_STAGES = [
   'needs_role',
@@ -110,16 +123,24 @@ export interface Influencer {
   /** Common profile avatar when set separately */
   avatar_url?: string;
   display_name?: string;
+  instagram_username?: string;
+  /** Legacy/mobile alias for instagram_username. */
   ig_username?: string;
+  /** Legacy/mobile alias for instagram_username. */
   instagram_handle?: string;
   bio?: string;
   city?: string;
   category?: string;
   follower_count?: number;
   avg_likes_per_reel?: number;
-  price_per_reel?: number;
-  price_per_post?: number;
-  price_per_story?: number;
+  avg_views_per_reel?: number;
+  price_per_reel_paise?: number;
+  /** Legacy/mobile rupee-backed aliases retained for older UI payloads. */
+  price_per_reel?: number | null;
+  price_per_post?: number | null;
+  price_per_story?: number | null;
+  starter_price_paise?: number | null;
+  /** Legacy/mobile rupee-backed alias for starter_price_paise. */
   starterPrice?: number | null;
   is_active?: boolean;
 }
@@ -147,12 +168,18 @@ export interface BusinessProfileSummary {
   id?: string;
   user_id?: string;
   brand_name?: string;
+  /** Legacy/mobile alias for brand_category. */
   brand_type?: string;
+  brand_category?: string;
   brand_location?: string;
   brand_summary?: string;
   tagline?: string;
+  instagram_username?: string;
+  /** Legacy/mobile alias for instagram_username. */
   ig_username?: string;
+  /** Legacy/mobile Instagram profile image alias. */
   ig_profile_picture_url?: string;
+  instagram_profile_picture_url?: string;
   /** Resolved brand owner / Instagram image for campaign cards. */
   profile_photo_url?: string;
   /** Common profile avatar when set separately. */
@@ -170,8 +197,17 @@ export interface CampaignListItem {
   ai_title?: string;
   brief?: string;
   status: CampaignStatus;
+  price_offered_paise?: number;
+  /** Legacy/mobile rupee-backed alias retained for older UI payloads. */
   price_offered?: number;
+  payment_status?: string;
+  platform_fee_paise?: number;
+  total_charged_paise?: number;
   package_type?: string;
+  objective?: string;
+  timing_mode?: string;
+  due_date?: string;
+  place_name?: string;
   card_image_url?: string;
   card_image_path?: string;
   card_image_prompt?: string;
@@ -183,7 +219,6 @@ export interface CampaignListItem {
   completed_at?: string;
   created_at?: string;
   updated_at?: string;
-  payment_status?: string;
   business_profile?: BusinessProfileSummary | null;
   influencer_profile?: InfluencerProfileResponse | null;
 }
@@ -196,11 +231,12 @@ export interface CampaignMessage {
   content: string;
   metadata?: Record<string, unknown>;
   read_by?: string[];
+  read_at?: string | null;
   created_at: string;
 }
 
 export interface AttachmentMessageMetadata {
-  storagePath: string;
+  storage_path: string;
   fileName: string;
   mimeType: string;
   fileSize: number;
@@ -231,7 +267,9 @@ export interface EarningsSummary {
   transactions: {
     campaignId: string;
     title: string;
-    amount: number;
+    /** Legacy/mobile rupee-backed alias retained for older UI payloads. */
+    amount?: number;
+    amount_paise: number;
     status: CampaignStatus;
     date?: string;
   }[];
@@ -246,7 +284,7 @@ export interface DeliveryPreviewResponse {
 
 export interface PushRegisterResponse {
   expo_push_token: string;
-  platform: 'ios' | 'android' | 'web';
+  platform: 'ios' | 'android';
 }
 
 export interface PushUnregisterResponse {
@@ -310,9 +348,7 @@ export const influencerProfilePatchSchema = z.object({
 });
 
 export const influencerPricingPatchSchema = z.object({
-  price_per_reel: numeric.optional(),
-  price_per_post: numeric.optional(),
-  price_per_story: numeric.optional(),
+  price_per_reel_paise: numeric.optional(),
 });
 
 export const influencerActivePatchSchema = z.object({
@@ -321,23 +357,32 @@ export const influencerActivePatchSchema = z.object({
 
 export const payoutUpsertSchema = z
   .object({
+    upi_id_masked: optionalText,
     upi_id: optionalText,
+    bank_account_masked: optionalText,
     bank_account_no: optionalText,
+    bank_ifsc_masked: optionalText,
     bank_ifsc: optionalText,
+    bank_account_name_masked: optionalText,
     bank_account_name: optionalText,
     preferred_method: z.enum(['upi', 'bank']).default('upi'),
   })
   .refine(
     (value) =>
-      value.upi_id || (value.bank_account_no && value.bank_ifsc && value.bank_account_name),
+      value.upi_id_masked ||
+      value.upi_id ||
+      ((value.bank_account_masked || value.bank_account_no) &&
+        (value.bank_ifsc_masked || value.bank_ifsc) &&
+        (value.bank_account_name_masked || value.bank_account_name)),
     {
-      message: 'Provide UPI ID or complete bank details',
+      message: 'Provide masked UPI ID or complete masked bank details',
     },
   );
 
 export const businessProfilePatchSchema = z.object({
   brand_name: optionalText,
   brand_type: z.enum(BUSINESS_TYPES).optional(),
+  brand_category: z.enum(BUSINESS_TYPES).optional(),
   brand_location: optionalText,
   brand_summary: optionalText,
   tagline: optionalText,
@@ -358,7 +403,7 @@ export const influencerOnboardingSchema = commonProfilePatchSchema;
 export const businessOnboardingSchema = commonProfilePatchSchema.merge(
   z.object({
     brand_name: z.string().trim().min(1),
-    brand_type: z.enum(BUSINESS_TYPES),
+    brand_category: z.enum(BUSINESS_TYPES),
     brand_location: optionalText,
     brand_summary: optionalText,
     tagline: optionalText,
@@ -370,21 +415,20 @@ export const createCampaignSchema = z
     influencer_id: uuid.optional(),
     influencer_profile_id: uuid,
     package_type: z.enum(PACKAGE_TYPES),
-    price_offered: numeric.positive().optional(),
     objective: z.enum(BOOKING_OBJECTIVES),
     timing_mode: z.enum(['asap', 'choose_date']),
     due_date: z.string().date().optional(),
-    event_name: optionalText,
-    contact_email: z.string().email(),
-    contact_phone: z.string().min(5),
+    place_name: optionalText,
+    business_contact_email: z.string().email(),
+    business_contact_phone: z.string().min(5),
   })
   .refine((value) => value.timing_mode !== 'choose_date' || value.due_date, {
     path: ['due_date'],
     message: 'due_date is required when timing_mode is choose_date',
   })
-  .refine((value) => value.objective !== 'visit_place' || value.event_name, {
-    path: ['event_name'],
-    message: 'event_name is required when objective is visit_place',
+  .refine((value) => value.objective !== 'visit_place' || value.place_name, {
+    path: ['place_name'],
+    message: 'place_name is required when objective is visit_place',
   });
 
 export const campaignListQuerySchema = paginationQuerySchema.extend({
@@ -427,8 +471,8 @@ export const campaignIdSchema = z.object({
 });
 
 export const deliverySubmitSchema = z.object({
-  storagePath: z.string().trim().min(1),
-  notes: z.string().optional(),
+  storage_path: z.string().trim().min(1),
+  creator_note: z.string().optional(),
 });
 
 export const messageCreateSchema = z.object({
@@ -470,7 +514,7 @@ export const aiGenerateSchema = z.object({
 
 export const pushRegisterSchema = z.object({
   expo_push_token: z.string().trim().min(1),
-  platform: z.enum(['ios', 'android', 'web']).default('ios'),
+  platform: z.enum(['ios', 'android']).default('ios'),
 });
 
 export type InfluencerListQuery = z.infer<typeof influencerListQuerySchema>;

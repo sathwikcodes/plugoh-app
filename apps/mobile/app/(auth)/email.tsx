@@ -98,14 +98,10 @@ const styles = StyleSheet.create({
   },
   heading: {
     ...authTypography.displayMd,
-    fontSize: 26,
-    lineHeight: 34,
     color: theme.colors.foreground,
   },
   subheading: {
     ...authTypography.body,
-    fontSize: 15,
-    lineHeight: 22,
     color: theme.colors.muted,
     marginBottom: 8,
   },

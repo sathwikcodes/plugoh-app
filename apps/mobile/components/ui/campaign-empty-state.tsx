@@ -1,6 +1,10 @@
+import campaignImage from '@/assets/images/campaign.png';
+import { CAMPAIGN_CARD_CORNER_RADIUS } from '@/constants/campaign-card-frame';
 import { theme } from '@/constants/theme';
+import { BlurView } from 'expo-blur';
+import { Image } from 'expo-image';
 import { useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -8,6 +12,51 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+
+export function CampaignDeckEmptyState({
+  title = 'No campaigns',
+  subtitle = 'Brand requests will appear here.',
+  imageSource = campaignImage,
+  cardWidth,
+  cardHeight,
+}: {
+  title?: string;
+  subtitle?: string;
+  imageSource?: ImageSourcePropType;
+  cardWidth: number;
+  cardHeight: number;
+}) {
+  const imageSize = Math.min(Math.round(cardWidth * 0.34), 118);
+
+  return (
+    <View
+      style={[
+        styles.deckCard,
+        {
+          width: cardWidth,
+          height: cardHeight,
+          borderRadius: CAMPAIGN_CARD_CORNER_RADIUS,
+        },
+      ]}
+    >
+      <BlurView tint="systemUltraThinMaterialDark" intensity={74} style={StyleSheet.absoluteFill} />
+      <View style={styles.deckCardWash} />
+      <View style={styles.deckCardContent}>
+        <Image
+          source={imageSource}
+          style={[styles.deckImage, { width: imageSize, height: imageSize }]}
+          contentFit="contain"
+          accessibilityLabel="Campaign target illustration"
+          accessibilityIgnoresInvertColors
+        />
+        <View style={styles.deckCopy}>
+          <Text style={styles.deckCardTitle}>{title}</Text>
+          <Text style={styles.deckCardSubtitle}>{subtitle}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export function CampaignEmptyState({
   title = "You're all caught up!",
@@ -24,7 +73,7 @@ export function CampaignEmptyState({
     scale.value = withSpring(1, { damping: 12, stiffness: 180 });
     opacity.value = withTiming(1, { duration: 300 });
     textOpacity.value = withDelay(300, withTiming(1, { duration: 400 }));
-  }, []);
+  }, [opacity, scale, textOpacity]);
 
   const circleStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -111,3 +160,48 @@ export function CampaignEmptyState({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  deckCard: {
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: '#050509',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
+    elevation: 16,
+  },
+  deckCardWash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.045)',
+  },
+  deckCardContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.xxl,
+    paddingVertical: theme.spacing.section,
+  },
+  deckImage: {
+    opacity: 0.96,
+  },
+  deckCopy: {
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  deckCardTitle: {
+    ...theme.typography.section,
+    color: theme.colors.foreground,
+    textAlign: 'center',
+  },
+  deckCardSubtitle: {
+    ...theme.typography.body,
+    color: 'rgba(255,255,255,0.58)',
+    textAlign: 'center',
+    maxWidth: 260,
+  },
+});

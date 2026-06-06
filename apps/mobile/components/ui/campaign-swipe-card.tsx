@@ -554,7 +554,6 @@ const styles = StyleSheet.create({
   statusPillText: {
     color: 'rgba(255,255,255,0.94)',
     fontWeight: '700',
-    letterSpacing: 0,
     fontVariant: ['tabular-nums'],
   },
   content: {
@@ -569,7 +568,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: theme.typography.display.fontFamily,
     fontWeight: '400',
-    letterSpacing: 0,
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.42)',
     textShadowOffset: { width: 0, height: 2 },
@@ -578,7 +576,6 @@ const styles = StyleSheet.create({
   detailLine: {
     color: 'rgba(255,255,255,0.68)',
     fontWeight: '400',
-    letterSpacing: 0,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
     textShadowColor: 'rgba(0,0,0,0.36)',
@@ -588,7 +585,6 @@ const styles = StyleSheet.create({
   description: {
     color: 'rgba(255,255,255,0.82)',
     fontWeight: '500',
-    letterSpacing: 0,
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.38)',
     textShadowOffset: { width: 0, height: 1 },
@@ -617,10 +613,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   actionText: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 16,
+    ...theme.typography.bodyStrong,
     fontWeight: '700',
-    letterSpacing: 0,
   },
   pressed: {
     opacity: 0.82,

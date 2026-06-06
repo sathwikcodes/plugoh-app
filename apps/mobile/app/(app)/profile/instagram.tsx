@@ -1,5 +1,5 @@
 import { GlassCard } from '@/components/ui/glass-card';
-import { GlassCircleButton } from '@/components/ui/glass-circle-button';
+import { BackHeader } from '@/components/ui/app-header';
 import { PrimaryButton, SecondaryButton, StatusChip } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
 import {
@@ -11,7 +11,7 @@ import {
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Alert, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const ACCOUNT_CARD_RADIUS = 28;
@@ -33,7 +33,7 @@ export default function InstagramScreen() {
     ? 'Loading account status...'
     : username
       ? `@${username.replace(/^@/, '')}`
-      : 'No account linked yet';
+      : 'Ready to connect';
   const syncLabel = mutations.instagramSync.isPending
     ? connected
       ? 'Syncing...'
@@ -53,24 +53,13 @@ export default function InstagramScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.pageHeaderRow}>
-          <View style={styles.pageBackShadow}>
-            <GlassCircleButton
-              symbol="chevron.left"
-              fallbackIcon="chevron-back"
-              tintColor="#FFFFFF"
-              size={44}
-              symbolSize={19}
-              accessibilityLabel="Go back"
-              onPress={() => {
-                router.back();
-              }}
-            />
-          </View>
-          <View style={styles.headerCopy}>
-            <Text style={styles.pageTitle}>{title}</Text>
-          </View>
-        </View>
+        <BackHeader
+          title={title}
+          onBack={() => {
+            router.back();
+          }}
+          style={styles.pageHeaderRow}
+        />
 
         <GlassCard style={styles.accountCard} contentStyle={styles.accountCardInner}>
           <View style={styles.accountTopRow}>
@@ -78,13 +67,13 @@ export default function InstagramScreen() {
               <Ionicons name="logo-instagram" size={22} color="#FFFFFF" />
             </View>
             <StatusChip
-              label={profileLoading ? 'Checking...' : connected ? 'Connected' : 'Not connected'}
+              label={profileLoading ? 'Checking...' : connected ? 'Connected' : 'Needs setup'}
               status={connected ? 'success' : 'pending'}
             />
           </View>
 
           <View style={styles.accountCopy}>
-            <Text style={styles.accountTitle}>Instagram account</Text>
+            <Text style={styles.accountTitle}>Connected account</Text>
             <Text style={styles.accountHandle} numberOfLines={1}>
               {accountLabel}
             </Text>
@@ -148,32 +137,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.section,
   },
   pageHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.lg,
     marginBottom: theme.spacing.xs,
-  },
-  pageBackShadow: {
-    flexShrink: 0,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.32,
-        shadowRadius: 10,
-      },
-      default: {
-        elevation: 8,
-      },
-    }),
-  },
-  headerCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  pageTitle: {
-    ...theme.typography.display,
-    color: theme.colors.foreground,
   },
   accountCard: {
     borderRadius: ACCOUNT_CARD_RADIUS,
@@ -207,7 +171,6 @@ const styles = StyleSheet.create({
   accountHandle: {
     ...theme.typography.body,
     color: 'rgba(255,255,255,0.62)',
-    fontSize: 17,
   },
   footer: {
     gap: theme.spacing.md,

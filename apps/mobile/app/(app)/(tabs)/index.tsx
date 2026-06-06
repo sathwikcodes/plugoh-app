@@ -1,6 +1,6 @@
-import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { AppHeader, APP_HEADER_SCREEN_TOP_PADDING } from '@/components/ui/app-header';
 import { Screen, SectionTitle, StatusChip } from '@/components/ui/primitives';
-import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
+import { ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
 import {
   useBootstrap,
@@ -8,75 +8,21 @@ import {
   useEarnings,
   useInfluencerProfile,
 } from '@/hooks/use-marketplace';
-import { shouldShowAnyInitialLoader, shouldShowInitialLoader } from '@/lib/query/loading';
+import { formatPaiseAsINR, getTierDisplay } from '@/lib/influencer/home-tier';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
 import type { CampaignListItem } from '@plugoh/contracts';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning,';
-  if (h < 17) return 'Good afternoon,';
-  return 'Good evening,';
-}
-
-const fmt = (n: number) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(n);
+const ACTIVE_CAMPAIGN_STATUSES = ['pre_authorized', 'in_escrow', 'delivery_submitted'] as const;
 
 function truncate(s: string, n: number) {
-  return s.length > n ? s.slice(0, n) + '…' : s;
-}
-
-// ─── PendingTile ──────────────────────────────────────────────────────────────
-
-function PendingTile({ amount }: { amount: number }) {
-  const pulse = useRef(new Animated.Value(0.4)).current;
-
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.4, duration: 900, useNativeDriver: true }),
-      ]),
-    );
-    anim.start();
-    return () => {
-      anim.stop();
-    };
-  }, [pulse]);
-
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.snapshotTile, pressed && styles.tilePressed]}
-      onPress={() => {
-        router.push('/(app)/(tabs)/earnings');
-      }}
-    >
-      <View style={styles.pendingLabel}>
-        <Text style={styles.tileLabel}>Pending</Text>
-        <Animated.View style={[styles.pulseDot, { opacity: pulse }]} />
-      </View>
-      <Text style={styles.tileValue}>{fmt(amount)}</Text>
-    </Pressable>
-  );
-}
-
-function LoadingSnapshotTile({ label }: { label: string }) {
-  return (
-    <View style={styles.snapshotTile}>
-      <Text style={styles.tileLabel}>{label}</Text>
-      <ShimmerText width="72%" height={24} style={{ marginTop: 2 }} />
-    </View>
-  );
+  return s.length > n ? s.slice(0, n) + '...' : s;
 }
 
 // ─── ActionCard ───────────────────────────────────────────────────────────────
@@ -95,6 +41,8 @@ function ActionCard({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
       style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
     >
       <View style={styles.accentStrip} />
@@ -104,7 +52,7 @@ function ActionCard({
           <Text style={styles.actionTitle}>{title}</Text>
           <Text style={styles.actionSubtitle}>{subtitle}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.62)" />
       </View>
     </Pressable>
   );
@@ -114,7 +62,7 @@ function ActionCard({
 
 function CampaignSpotlightCard({ campaign }: { campaign: CampaignListItem }) {
   const brandName = campaign.business_profile?.brand_name;
-  const price = campaign.price_offered;
+  const price = campaign.price_offered_paise;
   const title = campaign.ai_title?.trim() || campaign.title;
 
   return (
@@ -122,6 +70,8 @@ function CampaignSpotlightCard({ campaign }: { campaign: CampaignListItem }) {
       onPress={() => {
         router.push('/(app)/(tabs)/campaigns');
       }}
+      accessibilityRole="button"
+      accessibilityLabel={`Open campaign ${title}`}
       style={({ pressed }) => [styles.spotlightCard, pressed && { opacity: 0.85 }]}
     >
       <StatusChip
@@ -139,16 +89,187 @@ function CampaignSpotlightCard({ campaign }: { campaign: CampaignListItem }) {
       </Text>
       {brandName || price ? (
         <Text style={styles.spotlightMeta}>
-          {[brandName, price ? fmt(price) : null].filter(Boolean).join(' · ')}
+          {[brandName, price ? formatPaiseAsINR(price) : null].filter(Boolean).join(' - ')}
         </Text>
       ) : null}
     </Pressable>
   );
 }
 
+// ─── HomeTierHero ─────────────────────────────────────────────────────────────
+
+function BadgePlaceholder({
+  colors,
+  label,
+}: {
+  colors: readonly [string, string, string];
+  label: string;
+}) {
+  return (
+    <View style={heroStyles.badgeStage} accessibilityLabel={`${label} tier badge placeholder`}>
+      <View style={heroStyles.badgeShadow} />
+      <LinearGradient
+        colors={colors}
+        locations={[0, 0.48, 1]}
+        start={{ x: 0.08, y: 0.1 }}
+        end={{ x: 0.88, y: 0.92 }}
+        style={heroStyles.badgeGem}
+      >
+        <View style={heroStyles.badgeGlareLarge} />
+        <View style={heroStyles.badgeGlareSmall} />
+        <View style={heroStyles.badgeFacetOne} />
+        <View style={heroStyles.badgeFacetTwo} />
+      </LinearGradient>
+      <View style={heroStyles.badgeBase} />
+    </View>
+  );
+}
+
+function HeroMetric({ label, value, loading }: { label: string; value: string; loading: boolean }) {
+  return (
+    <View style={heroStyles.metric}>
+      <Text style={heroStyles.metricLabel}>{label}</Text>
+      {loading ? (
+        <ShimmerText width="62%" height={22} />
+      ) : (
+        <Text style={heroStyles.metricValue} numberOfLines={1} adjustsFontSizeToFit>
+          {value}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function HomeTierHero({
+  earnings,
+  loading,
+}: {
+  earnings: ReturnType<typeof useEarnings>['data'];
+  loading: boolean;
+}) {
+  const tier = getTierDisplay(earnings?.tier, earnings?.tier_progress);
+
+  return (
+    <View style={heroStyles.section}>
+      <BadgePlaceholder colors={tier.colors} label={tier.label} />
+
+      <View style={heroStyles.metricStrip}>
+        <HeroMetric label="Tier" value={tier.label} loading={loading} />
+        <HeroMetric
+          label="Earned"
+          value={formatPaiseAsINR(earnings?.total_earnings)}
+          loading={loading}
+        />
+        <HeroMetric label="Progress" value={`${tier.progressPercent}%`} loading={loading} />
+      </View>
+    </View>
+  );
+}
+
+function InsightCard({
+  icon,
+  title,
+  value,
+  subtitle,
+  colors,
+  size,
+}: {
+  icon: string;
+  title: string;
+  value: string;
+  subtitle: string;
+  colors: readonly [string, string];
+  size: number;
+}) {
+  return (
+    <View style={[insightStyles.card, { width: size, height: size }]}>
+      <LinearGradient
+        colors={[colors[0] + '26', colors[1] + '12', 'rgba(255,255,255,0.03)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <View style={[insightStyles.iconShell, { borderColor: colors[0] + '44' }]}>
+        <Ionicons name={icon as never} size={30} color={colors[0]} />
+      </View>
+      <View style={insightStyles.cardCopy}>
+        <Text style={insightStyles.cardTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={insightStyles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+          {value}
+        </Text>
+        <Text style={insightStyles.cardSubtitle} numberOfLines={2}>
+          {subtitle}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function DailyInsightsSection({
+  earnings,
+  activeCampaignCount,
+  loading,
+}: {
+  earnings: ReturnType<typeof useEarnings>['data'];
+  activeCampaignCount: number;
+  loading: boolean;
+}) {
+  const window = useWindowDimensions();
+  const cardSize = Math.min(Math.max(window.width - 72, 280), 390);
+  const sidePeekPadding = Math.max(0, (window.width - cardSize) / 2);
+  const tier = getTierDisplay(earnings?.tier, earnings?.tier_progress);
+  const cards = [
+    {
+      icon: 'sparkles-outline',
+      title: 'Tier Progress',
+      value: loading ? '--' : `${tier.progressPercent}%`,
+      subtitle: tier.progressLabel,
+      colors: ['#9AF4E4', '#87BFFF'] as const,
+    },
+    {
+      icon: 'wallet-outline',
+      title: 'Secured Earnings',
+      value: loading ? '--' : formatPaiseAsINR(earnings?.pending_earnings),
+      subtitle: 'Waiting for release',
+      colors: ['#FFD36E', '#FF8EC3'] as const,
+    },
+    {
+      icon: 'briefcase-outline',
+      title: 'Active Deals',
+      value: loading ? '--' : String(activeCampaignCount),
+      subtitle: activeCampaignCount === 1 ? 'Campaign in motion' : 'Campaigns in motion',
+      colors: ['#B6FFCF', '#9AF4E4'] as const,
+    },
+  ];
+
+  return (
+    <View style={insightStyles.section}>
+      <View style={insightStyles.header}>
+        <Text style={insightStyles.title}>Daily Insights</Text>
+        <Text style={insightStyles.subtitle}>{"Today's update on your focus"}</Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={cardSize + theme.spacing.md}
+        style={insightStyles.scrollerFrame}
+        contentContainerStyle={[insightStyles.scroller, { paddingHorizontal: sidePeekPadding }]}
+      >
+        {cards.map((card) => (
+          <InsightCard key={card.title} {...card} size={cardSize} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const profile = useInfluencerProfile();
   const bootstrap = useBootstrap();
   const earnings = useEarnings();
@@ -158,95 +279,42 @@ export default function HomeScreen() {
   const profileLoading = bootstrapLoading || shouldShowInitialLoader(profile);
   const earningsLoading = bootstrapLoading || shouldShowInitialLoader(earnings);
   const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
-  const summaryLoading = shouldShowAnyInitialLoader(profile, earnings, campaigns);
+  const heroLoading = profileLoading || earningsLoading;
 
-  const firstName = profile.data?.display_name?.split(' ')[0];
-  const thisMonth = earnings.data?.this_month ?? 0;
   const pendingEarnings = earnings.data?.pending_earnings ?? 0;
 
   const activeCampaigns = (campaigns.data?.items ?? []).filter((c) =>
-    ['pre_authorized', 'in_escrow', 'delivery_submitted'].includes(c.status),
+    ACTIVE_CAMPAIGN_STATUSES.includes(c.status as (typeof ACTIVE_CAMPAIGN_STATUSES)[number]),
   );
   const deliveryPending = activeCampaigns.find((c) => c.status === 'delivery_submitted');
   const showInstagramNudge = profile.data?.instagram_connected === false;
-  const showPricingNudge = Boolean(profile.data) && !profile.data?.price_per_reel;
-  const hasActionItems = Boolean(deliveryPending) || showInstagramNudge || showPricingNudge;
-
-  function contextualSubtitle() {
-    if (activeCampaigns.length > 0) {
-      return `${activeCampaigns.length} active campaign${activeCampaigns.length > 1 ? 's' : ''} in progress`;
-    }
-    if (pendingEarnings > 0) {
-      return `${fmt(pendingEarnings)} waiting for payout`;
-    }
-    if (showInstagramNudge) {
-      return 'Connect Instagram to get discovered';
-    }
-    return 'Ready for your next brand deal?';
-  }
+  const showPricingNudge = Boolean(profile.data) && (profile.data?.price_per_reel_paise ?? 0) <= 0;
+  const hasActionItems =
+    Boolean(deliveryPending) || showInstagramNudge || showPricingNudge || pendingEarnings > 0;
 
   return (
-    <Screen>
-      {/* ── header ── */}
-      <View style={styles.header}>
-        <View style={styles.greetingBlock}>
-          <Text style={styles.greetingLine}>{getGreeting()}</Text>
-          <AsyncText
-            loading={profileLoading}
-            value={firstName ? `${firstName}.` : null}
-            fallback="there."
-            style={styles.nameLine}
-            shimmerWidth="58%"
-            shimmerHeight={34}
-          />
-          <AsyncText
-            loading={summaryLoading}
-            value={contextualSubtitle()}
-            style={styles.subtitle}
-            shimmerWidth="78%"
-            shimmerHeight={18}
-          />
-        </View>
-        <NativeIconButton
-          symbol="person.circle"
-          fallbackIcon="person-circle-outline"
-          variant="glass"
-          haptic="light"
-          size={44}
-          symbolSize={20}
-          imageUri={profile.data?.profile_photo_url}
-          onPress={() => {
+    <Screen
+      contentInsetAdjustmentBehavior="never"
+      contentContainerStyle={{ paddingTop: insets.top + APP_HEADER_SCREEN_TOP_PADDING }}
+    >
+      <AppHeader
+        title="Home"
+        profile={{
+          imageUri: profile.data?.profile_photo_url,
+          onPress: () => {
             router.push('/(app)/profile');
-          }}
-        />
-      </View>
+          },
+        }}
+      />
 
-      {/* ── earnings snapshot ── */}
-      <View style={styles.snapshotRow}>
-        <Pressable
-          style={({ pressed }) => [styles.snapshotTile, pressed && styles.tilePressed]}
-          onPress={() => {
-            router.push('/(app)/(tabs)/earnings');
-          }}
-        >
-          <Text style={styles.tileLabel}>This Month</Text>
-          <AsyncText
-            loading={earningsLoading}
-            value={fmt(thisMonth)}
-            style={styles.tileValue}
-            shimmerWidth="70%"
-            shimmerHeight={24}
-          />
-        </Pressable>
+      <HomeTierHero earnings={earnings.data} loading={heroLoading} />
 
-        {earningsLoading ? (
-          <LoadingSnapshotTile label="Pending" />
-        ) : (
-          <PendingTile amount={pendingEarnings} />
-        )}
-      </View>
+      <DailyInsightsSection
+        earnings={earnings.data}
+        activeCampaignCount={activeCampaigns.length}
+        loading={earningsLoading || campaignsLoading}
+      />
 
-      {/* ── needs attention ── */}
       {!campaignsLoading && !profileLoading && hasActionItems && (
         <>
           <SectionTitle eyebrow="Needs Attention" title="" />
@@ -280,10 +348,19 @@ export default function HomeScreen() {
               }}
             />
           )}
+          {pendingEarnings > 0 && (
+            <ActionCard
+              icon="wallet-outline"
+              title="Pending payout"
+              subtitle={`${formatPaiseAsINR(pendingEarnings)} waiting for release`}
+              onPress={() => {
+                router.push('/(app)/(tabs)/earnings');
+              }}
+            />
+          )}
         </>
       )}
 
-      {/* ── in progress ── */}
       {!campaignsLoading && activeCampaigns.length > 0 && (
         <>
           <SectionTitle eyebrow="In Progress" title="" />
@@ -294,6 +371,8 @@ export default function HomeScreen() {
             onPress={() => {
               router.push('/(app)/(tabs)/campaigns');
             }}
+            accessibilityRole="button"
+            accessibilityLabel="View all campaigns"
             style={styles.viewAllRow}
           >
             <Text style={styles.viewAllText}>View all campaigns</Text>
@@ -307,69 +386,178 @@ export default function HomeScreen() {
 
 // ─── styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
+const heroStyles = StyleSheet.create({
+  section: {
+    position: 'relative',
+    overflow: 'hidden',
+    marginHorizontal: -theme.spacing.xxl,
+    minHeight: 374,
+    paddingTop: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xxl,
   },
-  greetingBlock: {
+  badgeStage: {
+    height: 268,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeGem: {
+    width: 142,
+    height: 142,
+    borderRadius: 44,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.58)',
+    shadowColor: '#9AF4E4',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.36,
+    shadowRadius: 28,
+    elevation: 14,
+    transform: [{ perspective: 900 }, { rotateZ: '-10deg' }, { rotateX: '12deg' }],
+  },
+  badgeGlareLarge: {
+    position: 'absolute',
+    top: 14,
+    left: 18,
+    width: 72,
+    height: 54,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255,255,255,0.48)',
+    transform: [{ rotate: '-28deg' }],
+  },
+  badgeGlareSmall: {
+    position: 'absolute',
+    right: 22,
+    top: 30,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.34)',
+  },
+  badgeFacetOne: {
+    position: 'absolute',
+    left: 22,
+    right: 10,
+    bottom: 44,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.38)',
+    transform: [{ rotate: '24deg' }],
+  },
+  badgeFacetTwo: {
+    position: 'absolute',
+    top: 14,
+    bottom: 14,
+    left: 74,
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+    transform: [{ rotate: '-18deg' }],
+  },
+  badgeShadow: {
+    position: 'absolute',
+    bottom: 36,
+    width: 86,
+    height: 18,
+    borderRadius: 43,
+    backgroundColor: 'rgba(0,0,0,0.58)',
+    transform: [{ scaleX: 1.5 }],
+  },
+  badgeBase: {
+    position: 'absolute',
+    bottom: 54,
+    width: 74,
+    height: 17,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.86)',
+  },
+  metricStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+    minHeight: 76,
+    paddingVertical: theme.spacing.sm,
+    zIndex: 1,
+  },
+  metric: {
     flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  metricLabel: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.50)',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  metricValue: {
+    ...theme.typography.metricSmall,
+    color: theme.colors.foreground,
+    textAlign: 'center',
+  },
+});
+
+const insightStyles = StyleSheet.create({
+  section: {
+    gap: theme.spacing.lg,
+    marginTop: -theme.spacing.xs,
+  },
+  header: {
     gap: theme.spacing.xs,
   },
-  greetingLine: {
-    ...theme.typography.body,
-    color: theme.colors.muted,
-  },
-  nameLine: {
-    ...theme.typography.display,
+  title: {
+    ...theme.typography.headline,
     color: theme.colors.foreground,
-    marginTop: -2,
   },
   subtitle: {
     ...theme.typography.body,
-    color: theme.colors.muted,
-    marginTop: theme.spacing.xs,
+    color: 'rgba(255,255,255,0.58)',
   },
-  snapshotRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    marginTop: theme.spacing.xs,
+  scrollerFrame: {
+    marginHorizontal: -theme.spacing.xxl,
   },
-  snapshotTile: {
-    flex: 1,
-    borderRadius: theme.radius.card,
+  scroller: {
+    gap: theme.spacing.md,
+  },
+  card: {
+    borderRadius: 28,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.xl,
-    gap: theme.spacing.xs,
-    ...theme.shadow.card,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    overflow: 'hidden',
+    padding: theme.spacing.xxl,
+    justifyContent: 'space-between',
   },
-  tilePressed: {
-    backgroundColor: theme.colors.surfaceWarm,
-  },
-  tileLabel: {
-    ...theme.typography.label,
-    color: theme.colors.muted,
-  },
-  tileValue: {
-    ...theme.typography.section,
-    color: theme.colors.foreground,
-    fontVariant: ['tabular-nums'],
-  },
-  pendingLabel: {
-    flexDirection: 'row',
+  iconShell: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
-    gap: theme.spacing.sm,
+    justifyContent: 'center',
   },
-  pulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.pending,
+  cardCopy: {
+    gap: theme.spacing.xs,
   },
+  cardTitle: {
+    ...theme.typography.caption,
+    color: 'rgba(255,255,255,0.62)',
+  },
+  cardValue: {
+    ...theme.typography.metric,
+    color: theme.colors.foreground,
+  },
+  cardSubtitle: {
+    ...theme.typography.caption,
+    color: 'rgba(255,255,255,0.48)',
+  },
+});
+
+const styles = StyleSheet.create({
   actionCard: {
     borderRadius: theme.radius.card,
     borderWidth: 1,
@@ -408,7 +596,7 @@ const styles = StyleSheet.create({
   },
   actionSubtitle: {
     ...theme.typography.label,
-    color: theme.colors.muted,
+    color: 'rgba(255,255,255,0.62)',
   },
   spotlightCard: {
     borderRadius: theme.radius.card,
@@ -425,7 +613,7 @@ const styles = StyleSheet.create({
   },
   spotlightMeta: {
     ...theme.typography.label,
-    color: theme.colors.muted,
+    color: 'rgba(255,255,255,0.62)',
   },
   viewAllRow: {
     flexDirection: 'row',

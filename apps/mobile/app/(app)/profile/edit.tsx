@@ -1,4 +1,4 @@
-import { GlassCircleButton } from '@/components/ui/glass-circle-button';
+import { BackHeader } from '@/components/ui/app-header';
 import { PrimaryButton } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
 import {
@@ -228,24 +228,13 @@ export default function EditProfileScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.pageHeaderRow}>
-          <View style={styles.pageBackShadow}>
-            <GlassCircleButton
-              symbol="chevron.left"
-              fallbackIcon="chevron-back"
-              tintColor="#FFFFFF"
-              size={44}
-              symbolSize={19}
-              accessibilityLabel="Go back"
-              onPress={() => {
-                router.back();
-              }}
-            />
-          </View>
-          <View style={styles.headerCopy}>
-            <Text style={styles.pageTitle}>Edit Profile</Text>
-          </View>
-        </View>
+        <BackHeader
+          title="Personal Information"
+          onBack={() => {
+            router.back();
+          }}
+          style={styles.pageHeaderRow}
+        />
 
         <View style={styles.fieldsColumn}>
           <GlassFormField
@@ -308,32 +297,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.section,
   },
   pageHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.lg,
     marginBottom: theme.spacing.xs,
-  },
-  pageBackShadow: {
-    flexShrink: 0,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.32,
-        shadowRadius: 10,
-      },
-      default: {
-        elevation: 8,
-      },
-    }),
-  },
-  headerCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  pageTitle: {
-    ...theme.typography.display,
-    color: theme.colors.foreground,
   },
   fieldsColumn: {
     gap: theme.spacing.xxl,
@@ -364,6 +328,7 @@ const styles = StyleSheet.create({
     paddingLeft: theme.spacing.lg,
   },
   fieldInputSingle: {
+    ...theme.typography.body,
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
     paddingHorizontal: theme.spacing.xxl,
@@ -373,12 +338,10 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     backgroundColor: 'transparent',
     color: theme.colors.foreground,
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 17,
-    fontWeight: '400',
     textAlignVertical: 'center',
   },
   fieldInputMultiline: {
+    ...theme.typography.body,
     minHeight: MULTILINE_MIN_HEIGHT,
     zIndex: 1,
     paddingHorizontal: theme.spacing.xxl,
@@ -388,10 +351,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     backgroundColor: 'transparent',
     color: theme.colors.foreground,
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 16,
-    fontWeight: '400',
-    lineHeight: 24,
     textAlignVertical: 'top',
   },
   selectorPressable: {
@@ -408,11 +367,9 @@ const styles = StyleSheet.create({
     opacity: 0.78,
   },
   selectorText: {
+    ...theme.typography.body,
     flex: 1,
     color: theme.colors.foreground,
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 17,
-    fontWeight: '400',
   },
   footer: {
     paddingHorizontal: theme.spacing.xxl,

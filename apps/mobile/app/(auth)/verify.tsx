@@ -165,14 +165,10 @@ const styles = StyleSheet.create({
   },
   heading: {
     ...authTypography.displayMd,
-    fontSize: 26,
-    lineHeight: 34,
     color: theme.colors.foreground,
   },
   subheading: {
     ...authTypography.body,
-    fontSize: 15,
-    lineHeight: 22,
     color: theme.colors.muted,
     marginBottom: 8,
   },
@@ -195,17 +191,13 @@ const styles = StyleSheet.create({
     opacity: 0.58,
   },
   resendText: {
-    ...authTypography.body,
+    ...authTypography.caption,
     color: theme.colors.muted,
-    fontSize: 14,
-    lineHeight: 18,
   },
   resendMessage: {
-    ...authTypography.body,
+    ...authTypography.caption,
     color: theme.colors.success,
     textAlign: 'center',
-    fontSize: 13,
-    lineHeight: 18,
   },
   footer: {
     marginTop: 'auto',

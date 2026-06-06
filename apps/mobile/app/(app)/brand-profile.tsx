@@ -1,8 +1,8 @@
 import { GlassCard } from '@/components/ui/glass-card';
-import { GlassCircleButton } from '@/components/ui/glass-circle-button';
+import { BackHeader } from '@/components/ui/app-header';
 import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useBusinessProfile } from '@/hooks/use-marketplace';
+import { useBootstrap, useBusinessProfile } from '@/hooks/use-marketplace';
 import { logout } from '@/lib/auth/logout';
 import {
   getPushNotificationsPreference,
@@ -13,7 +13,11 @@ import {
   registerForPushNotificationsAsync,
 } from '@/lib/notifications/register';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
+import bellImage from '@/assets/images/bell.png';
+import ghostImage from '@/assets/images/ghost.png';
+import instagramImage from '@/assets/images/instagram.png';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router, useFocusEffect } from 'expo-router';
@@ -29,6 +33,7 @@ import {
   Switch,
   Text,
   View,
+  type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -51,16 +56,14 @@ function initials(name?: string | null): string {
 // ─── SettingRow ───────────────────────────────────────────────────────────────
 
 function SettingRow({
-  iconName,
-  iconBg,
+  iconSource,
   title,
   subtitle,
   subtitleLoading,
   onPress,
   first,
 }: {
-  iconName: string;
-  iconBg: string;
+  iconSource: ImageSourcePropType;
   title: string;
   subtitle?: string;
   subtitleLoading?: boolean;
@@ -74,8 +77,13 @@ function SettingRow({
         onPress={onPress}
         style={({ pressed }) => [styles.settingRow, pressed && styles.rowPressed]}
       >
-        <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
-          <Ionicons name={iconName as never} size={17} color="#fff" />
+        <View style={styles.assetIconSlot}>
+          <Image
+            source={iconSource}
+            style={styles.assetIcon}
+            contentFit="contain"
+            accessibilityIgnoresInvertColors
+          />
         </View>
         <View style={styles.settingBody}>
           <Text style={styles.settingTitle}>{title}</Text>
@@ -151,8 +159,13 @@ function NotificationToggleRow({ first }: { first?: boolean }) {
     <>
       {!first && <View style={styles.insetDivider} />}
       <View style={styles.settingRow}>
-        <View style={[styles.iconBox, { backgroundColor: theme.colors.pending }]}>
-          <Ionicons name="notifications-outline" size={17} color="#fff" />
+        <View style={styles.assetIconSlot}>
+          <Image
+            source={bellImage}
+            style={styles.assetIcon}
+            contentFit="contain"
+            accessibilityIgnoresInvertColors
+          />
         </View>
         <View style={styles.settingBody}>
           <Text style={styles.settingTitle}>Notifications</Text>
@@ -184,11 +197,14 @@ function NotificationToggleRow({ first }: { first?: boolean }) {
 
 export default function BrandProfileScreen() {
   const insets = useSafeAreaInsets();
+  const bootstrap = useBootstrap();
   const profile = useBusinessProfile();
-  const profileLoading = shouldShowInitialLoader(profile);
+  const bootstrapLoading = shouldShowInitialLoader(bootstrap);
+  const profileLoading = bootstrapLoading || shouldShowInitialLoader(profile);
 
   const igConnected = Boolean(profile.data?.instagram_connected);
   const brandName = profile.data?.brand_name;
+  const email = bootstrap.data?.user.email?.trim();
 
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
@@ -213,20 +229,13 @@ export default function BrandProfileScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Page header */}
-      <View style={[styles.pageHeaderRow, { paddingTop: insets.top + theme.spacing.md }]}>
-        <GlassCircleButton
-          symbol="chevron.left"
-          fallbackIcon="chevron-back"
-          tintColor="#FFFFFF"
-          size={38}
-          symbolSize={17}
-          accessibilityLabel="Go back"
-          onPress={() => {
-            router.back();
-          }}
-        />
-        <Text style={styles.pageTitle}>Profile</Text>
-      </View>
+      <BackHeader
+        title="Profile"
+        onBack={() => {
+          router.back();
+        }}
+        style={[styles.pageHeaderRow, { paddingTop: insets.top + theme.spacing.md }]}
+      />
 
       {/* ── Profile hero row ── */}
       <View style={styles.profileRow}>
@@ -253,6 +262,13 @@ export default function BrandProfileScreen() {
             shimmerWidth="62%"
             shimmerHeight={24}
           />
+          {email ? (
+            <Text style={styles.profileEmail} numberOfLines={1} selectable>
+              {email}
+            </Text>
+          ) : bootstrapLoading ? (
+            <ShimmerText width="58%" height={14} />
+          ) : null}
           {profile.data?.brand_type ? (
             <Text style={styles.profileSub} numberOfLines={1}>
               {profile.data.brand_type}
@@ -280,8 +296,7 @@ export default function BrandProfileScreen() {
       >
         <SettingRow
           first
-          iconName="person-outline"
-          iconBg={theme.colors.info}
+          iconSource={ghostImage}
           title="Edit Profile"
           subtitle={brandName ?? 'Brand Profile'}
           subtitleLoading={profileLoading}
@@ -290,8 +305,7 @@ export default function BrandProfileScreen() {
           }}
         />
         <SettingRow
-          iconName="logo-instagram"
-          iconBg="#C13584"
+          iconSource={instagramImage}
           title="Instagram"
           subtitle={igConnected ? 'Connected' : 'Not connected'}
           subtitleLoading={profileLoading}
@@ -339,14 +353,7 @@ const styles = StyleSheet.create({
 
   // Page header
   pageHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
     marginBottom: theme.spacing.sm,
-  },
-  pageTitle: {
-    ...theme.typography.display,
-    color: theme.colors.foreground,
   },
 
   // Profile row
@@ -366,7 +373,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   avatarInitials: {
-    fontSize: 26,
+    ...theme.typography.headline,
     fontWeight: '800',
     color: '#FFFFFF',
   },
@@ -375,6 +382,10 @@ const styles = StyleSheet.create({
     ...theme.typography.section,
     color: theme.colors.foreground,
   },
+  profileEmail: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.62)',
+  },
   profileSub: {
     ...theme.typography.body,
     color: 'rgba(255,255,255,0.55)',
@@ -382,7 +393,6 @@ const styles = StyleSheet.create({
   profileLocation: {
     ...theme.typography.label,
     color: 'rgba(255,255,255,0.38)',
-    fontSize: 12,
   },
   sectionDivider: {
     height: StyleSheet.hairlineWidth,
@@ -393,9 +403,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     ...theme.typography.label,
     color: 'rgba(255,255,255,0.45)',
-    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 0.8,
     textTransform: 'uppercase',
     paddingLeft: 4,
     marginTop: theme.spacing.xs,
@@ -421,14 +429,16 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     minHeight: 54,
   },
-  iconBox: {
+  assetIconSlot: {
     width: 36,
     height: 36,
-    borderRadius: 10,
-    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  assetIcon: {
+    width: 34,
+    height: 34,
   },
   settingBody: { flex: 1 },
   settingTitle: {
@@ -439,13 +449,12 @@ const styles = StyleSheet.create({
   settingSubtitle: {
     ...theme.typography.label,
     color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
     marginTop: 1,
   },
   insetDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: 'rgba(255,255,255,0.08)',
-    marginLeft: 66,
+    marginHorizontal: theme.spacing.xxl,
   },
   signOutRow: {
     alignItems: 'center',

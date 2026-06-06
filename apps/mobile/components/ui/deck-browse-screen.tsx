@@ -1,8 +1,16 @@
 import { theme } from '@/constants/theme';
 import { router, type Href } from 'expo-router';
 import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type ImageSourcePropType,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppHeader, APP_HEADER_SCREEN_TOP_PADDING } from './app-header';
 import { FilterOption, FilterSheet, FilterSheetSection } from './filter-sheet';
 import { GlassSearchField } from './glass-search-field';
 import { NativeIconButton } from './native-icon-button';
@@ -10,7 +18,7 @@ import { Screen } from './primitives';
 
 const NATIVE_TAB_DOCK_HEIGHT = 72;
 const TAB_DOCK_GAP = theme.spacing.lg;
-const PAGE_HORIZONTAL_INSET = theme.spacing.lg;
+const PAGE_HORIZONTAL_INSET = theme.spacing.xxl;
 const MAX_CARD_WIDTH = 390;
 const CARD_VIEWPORT_RATIO = 0.84;
 const DECK_FRAME_CLEARANCE = theme.spacing.section;
@@ -71,6 +79,7 @@ type Props<TItem, TSort extends string, TFilters extends object> = {
   profileSymbol: ComponentProps<typeof NativeIconButton>['symbol'];
   profileFallbackIcon: ComponentProps<typeof NativeIconButton>['fallbackIcon'];
   profileRoute: Href;
+  filterIconSource?: ImageSourcePropType;
   searchPlaceholder: string;
   sortTitle: string;
   sortOptions: DeckSortOption<TSort>[];
@@ -116,6 +125,7 @@ export function DeckBrowseScreen<
   profileSymbol,
   profileFallbackIcon,
   profileRoute,
+  filterIconSource,
   searchPlaceholder,
   sortTitle,
   sortOptions,
@@ -242,73 +252,63 @@ export function DeckBrowseScreen<
       contentContainerStyle={{
         flexGrow: 1,
         paddingHorizontal: PAGE_HORIZONTAL_INSET,
-        paddingTop: insets.top + (isPremiumCampaigns ? theme.spacing.md : theme.spacing.lg),
+        paddingTop: insets.top + APP_HEADER_SCREEN_TOP_PADDING,
         paddingBottom:
           Math.max(insets.bottom, theme.spacing.sm) + NATIVE_TAB_DOCK_HEIGHT + TAB_DOCK_GAP,
         gap: isPremiumCampaigns ? theme.spacing.md : theme.spacing.md,
       }}
     >
-      <View style={isPremiumCampaigns ? styles.premiumHeaderBlock : styles.headerBlock}>
-        <View style={isPremiumCampaigns ? styles.premiumHeaderRow : styles.headerRow}>
-          <Text style={isPremiumCampaigns ? styles.premiumTitle : styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-          <NativeIconButton
-            symbol={profileSymbol}
-            fallbackIcon={profileFallbackIcon}
-            variant="glass"
-            haptic="light"
-            size={isPremiumCampaigns ? 44 : 44}
-            symbolSize={isPremiumCampaigns ? 20 : 20}
-            imageUri={profileImageUri}
-            accessibilityLabel="Open profile"
-            glassRendering={isPremiumCampaigns ? 'blur' : 'native'}
-            onPress={() => {
-              router.push(profileRoute);
-            }}
+      <AppHeader
+        title={title}
+        profile={{
+          symbol: profileSymbol,
+          fallbackIcon: profileFallbackIcon,
+          imageUri: profileImageUri,
+          onPress: () => {
+            router.push(profileRoute);
+          },
+        }}
+      />
+
+      <View style={isPremiumCampaigns ? styles.premiumSearchRow : styles.searchRow}>
+        <View style={{ flex: 1 }}>
+          <GlassSearchField
+            value={search}
+            onChangeText={handleSearchChange}
+            placeholder={searchPlaceholder}
           />
         </View>
-
-        <View style={isPremiumCampaigns ? styles.premiumSearchRow : styles.searchRow}>
-          <View style={{ flex: 1 }}>
-            <GlassSearchField
-              value={search}
-              onChangeText={handleSearchChange}
-              placeholder={searchPlaceholder}
-            />
-          </View>
-          <View
-            style={[
-              styles.filterButtonWrap,
-              isPremiumCampaigns ? styles.premiumFilterButtonWrap : null,
-            ]}
-          >
-            <NativeIconButton
-              symbol="line.3.horizontal.decrease.circle"
-              fallbackIcon={isPremiumCampaigns ? 'filter' : 'options-outline'}
-              fallbackIconFamily={isPremiumCampaigns ? 'foundation' : 'ionicons'}
-              preferFallbackIcon={isPremiumCampaigns}
-              variant="glass"
-              haptic="selection"
-              size={isPremiumCampaigns ? 46 : 44}
-              symbolSize={isPremiumCampaigns ? 21 : 20}
-              fallbackSize={isPremiumCampaigns ? 22 : undefined}
-              accessibilityLabel="Open filters"
-              glassRendering={isPremiumCampaigns ? 'blur' : 'native'}
-              onPress={handleFilterPress}
-            />
-            {appliedFilterCount > 0 ? (
-              <View style={isPremiumCampaigns ? styles.premiumActiveBadge : styles.activeBadge}>
-                <Text
-                  style={
-                    isPremiumCampaigns ? styles.premiumActiveBadgeText : styles.activeBadgeText
-                  }
-                >
-                  {appliedFilterCount}
-                </Text>
-              </View>
-            ) : null}
-          </View>
+        <View
+          style={[
+            styles.filterButtonWrap,
+            isPremiumCampaigns ? styles.premiumFilterButtonWrap : null,
+          ]}
+        >
+          <NativeIconButton
+            symbol="line.3.horizontal.decrease.circle"
+            fallbackIcon={isPremiumCampaigns ? 'filter' : 'options-outline'}
+            fallbackIconFamily={isPremiumCampaigns ? 'foundation' : 'ionicons'}
+            preferFallbackIcon={isPremiumCampaigns}
+            imageSource={filterIconSource}
+            imageSize={isPremiumCampaigns ? 30 : 28}
+            variant="glass"
+            haptic="selection"
+            size={isPremiumCampaigns ? 46 : 44}
+            symbolSize={isPremiumCampaigns ? 21 : 20}
+            fallbackSize={isPremiumCampaigns ? 22 : undefined}
+            accessibilityLabel="Open filters"
+            glassRendering={isPremiumCampaigns ? 'blur' : 'native'}
+            onPress={handleFilterPress}
+          />
+          {appliedFilterCount > 0 ? (
+            <View style={isPremiumCampaigns ? styles.premiumActiveBadge : styles.activeBadge}>
+              <Text
+                style={isPremiumCampaigns ? styles.premiumActiveBadgeText : styles.activeBadgeText}
+              >
+                {appliedFilterCount}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -395,42 +395,6 @@ export function DeckBrowseScreen<
 }
 
 const styles = StyleSheet.create({
-  headerBlock: {
-    gap: theme.spacing.md,
-  },
-  premiumHeaderBlock: {
-    gap: theme.spacing.md,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
-  },
-  premiumHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.md,
-    minHeight: 48,
-    paddingHorizontal: 2,
-  },
-  title: {
-    ...theme.typography.title,
-    color: theme.colors.foreground,
-    flex: 1,
-    minWidth: 0,
-  },
-  premiumTitle: {
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: '800',
-    letterSpacing: 0,
-    color: theme.colors.foreground,
-    flex: 1,
-    minWidth: 0,
-    includeFontPadding: false,
-  },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -480,17 +444,13 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   activeBadgeText: {
-    ...theme.typography.label,
+    ...theme.typography.labelSmall,
     color: theme.colors.background,
-    fontSize: 10,
-    lineHeight: 12,
     fontVariant: ['tabular-nums'],
   },
   premiumActiveBadgeText: {
-    ...theme.typography.label,
+    ...theme.typography.labelSmall,
     color: theme.colors.foreground,
-    fontSize: 10,
-    lineHeight: 13,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },

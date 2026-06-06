@@ -15,6 +15,7 @@ type Props<TItem> = {
   viewportWidth: number;
   emptyTitle?: string;
   emptySubtitle?: string;
+  renderEmptyState?: (input: { cardWidth: number; cardHeight: number }) => ReactNode;
   keyExtractor: (item: TItem) => string;
   renderCard: (input: {
     item: TItem;
@@ -75,6 +76,7 @@ export function SnapCardDeck<TItem>({
   viewportWidth,
   emptyTitle,
   emptySubtitle,
+  renderEmptyState,
   keyExtractor,
   renderCard,
 }: Props<TItem>) {
@@ -98,8 +100,19 @@ export function SnapCardDeck<TItem>({
 
   if (items.length === 0) {
     return (
-      <View style={{ width: viewportWidth, height: cardHeight, justifyContent: 'center' }}>
-        <CampaignEmptyState title={emptyTitle} subtitle={emptySubtitle} />
+      <View
+        style={{
+          width: viewportWidth,
+          height: cardHeight,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {renderEmptyState ? (
+          renderEmptyState({ cardWidth, cardHeight })
+        ) : (
+          <CampaignEmptyState title={emptyTitle} subtitle={emptySubtitle} />
+        )}
       </View>
     );
   }

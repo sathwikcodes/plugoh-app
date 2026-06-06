@@ -1,4 +1,4 @@
-import { GlassCircleButton } from '@/components/ui/glass-circle-button';
+import { BackHeader } from '@/components/ui/app-header';
 import { PrimaryButton } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
 import { useMarketplaceMutations, usePayout } from '@/hooks/use-marketplace';
@@ -172,7 +172,10 @@ export default function PayoutScreen() {
       await mutations.updatePayout.mutateAsync(values);
       router.back();
     } catch (error) {
-      Alert.alert('Could not save payout', error instanceof Error ? error.message : 'Try again.');
+      Alert.alert(
+        'Could not save payout account',
+        error instanceof Error ? error.message : 'Try again.',
+      );
     }
   });
 
@@ -188,24 +191,13 @@ export default function PayoutScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.pageHeaderRow}>
-          <View style={styles.pageBackShadow}>
-            <GlassCircleButton
-              symbol="chevron.left"
-              fallbackIcon="chevron-back"
-              tintColor="#FFFFFF"
-              size={44}
-              symbolSize={19}
-              accessibilityLabel="Go back"
-              onPress={() => {
-                router.back();
-              }}
-            />
-          </View>
-          <View style={styles.headerCopy}>
-            <Text style={styles.pageTitle}>Payout Details</Text>
-          </View>
-        </View>
+        <BackHeader
+          title="Payment & Payouts"
+          onBack={() => {
+            router.back();
+          }}
+          style={styles.pageHeaderRow}
+        />
 
         <View style={styles.fieldsColumn}>
           <GlassMethodSelector
@@ -261,7 +253,7 @@ export default function PayoutScreen() {
         ]}
       >
         <PrimaryButton
-          label={mutations.updatePayout.isPending ? 'Saving...' : 'Save payout details'}
+          label={mutations.updatePayout.isPending ? 'Saving...' : 'Save payout account'}
           disabled={mutations.updatePayout.isPending}
           onPress={onSubmit}
           style={styles.saveButton}
@@ -285,32 +277,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.section,
   },
   pageHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.lg,
     marginBottom: theme.spacing.xs,
-  },
-  pageBackShadow: {
-    flexShrink: 0,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.32,
-        shadowRadius: 10,
-      },
-      default: {
-        elevation: 8,
-      },
-    }),
-  },
-  headerCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  pageTitle: {
-    ...theme.typography.display,
-    color: theme.colors.foreground,
   },
   fieldsColumn: {
     gap: theme.spacing.xxl,
@@ -337,6 +304,7 @@ const styles = StyleSheet.create({
     paddingLeft: theme.spacing.lg,
   },
   fieldInputSingle: {
+    ...theme.typography.body,
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
     paddingHorizontal: theme.spacing.xxl,
@@ -346,9 +314,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     backgroundColor: 'transparent',
     color: theme.colors.foreground,
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 17,
-    fontWeight: '400',
     textAlignVertical: 'center',
   },
   selectorPressable: {
@@ -365,11 +330,9 @@ const styles = StyleSheet.create({
     opacity: 0.78,
   },
   selectorText: {
+    ...theme.typography.body,
     flex: 1,
     color: theme.colors.foreground,
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 17,
-    fontWeight: '400',
   },
   footer: {
     paddingHorizontal: theme.spacing.xxl,
