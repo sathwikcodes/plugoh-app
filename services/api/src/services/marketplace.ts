@@ -467,23 +467,12 @@ export class ProfileService {
 
     let inboxUnread = 0;
     if (role) {
-      const key = role === 'business' ? 'business_id' : 'influencer_id';
-      const campaigns = await this.store.list<Row>('campaigns', { eq: { [key]: user.id } });
-      const campaignIds = campaigns.map((campaign) => campaign.id);
-      const messages = campaignIds.length
-        ? await this.store.list<Row>('campaign_messages', { in: { campaign_id: campaignIds } })
-        : [];
-      const messageIds = messages.map((message) => String(message.id)).filter(Boolean);
-      const reads = messageIds.length
-        ? await this.store.list<Row>('campaign_message_reads', {
-            eq: { user_id: user.id },
-            in: { message_id: messageIds },
-          })
-        : [];
-      const readIds = new Set(reads.map((read) => read.message_id));
-      inboxUnread = messages.filter(
-        (message) => message.sender_id !== user.id && !readIds.has(message.id),
-      ).length;
+      // Reuse the aggregate inbox summary instead of re-scanning every message.
+      const summary = (await this.store.rpc('inbox_summary', {
+        p_user_id: user.id,
+        p_role: role,
+      })) as unknown as Array<{ unread_count: number | string }>;
+      inboxUnread = summary.reduce((total, entry) => total + Number(entry.unread_count), 0);
     }
 
     let onboardingStage: OnboardingStage = 'ready';
@@ -1358,29 +1347,23 @@ export class MessagingService {
   ) {}
 
   async inbox(user: AuthUser, role: UserRole) {
-    const key = role === 'business' ? 'business_id' : 'influencer_id';
-    const campaigns = await this.store.list<Row>('campaigns', { eq: { [key]: user.id } });
-    const campaignIds = campaigns.map((campaign) => campaign.id);
+    // One aggregate query returns each campaign's latest message + unread count,
+    // already ordered newest-activity-first (see the inbox_summary RPC migration).
+    const summary = (await this.store.rpc('inbox_summary', {
+      p_user_id: user.id,
+      p_role: role,
+    })) as unknown as Array<{
+      campaign: Row;
+      latest_message: Row | null;
+      unread_count: number | string;
+    }>;
+    const campaigns = summary.map((entry) => entry.campaign);
     const businessIds = [
       ...new Set(campaigns.map((campaign) => campaign.business_id).filter(Boolean)),
     ];
     const influencerIds = [
       ...new Set(campaigns.map((campaign) => campaign.influencer_id).filter(Boolean)),
     ];
-    const messages = campaignIds.length
-      ? await this.store.list<Row>('campaign_messages', {
-          in: { campaign_id: campaignIds },
-          order: { column: 'created_at', ascending: false },
-        })
-      : [];
-    const messageIds = messages.map((message) => String(message.id)).filter(Boolean);
-    const reads = messageIds.length
-      ? await this.store.list<Row>('campaign_message_reads', {
-          eq: { user_id: user.id },
-          in: { message_id: messageIds },
-        })
-      : [];
-    const readIds = new Set(reads.map((read) => read.message_id));
     const [businessProfiles, businessAccounts, influencerProfiles, influencerAccounts] =
       await Promise.all([
         businessIds.length
@@ -1400,60 +1383,56 @@ export class MessagingService {
     const influencerAccountByUserId = new Map(
       influencerAccounts.map((account) => [account.id, account]),
     );
-    const messagesByCampaignId = new Map<string, Row[]>();
-    for (const message of messages) {
-      const rows = messagesByCampaignId.get(message.campaign_id) ?? [];
-      rows.push(message);
-      messagesByCampaignId.set(message.campaign_id, rows);
-    }
-    const rows: Array<{ campaign: Row; latestMessage: Row | null; unreadCount: number }> =
-      campaigns.map((campaign) => {
-        const campaignMessages = messagesByCampaignId.get(campaign.id) ?? [];
-        const latest = campaignMessages[0] ?? null;
-        const unread = campaignMessages.filter(
-          (message) => message.sender_id !== user.id && !readIds.has(message.id),
-        ).length;
-        return {
-          campaign: {
-            ...campaign,
-            business_profile: withBusinessProfileImage(
-              businessByUserId.get(campaign.business_id),
-              accountByUserId.get(campaign.business_id),
-            ),
-            influencer_profile: withInfluencerProfileImage(
-              influencerByUserId.get(campaign.influencer_id),
-              influencerAccountByUserId.get(campaign.influencer_id),
-            ),
-          },
-          latestMessage: latest,
-          unreadCount: unread,
-        };
-      });
-    return rows.sort((a, b) =>
-      String(b.latestMessage?.created_at ?? b.campaign.created_at).localeCompare(
-        String(a.latestMessage?.created_at ?? a.campaign.created_at),
-      ),
-    );
+    return summary.map((entry) => ({
+      campaign: {
+        ...entry.campaign,
+        business_profile: withBusinessProfileImage(
+          businessByUserId.get(entry.campaign.business_id),
+          accountByUserId.get(entry.campaign.business_id),
+        ),
+        influencer_profile: withInfluencerProfileImage(
+          influencerByUserId.get(entry.campaign.influencer_id),
+          influencerAccountByUserId.get(entry.campaign.influencer_id),
+        ),
+      },
+      latestMessage: entry.latest_message,
+      unreadCount: Number(entry.unread_count),
+    }));
   }
 
-  async messages(user: AuthUser, id: string) {
+  async messages(user: AuthUser, id: string, options: { limit?: number; before?: string } = {}) {
     await campaignForParticipant(this.store, id, user.id);
-    const messages = await this.store.list<Row>('campaign_messages', {
+    const limit = Math.min(Math.max(options.limit ?? 30, 1), 100);
+    // Newest-first window; fetch one extra row to detect whether older messages remain.
+    const page = await this.store.list<Row>('campaign_messages', {
       eq: { campaign_id: id },
-      order: { column: 'created_at', ascending: true },
+      ...(options.before ? { lt: { created_at: options.before } } : {}),
+      order: { column: 'created_at', ascending: false },
+      limit: limit + 1,
     });
-    const messageIds = messages.map((message) => String(message.id)).filter(Boolean);
+    const hasMore = page.length > limit;
+    const windowed = hasMore ? page.slice(0, limit) : page;
+    const nextCursor = hasMore ? String(windowed[windowed.length - 1]?.created_at) : null;
+    const messageIds = windowed.map((message) => String(message.id)).filter(Boolean);
+    // Fetch ALL reads (not just this user's) so `read_by` reflects the counterparty too.
     const reads = messageIds.length
-      ? await this.store.list<Row>('campaign_message_reads', {
-          eq: { user_id: user.id },
-          in: { message_id: messageIds },
-        })
+      ? await this.store.list<Row>('campaign_message_reads', { in: { message_id: messageIds } })
       : [];
-    const readsByMessageId = new Map(reads.map((read) => [read.message_id, read.read_at]));
-    return messages.map((message) => ({
+    const readBy = new Map<string, string[]>();
+    const ownReadAt = new Map<string, string>();
+    for (const read of reads) {
+      const messageId = String(read.message_id);
+      const readers = readBy.get(messageId) ?? [];
+      readers.push(String(read.user_id));
+      readBy.set(messageId, readers);
+      if (read.user_id === user.id) ownReadAt.set(messageId, String(read.read_at));
+    }
+    const messages = windowed.map((message) => ({
       ...message,
-      read_at: readsByMessageId.get(message.id) ?? null,
+      read_by: readBy.get(String(message.id)) ?? [],
+      read_at: ownReadAt.get(String(message.id)) ?? null,
     }));
+    return { messages, nextCursor };
   }
 
   async send(user: AuthUser, id: string, input: Row) {
@@ -1524,17 +1503,29 @@ export class MessagingService {
 
   async markRead(user: AuthUser, id: string) {
     await campaignForParticipant(this.store, id, user.id);
-    const messages = await this.store.list<Row>('campaign_messages', { eq: { campaign_id: id } });
-    await Promise.all(
-      messages.map((message) =>
-        this.store.upsert(
-          'campaign_message_reads',
-          { message_id: message.id, user_id: user.id, read_at: nowIso() },
-          'message_id,user_id',
-        ),
-      ),
+    // Only the counterparty's messages need a read record for this user.
+    const messages = await this.store.list<Row>('campaign_messages', {
+      eq: { campaign_id: id },
+    });
+    const counterpartyMessageIds = messages
+      .filter((message) => message.sender_id !== user.id)
+      .map((message) => String(message.id));
+    if (counterpartyMessageIds.length === 0) return { ok: true, marked: 0 };
+    // Skip messages this user has already read so a re-open is a no-op write.
+    const existingReads = await this.store.list<Row>('campaign_message_reads', {
+      eq: { user_id: user.id },
+      in: { message_id: counterpartyMessageIds },
+    });
+    const alreadyRead = new Set(existingReads.map((read) => String(read.message_id)));
+    const unread = counterpartyMessageIds.filter((messageId) => !alreadyRead.has(messageId));
+    if (unread.length === 0) return { ok: true, marked: 0 };
+    const readAt = nowIso();
+    await this.store.upsertMany(
+      'campaign_message_reads',
+      unread.map((messageId) => ({ message_id: messageId, user_id: user.id, read_at: readAt })),
+      'message_id,user_id',
     );
-    return { ok: true };
+    return { ok: true, marked: unread.length };
   }
 
   async requestCall(user: AuthUser, campaignId: string) {

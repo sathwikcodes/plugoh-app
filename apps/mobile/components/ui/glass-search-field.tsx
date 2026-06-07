@@ -18,7 +18,7 @@ export function GlassSearchField({ value, onChangeText, placeholder }: GlassSear
   return (
     <BlurView tint="systemUltraThinMaterialDark" intensity={68} style={styles.shell}>
       <View style={styles.inner}>
-        <Ionicons name="search" size={19} color={SEARCH_PLACEHOLDER_TONE} style={styles.icon} />
+        <Ionicons name="search" size={19} color={SEARCH_TEXT} style={styles.icon} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -74,7 +74,10 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   input: {
-    ...theme.typography.body,
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: theme.typography.body.fontSize,
+    fontWeight: theme.typography.body.fontWeight,
+    letterSpacing: theme.typography.body.letterSpacing,
     flex: 1,
     height: SEARCH_HEIGHT,
     padding: 0,
@@ -82,6 +85,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     color: SEARCH_TEXT,
     textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   clearButton: {
     width: 24,

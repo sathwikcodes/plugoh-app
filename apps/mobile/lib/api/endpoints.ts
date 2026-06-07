@@ -13,6 +13,7 @@ import type {
   InfluencerProfileResponse,
   InfluencerPricingPatch,
   MeBootstrapResponse,
+  MessagesPage,
   NotificationItem,
   NotificationsReadRequest,
   PayoutUpsert,
@@ -189,8 +190,12 @@ export async function inbox(role: UserRole) {
   return api<InboxItem[]>(`/inbox/${role}`);
 }
 
-export async function messages(id: string) {
-  return api<CampaignMessage[]>(`/campaigns/${id}/messages`);
+export async function messages(id: string, params: { limit?: number; before?: string } = {}) {
+  const query = new URLSearchParams();
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.before) query.set('before', params.before);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return api<MessagesPage>(`/campaigns/${id}/messages${suffix}`);
 }
 
 export async function sendMessage(id: string, content: string) {
@@ -219,7 +224,9 @@ export async function sendAttachment(
 }
 
 export async function markMessagesRead(id: string) {
-  return api<{ ok: boolean }>(`/campaigns/${id}/messages/read`, { method: 'PATCH' });
+  return api<{ ok: boolean; marked: number }>(`/campaigns/${id}/messages/read`, {
+    method: 'PATCH',
+  });
 }
 
 export async function uploadDelivery(

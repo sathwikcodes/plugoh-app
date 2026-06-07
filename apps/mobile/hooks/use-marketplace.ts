@@ -29,12 +29,39 @@ import { coreInvalidationKeys, queryKeys } from '@/lib/query/keys';
 import { useAuthStore } from '@/store/auth';
 import type {
   BusinessOnboardingRequest,
+  CampaignMessage,
   InfluencerOnboardingRequest,
   InfluencerPricingPatch,
+  MessagesPage,
   NotificationsReadRequest,
   PayoutUpsert,
 } from '@plugoh/contracts';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query';
+import { useMemo } from 'react';
+
+const THREAD_PAGE_SIZE = 30;
+const THREAD_REFETCH_INTERVAL_MS = 10_000;
+
+/** Prepend an optimistic message to the newest page of the cached infinite thread. */
+function prependOptimisticMessage(
+  old: InfiniteData<MessagesPage> | undefined,
+  message: CampaignMessage,
+): InfiniteData<MessagesPage> {
+  if (!old || old.pages.length === 0) {
+    return { pages: [{ messages: [message], nextCursor: null }], pageParams: [null] };
+  }
+  const [newest, ...rest] = old.pages;
+  return {
+    ...old,
+    pages: [{ ...newest, messages: [message, ...newest.messages] }, ...rest],
+  };
+}
 
 type CampaignListParams = {
   limit?: number;
@@ -115,13 +142,29 @@ export function useInbox() {
   });
 }
 
-export function useMessages(id: string) {
+/**
+ * Cursor-paginated conversation thread. Pages are newest-first; `messages` is the
+ * flattened, oldest-first list ready for the inverted list builder. Polls while
+ * mounted and refetches on focus so incoming messages appear without re-opening.
+ */
+export function useThreadMessages(id: string) {
   const session = useAuthStore((state) => state.session);
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: queryKeys.messages(id),
-    queryFn: () => messages(id),
+    queryFn: ({ pageParam }) =>
+      messages(id, { limit: THREAD_PAGE_SIZE, before: pageParam ?? undefined }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: Boolean(session && id),
+    refetchInterval: THREAD_REFETCH_INTERVAL_MS,
+    refetchOnWindowFocus: true,
   });
+  const flatMessages = useMemo(() => {
+    const all = (query.data?.pages ?? []).flatMap((page) => page.messages);
+    // Newest-first pages → oldest-first for buildListItems.
+    return [...all].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }, [query.data]);
+  return { ...query, messages: flatMessages };
 }
 
 export function useEarnings() {
@@ -173,12 +216,22 @@ export function useInfluencerDiscovery(params?: {
 
 export function useMarketplaceMutations() {
   const queryClient = useQueryClient();
+  const { role } = useRoleFromBootstrap();
+  const activeRole = role ?? 'influencer';
+  const myId = useAuthStore((state) => state.session?.user.id) ?? '';
 
   const invalidateKeys = async (keys: ReadonlyArray<readonly unknown[]>) =>
     invalidateQueryKeys(queryClient, keys);
   const invalidateCore = async () => {
     await invalidateKeys(coreInvalidationKeys);
   };
+  // Scope thread mutations to the active role only — no cross-role inbox churn.
+  const invalidateThread = async (id: string) =>
+    invalidateKeys([
+      queryKeys.messages(id),
+      queryKeys.inbox(activeRole),
+      queryKeys.notifications(activeRole),
+    ]);
 
   return {
     setRole: useMutation({
@@ -254,14 +307,34 @@ export function useMarketplaceMutations() {
     }),
     sendMessage: useMutation({
       mutationFn: ({ id, content }: { id: string; content: string }) => sendMessage(id, content),
-      onSuccess: (_data, variables) => {
-        void invalidateKeys([
-          queryKeys.messages(variables.id),
-          queryKeys.inbox('influencer'),
-          queryKeys.inbox('business'),
-          queryKeys.notifications('influencer'),
-          queryKeys.notifications('business'),
-        ]);
+      // Optimistically show the message so the thread feels instant.
+      onMutate: async ({ id, content }: { id: string; content: string }) => {
+        await queryClient.cancelQueries({ queryKey: queryKeys.messages(id) });
+        const previous = queryClient.getQueryData<InfiniteData<MessagesPage>>(
+          queryKeys.messages(id),
+        );
+        const optimistic: CampaignMessage = {
+          id: `optimistic-${Date.now()}`,
+          campaign_id: id,
+          sender_id: myId,
+          message_type: 'text',
+          content,
+          read_by: [],
+          read_at: null,
+          created_at: new Date().toISOString(),
+        };
+        queryClient.setQueryData<InfiniteData<MessagesPage>>(queryKeys.messages(id), (old) =>
+          prependOptimisticMessage(old, optimistic),
+        );
+        return { previous };
+      },
+      onError: (_error, variables, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(queryKeys.messages(variables.id), context.previous);
+        }
+      },
+      onSettled: (_data, _error, variables) => {
+        void invalidateThread(variables.id);
       },
     }),
     sendAttachment: useMutation({
@@ -275,13 +348,7 @@ export function useMarketplaceMutations() {
         caption?: string;
       }) => sendAttachment(id, file, caption),
       onSuccess: (_data, variables) => {
-        void invalidateKeys([
-          queryKeys.messages(variables.id),
-          queryKeys.inbox('influencer'),
-          queryKeys.inbox('business'),
-          queryKeys.notifications('influencer'),
-          queryKeys.notifications('business'),
-        ]);
+        void invalidateThread(variables.id);
       },
     }),
     uploadDelivery: useMutation({
@@ -319,12 +386,10 @@ export function useMarketplaceMutations() {
     }),
     markMessagesRead: useMutation({
       mutationFn: (id: string) => markMessagesRead(id),
-      onSuccess: (_data, id) => {
-        void invalidateKeys([
-          queryKeys.messages(id),
-          queryKeys.inbox('influencer'),
-          queryKeys.inbox('business'),
-        ]);
+      // Only refresh the inbox unread badge — the thread itself updates via its own
+      // poll/focus refetch, so we avoid re-pulling the whole conversation here.
+      onSuccess: () => {
+        void invalidateKeys([queryKeys.inbox(activeRole), queryKeys.notifications(activeRole)]);
       },
     }),
     markNotificationsRead: useMutation({

@@ -1,5 +1,5 @@
 import { AppHeader, APP_HEADER_SCREEN_TOP_PADDING } from '@/components/ui/app-header';
-import { Screen, SectionTitle, StatusChip } from '@/components/ui/primitives';
+import { Screen } from '@/components/ui/primitives';
 import { ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
 import {
@@ -11,90 +11,14 @@ import {
 import { formatPaiseAsINR, getTierDisplay } from '@/lib/influencer/home-tier';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { Ionicons } from '@expo/vector-icons';
-import type { CampaignListItem } from '@plugoh/contracts';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 const ACTIVE_CAMPAIGN_STATUSES = ['pre_authorized', 'in_escrow', 'delivery_submitted'] as const;
-
-function truncate(s: string, n: number) {
-  return s.length > n ? s.slice(0, n) + '...' : s;
-}
-
-// ─── ActionCard ───────────────────────────────────────────────────────────────
-
-function ActionCard({
-  icon,
-  title,
-  subtitle,
-  onPress,
-}: {
-  icon: string;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
-    >
-      <View style={styles.accentStrip} />
-      <View style={styles.actionInner}>
-        <Ionicons name={icon as never} size={20} color={theme.colors.rose} />
-        <View style={styles.actionText}>
-          <Text style={styles.actionTitle}>{title}</Text>
-          <Text style={styles.actionSubtitle}>{subtitle}</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.62)" />
-      </View>
-    </Pressable>
-  );
-}
-
-// ─── CampaignSpotlightCard ────────────────────────────────────────────────────
-
-function CampaignSpotlightCard({ campaign }: { campaign: CampaignListItem }) {
-  const brandName = campaign.business_profile?.brand_name;
-  const price = campaign.price_offered_paise;
-  const title = campaign.ai_title?.trim() || campaign.title;
-
-  return (
-    <Pressable
-      onPress={() => {
-        router.push('/(app)/(tabs)/campaigns');
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={`Open campaign ${title}`}
-      style={({ pressed }) => [styles.spotlightCard, pressed && { opacity: 0.85 }]}
-    >
-      <StatusChip
-        label={
-          campaign.status === 'in_escrow'
-            ? 'In Escrow'
-            : campaign.status === 'pre_authorized'
-              ? 'Confirmed'
-              : 'Delivery Submitted'
-        }
-        status={campaign.status}
-      />
-      <Text style={styles.spotlightTitle} numberOfLines={2}>
-        {title}
-      </Text>
-      {brandName || price ? (
-        <Text style={styles.spotlightMeta}>
-          {[brandName, price ? formatPaiseAsINR(price) : null].filter(Boolean).join(' - ')}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
-}
 
 // ─── HomeTierHero ─────────────────────────────────────────────────────────────
 
@@ -281,16 +205,9 @@ export default function HomeScreen() {
   const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
   const heroLoading = profileLoading || earningsLoading;
 
-  const pendingEarnings = earnings.data?.pending_earnings ?? 0;
-
   const activeCampaigns = (campaigns.data?.items ?? []).filter((c) =>
     ACTIVE_CAMPAIGN_STATUSES.includes(c.status as (typeof ACTIVE_CAMPAIGN_STATUSES)[number]),
   );
-  const deliveryPending = activeCampaigns.find((c) => c.status === 'delivery_submitted');
-  const showInstagramNudge = profile.data?.instagram_connected === false;
-  const showPricingNudge = Boolean(profile.data) && (profile.data?.price_per_reel_paise ?? 0) <= 0;
-  const hasActionItems =
-    Boolean(deliveryPending) || showInstagramNudge || showPricingNudge || pendingEarnings > 0;
 
   return (
     <Screen
@@ -314,72 +231,6 @@ export default function HomeScreen() {
         activeCampaignCount={activeCampaigns.length}
         loading={earningsLoading || campaignsLoading}
       />
-
-      {!campaignsLoading && !profileLoading && hasActionItems && (
-        <>
-          <SectionTitle eyebrow="Needs Attention" title="" />
-          {deliveryPending && (
-            <ActionCard
-              icon="time-outline"
-              title="Delivery pending review"
-              subtitle={truncate(deliveryPending.ai_title ?? deliveryPending.title, 36)}
-              onPress={() => {
-                router.push('/(app)/(tabs)/campaigns');
-              }}
-            />
-          )}
-          {showInstagramNudge && (
-            <ActionCard
-              icon="logo-instagram"
-              title="Connect Instagram"
-              subtitle="Boost your discovery rate"
-              onPress={() => {
-                router.push('/(app)/profile/instagram');
-              }}
-            />
-          )}
-          {showPricingNudge && (
-            <ActionCard
-              icon="pricetag-outline"
-              title="Set your rates"
-              subtitle="Brands want to know your price"
-              onPress={() => {
-                router.push('/(app)/profile/pricing');
-              }}
-            />
-          )}
-          {pendingEarnings > 0 && (
-            <ActionCard
-              icon="wallet-outline"
-              title="Pending payout"
-              subtitle={`${formatPaiseAsINR(pendingEarnings)} waiting for release`}
-              onPress={() => {
-                router.push('/(app)/(tabs)/earnings');
-              }}
-            />
-          )}
-        </>
-      )}
-
-      {!campaignsLoading && activeCampaigns.length > 0 && (
-        <>
-          <SectionTitle eyebrow="In Progress" title="" />
-          {activeCampaigns.slice(0, 2).map((c) => (
-            <CampaignSpotlightCard key={c.id} campaign={c} />
-          ))}
-          <Pressable
-            onPress={() => {
-              router.push('/(app)/(tabs)/campaigns');
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="View all campaigns"
-            style={styles.viewAllRow}
-          >
-            <Text style={styles.viewAllText}>View all campaigns</Text>
-            <Ionicons name="arrow-forward" size={14} color={theme.colors.rose} />
-          </Pressable>
-        </>
-      )}
     </Screen>
   );
 }
@@ -554,78 +405,5 @@ const insightStyles = StyleSheet.create({
   cardSubtitle: {
     ...theme.typography.caption,
     color: 'rgba(255,255,255,0.48)',
-  },
-});
-
-const styles = StyleSheet.create({
-  actionCard: {
-    borderRadius: theme.radius.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    overflow: 'hidden',
-    ...theme.shadow.card,
-  },
-  actionPressed: {
-    backgroundColor: theme.colors.surfaceWarm,
-  },
-  accentStrip: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-    backgroundColor: theme.colors.rose,
-  },
-  actionInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.md,
-    paddingLeft: theme.spacing.xl + 3,
-    minHeight: 64,
-  },
-  actionText: {
-    flex: 1,
-    gap: 2,
-  },
-  actionTitle: {
-    ...theme.typography.cardTitle,
-    color: theme.colors.foreground,
-  },
-  actionSubtitle: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.62)',
-  },
-  spotlightCard: {
-    borderRadius: theme.radius.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.xl,
-    gap: theme.spacing.sm,
-    ...theme.shadow.card,
-  },
-  spotlightTitle: {
-    ...theme.typography.cardTitle,
-    color: theme.colors.foreground,
-  },
-  spotlightMeta: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.62)',
-  },
-  viewAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.xs,
-    paddingVertical: theme.spacing.sm,
-    marginTop: -theme.spacing.xs,
-  },
-  viewAllText: {
-    ...theme.typography.label,
-    color: theme.colors.rose,
-    fontWeight: '600',
   },
 });

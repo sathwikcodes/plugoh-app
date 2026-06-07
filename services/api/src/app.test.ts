@@ -505,6 +505,9 @@ describe('Plugoh API', () => {
     expect(body.data[0].campaign.business_profile.avatar_url).toBe(
       'https://cdn.test/brand-avatar.jpg',
     );
+    // Aggregated via the inbox_summary RPC: latest message + unread count.
+    expect(body.data[0].latestMessage.content).toBe('Hello');
+    expect(body.data[0].unreadCount).toBe(1);
   });
 
   it('validates campaign booking requirements', async () => {
@@ -783,6 +786,146 @@ describe('Plugoh API', () => {
       body: JSON.stringify({ content: 'Please start', message_type: 'text' }),
     });
     expect(res.status).toBe(409);
+  });
+
+  it('returns a newest-first message page with read_by populated', async () => {
+    const { app, store } = makeApp({
+      campaigns: [
+        {
+          id: campaignId,
+          business_id: businessId,
+          influencer_id: influencerId,
+          title: 'Booking',
+          status: 'in_escrow',
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
+        },
+      ],
+      campaign_messages: [
+        {
+          id: 'm1',
+          campaign_id: campaignId,
+          sender_id: businessId,
+          message_type: 'text',
+          content: 'first',
+          created_at: '2026-05-16T01:00:00.000Z',
+        },
+        {
+          id: 'm2',
+          campaign_id: campaignId,
+          sender_id: influencerId,
+          message_type: 'text',
+          content: 'second',
+          created_at: '2026-05-16T02:00:00.000Z',
+        },
+      ],
+      campaign_message_reads: [
+        { message_id: 'm1', user_id: influencerId, read_at: '2026-05-16T03:00:00.000Z' },
+      ],
+    });
+    void store;
+    const res = await app.request(`/campaigns/${campaignId}/messages`, {
+      headers: { authorization: 'Bearer business' },
+    });
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.data.messages.map((m: { id: string }) => m.id)).toEqual(['m2', 'm1']);
+    expect(body.data.nextCursor).toBeNull();
+    const m1 = body.data.messages.find((m: { id: string }) => m.id === 'm1');
+    expect(m1.read_by).toContain(influencerId);
+  });
+
+  it('paginates messages with limit and before cursor', async () => {
+    const { app } = makeApp({
+      campaigns: [
+        {
+          id: campaignId,
+          business_id: businessId,
+          influencer_id: influencerId,
+          title: 'Booking',
+          status: 'in_escrow',
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
+        },
+      ],
+      campaign_messages: Array.from({ length: 5 }).map((_, i) => ({
+        id: `msg-${i}`,
+        campaign_id: campaignId,
+        sender_id: businessId,
+        message_type: 'text',
+        content: `m${i}`,
+        created_at: `2026-05-16T0${i}:00:00.000Z`,
+      })),
+    });
+    const first = await json(
+      await app.request(`/campaigns/${campaignId}/messages?limit=2`, {
+        headers: { authorization: 'Bearer business' },
+      }),
+    );
+    expect(first.data.messages.map((m: { id: string }) => m.id)).toEqual(['msg-4', 'msg-3']);
+    expect(first.data.nextCursor).toBe('2026-05-16T03:00:00.000Z');
+    const second = await json(
+      await app.request(
+        `/campaigns/${campaignId}/messages?limit=2&before=${encodeURIComponent(first.data.nextCursor)}`,
+        { headers: { authorization: 'Bearer business' } },
+      ),
+    );
+    expect(second.data.messages.map((m: { id: string }) => m.id)).toEqual(['msg-2', 'msg-1']);
+  });
+
+  it('marks only unread counterparty messages and is a no-op when already read', async () => {
+    const { app, store } = makeApp({
+      campaigns: [
+        {
+          id: campaignId,
+          business_id: businessId,
+          influencer_id: influencerId,
+          title: 'Booking',
+          status: 'in_escrow',
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
+        },
+      ],
+      campaign_messages: [
+        {
+          id: 'own',
+          campaign_id: campaignId,
+          sender_id: influencerId,
+          message_type: 'text',
+          content: 'mine',
+          created_at: '2026-05-16T01:00:00.000Z',
+        },
+        {
+          id: 'theirs',
+          campaign_id: campaignId,
+          sender_id: businessId,
+          message_type: 'text',
+          content: 'hi',
+          created_at: '2026-05-16T02:00:00.000Z',
+        },
+      ],
+      campaign_message_reads: [],
+    });
+    const first = await json(
+      await app.request(`/campaigns/${campaignId}/messages/read`, {
+        method: 'PATCH',
+        headers: { authorization: 'Bearer influencer' },
+      }),
+    );
+    // Only the counterparty message ('theirs') gets a read row — never the user's own.
+    expect(first.data.marked).toBe(1);
+    expect(store.tables.get('campaign_message_reads')).toHaveLength(1);
+    const second = await json(
+      await app.request(`/campaigns/${campaignId}/messages/read`, {
+        method: 'PATCH',
+        headers: { authorization: 'Bearer influencer' },
+      }),
+    );
+    expect(second.data.marked).toBe(0);
+    expect(store.tables.get('campaign_message_reads')).toHaveLength(1);
   });
 
   it('submits and approves delivery', async () => {

@@ -1,53 +1,53 @@
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState, type ReactNode } from 'react';
+import { MeshGradientView } from 'expo-mesh-gradient';
+import type { ReactNode } from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-
-type SkiaModule = typeof import('@shopify/react-native-skia');
-
-const NOISE_WIDTH = 1200;
-const NOISE_HEIGHT = 760;
 
 export type PremiumEarningsGradientCardProps = {
   children: ReactNode;
   style?: ViewStyle;
 };
 
-export function PremiumEarningsGradientCard({ children, style }: PremiumEarningsGradientCardProps) {
-  const skia = useOptionalSkia();
+// 3×3 control mesh. Purple drifts out of the top-left, warm gold pools in the
+// bottom-right, and a cream bloom blends through the centre — the diffuse
+// "liquid metal" flow Apple uses on the Wallet card. The middle vertex is
+// nudged up-and-right so the blend reads organic rather than a straight wash.
+const MESH_POINTS = [
+  [0.0, 0.0],
+  [0.5, 0.0],
+  [1.0, 0.0],
+  [0.0, 0.5],
+  [0.62, 0.4],
+  [1.0, 0.5],
+  [0.0, 1.0],
+  [0.5, 1.0],
+  [1.0, 1.0],
+];
 
+const MESH_COLORS = [
+  '#9B1FFF',
+  '#E04BFF',
+  '#FFD24D',
+  '#B81CFF',
+  '#FF8F3C',
+  '#FFB300',
+  '#D81FF0',
+  '#FF8A00',
+  '#FF7A00',
+];
+
+export function PremiumEarningsGradientCard({ children, style }: PremiumEarningsGradientCardProps) {
   return (
     <View style={[styles.shell, style]}>
       <View pointerEvents="none" style={styles.innerClip}>
-        <LinearGradient
-          colors={['#FF3CAC', '#FF3CAC', '#FFD700', '#FFD700']}
-          locations={[0, 0.42, 0.68, 1]}
-          start={{ x: 0.04, y: 0.12 }}
-          end={{ x: 0.98, y: 0.78 }}
+        <MeshGradientView
           style={StyleSheet.absoluteFillObject}
+          columns={3}
+          rows={3}
+          points={MESH_POINTS}
+          colors={MESH_COLORS}
+          smoothsColors
         />
-        <LinearGradient
-          colors={[
-            'rgba(255,60,172,0)',
-            'rgba(255,60,172,0.2)',
-            'rgba(255,215,0,0.32)',
-            'rgba(255,215,0,0)',
-          ]}
-          locations={[0, 0.38, 0.62, 1]}
-          start={{ x: 0.2, y: 1 }}
-          end={{ x: 0.78, y: 0 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <LinearGradient
-          colors={['rgba(255,215,0,0)', 'rgba(255,215,0,0.82)', '#FFD700']}
-          locations={[0, 0.58, 1]}
-          start={{ x: 0.42, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <BlurView intensity={24} tint="default" style={styles.topBlur} />
-        <BlurView intensity={18} tint="default" style={styles.transitionBlur} />
-        {skia ? <SkiaGrainLayer skia={skia} /> : <View style={styles.grainFallback} />}
+        {/* edge-only bevel — no full-surface film, so the colour stays rich */}
         <View style={styles.innerStroke} />
       </View>
       {children}
@@ -55,53 +55,15 @@ export function PremiumEarningsGradientCard({ children, style }: PremiumEarnings
   );
 }
 
-function useOptionalSkia() {
-  const [skia, setSkia] = useState<SkiaModule | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    void import('@shopify/react-native-skia')
-      .then((module) => {
-        if (mounted) setSkia(module);
-      })
-      .catch(() => {
-        if (mounted) setSkia(null);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return skia;
-}
-
-function SkiaGrainLayer({ skia }: { skia: SkiaModule }) {
-  const { Canvas, FractalNoise, Group, Rect, Turbulence } = skia;
-
-  return (
-    <Canvas style={[StyleSheet.absoluteFill, styles.grainCanvas]}>
-      <Group opacity={0.24} blendMode="multiply">
-        <Rect x={0} y={0} width={NOISE_WIDTH} height={NOISE_HEIGHT}>
-          <Turbulence freqX={1.15} freqY={1.15} octaves={4} seed={12} />
-        </Rect>
-      </Group>
-      <Group opacity={0.16} blendMode="multiply">
-        <Rect x={0} y={0} width={NOISE_WIDTH} height={NOISE_HEIGHT}>
-          <FractalNoise freqX={0.52} freqY={0.62} octaves={3} seed={31} />
-        </Rect>
-      </Group>
-    </Canvas>
-  );
-}
-
 const styles = StyleSheet.create({
   shell: {
     position: 'relative',
-    backgroundColor: '#FF3CAC',
+    backgroundColor: '#E7B27A',
     borderCurve: 'continuous',
-    boxShadow: '0 18px 30px rgba(0,0,0,0.34), 0 1px 2px rgba(255,215,0,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    boxShadow:
+      '0 26px 40px rgba(38,18,48,0.42), 0 10px 18px rgba(70,36,8,0.22), inset 0 1px 0 rgba(255,255,255,0.16)',
   },
   innerClip: {
     ...StyleSheet.absoluteFillObject,
@@ -109,36 +71,12 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
-  topBlur: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    left: 0,
-    height: '42%',
-    opacity: 0.28,
-  },
-  transitionBlur: {
-    position: 'absolute',
-    top: '-18%',
-    bottom: '-18%',
-    left: '28%',
-    width: '44%',
-    opacity: 0.24,
-    transform: [{ rotate: '13deg' }],
-  },
-  grainCanvas: {
-    opacity: 1,
-  },
-  grainFallback: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-  },
+  // Beveled metal edge: bright catch-light along the top, a warm shadow under
+  // the bottom lip, and a soft inner vignette to give the surface real weight.
   innerStroke: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 24,
     borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.22)',
-    boxShadow: 'inset 0 1px 1px rgba(255,215,0,0.16), inset 0 -18px 24px rgba(0,0,0,0.12)',
+    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.18), inset 0 -2px 3px rgba(120,68,12,0.3)',
   },
 });

@@ -16,39 +16,22 @@ function groupLabel(iso: string): string {
 export function DateSeparator({ date }: Props) {
   return (
     <View style={styles.wrap}>
-      <View style={styles.line} />
-      <View style={styles.pill}>
-        <Text style={styles.label}>{groupLabel(date)}</Text>
-      </View>
-      <View style={styles.line} />
+      <Text style={styles.label}>{groupLabel(date)}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    justifyContent: 'center',
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    gap: 10,
-  },
-  line: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-  },
-  pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
   },
   label: {
     ...theme.typography.labelSmall,
-    color: 'rgba(255,255,255,0.40)',
+    color: 'rgba(255,255,255,0.45)',
+    fontWeight: '600',
     textAlign: 'center',
   },
 });

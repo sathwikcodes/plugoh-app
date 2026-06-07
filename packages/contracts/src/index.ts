@@ -248,6 +248,16 @@ export interface InboxItem {
   unreadCount: number;
 }
 
+/**
+ * One page of a campaign conversation, newest-first.
+ * `nextCursor` is the `created_at` of the oldest returned message; pass it back
+ * as `before` to fetch the next (older) page. `null` when no older messages remain.
+ */
+export interface MessagesPage {
+  messages: CampaignMessage[];
+  nextCursor: string | null;
+}
+
 export interface NotificationItem {
   id: string;
   user_id: string;

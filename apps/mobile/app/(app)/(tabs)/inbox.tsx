@@ -19,14 +19,14 @@ import {
   type InboxFilterDraft,
   type InboxSort,
 } from '@/lib/filters/inbox';
+import { getConversationParty } from '@/lib/inbox/conversation-display';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import labImage from '@/assets/images/lab.png';
-import mailImage from '@/assets/images/mail.png';
 import type { InboxItem } from '@plugoh/contracts';
-import { Image } from 'expo-image';
+import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /** Breathing room above the native tab bar — matches campaigns tab screen. */
@@ -48,15 +48,8 @@ function SkeletonRow() {
 function EmptyInboxState({ title }: { title: string }) {
   return (
     <View style={styles.emptyWrap}>
-      <Image
-        source={mailImage}
-        style={styles.emptyImage}
-        contentFit="contain"
-        accessibilityIgnoresInvertColors
-      />
       <View style={styles.emptyCopy}>
         <Text style={styles.emptyTitle}>{title}</Text>
-        <Text style={styles.emptySubtitle}>New messages will appear here.</Text>
       </View>
     </View>
   );
@@ -108,25 +101,36 @@ export default function InboxScreen() {
     [mutations.markMessagesRead],
   );
 
+  const handlePress = useCallback((item: InboxItem) => {
+    router.push(`/(app)/inbox/${item.campaign.id}`);
+  }, []);
+
   const renderItem = useCallback(
-    ({ item, index }: { item: InboxItem; index: number }) => (
-      <ConversationRow
-        item={item}
-        index={index}
-        onPress={() => {
-          router.push(`/(app)/inbox/${item.campaign.id}`);
-        }}
-        onLongPress={() => {
-          handleLongPress(item);
-        }}
-      />
-    ),
-    [handleLongPress],
+    ({ item, index }: { item: InboxItem; index: number }) => {
+      const party = getConversationParty(item.campaign, 'influencer');
+      return (
+        <ConversationRow
+          item={item}
+          index={index}
+          nameLabel={party.name}
+          avatarName={party.avatarName}
+          avatarImageUri={party.avatarUri}
+          onPress={handlePress}
+          onLongPress={handleLongPress}
+        />
+      );
+    },
+    [handlePress, handleLongPress],
   );
 
   const keyExtractor = useCallback((item: InboxItem) => item.campaign.id, []);
 
   const Separator = useCallback(() => <View style={styles.separator} />, []);
+
+  const listContentStyle = useMemo(
+    () => ({ paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE }),
+    [insets.bottom],
+  );
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
@@ -193,21 +197,20 @@ export default function InboxScreen() {
             <SkeletonRow key={i} />
           ))}
         </View>
+      ) : filtered.length === 0 ? (
+        <EmptyInboxState title="No messages yet" />
       ) : (
-        <FlatList
-          style={styles.list}
-          data={filtered}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          ItemSeparatorComponent={Separator}
-          ListEmptyComponent={<EmptyInboxState title="No messages" />}
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE,
-          }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
+        <View style={styles.list}>
+          <FlashList
+            data={filtered}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            ItemSeparatorComponent={Separator}
+            contentContainerStyle={listContentStyle}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          />
+        </View>
       )}
 
       <InboxFilterSheet
@@ -293,16 +296,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: theme.spacing.lg,
-    gap: theme.spacing.xl,
-  },
-  emptyImage: {
-    width: 118,
-    height: 118,
+    paddingHorizontal: theme.spacing.xxl,
   },
   emptyCopy: {
     alignItems: 'center',
-    gap: theme.spacing.sm,
   },
   emptyTitle: {
     ...theme.typography.section,

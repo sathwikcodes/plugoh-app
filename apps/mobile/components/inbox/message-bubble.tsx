@@ -1,3 +1,4 @@
+import { BrandAvatar } from '@/components/inbox/brand-avatar';
 import { GlassCard } from '@/components/ui/glass-card';
 import { theme } from '@/constants/theme';
 import type { CampaignMessage } from '@plugoh/contracts';
@@ -5,12 +6,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { StyleSheet, Text, View } from 'react-native';
+import { memo } from 'react';
+import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+
+const BUBBLE_RADIUS = 20;
+const BUBBLE_TIGHT = 6;
+const AVATAR_SIZE = 28;
 
 type Props = {
   message: CampaignMessage;
   isOwn: boolean;
   showSeenReceipt: boolean;
+  /** First bubble of a same-sender run (top corner stays round). */
+  isGroupStart: boolean;
+  /** Last bubble of a same-sender run (bottom corner stays round, avatar shows). */
+  isGroupEnd: boolean;
+  /** Render the counterparty avatar beside an incoming message (group end only). */
+  showAvatar: boolean;
+  avatarUri?: string | null;
+  avatarName?: string | null;
 };
 
 function fmtFileSize(bytes?: number): string {
@@ -53,27 +67,50 @@ function AttachmentContent({ message }: { message: CampaignMessage }) {
   );
 }
 
-export function MessageBubble({ message, isOwn, showSeenReceipt }: Props) {
+function SystemPill({ message }: { message: CampaignMessage }) {
+  return (
+    <Animated.View entering={FadeInUp.duration(220).springify()} style={styles.systemWrap}>
+      <GlassCard style={styles.systemPill} contentStyle={styles.systemPillContent}>
+        <Text style={styles.systemText}>{systemLabel(message)}</Text>
+      </GlassCard>
+    </Animated.View>
+  );
+}
+
+function MessageBubbleComponent({
+  message,
+  isOwn,
+  showSeenReceipt,
+  isGroupStart,
+  isGroupEnd,
+  showAvatar,
+  avatarUri,
+  avatarName,
+}: Props) {
   if (message.message_type === 'system' || message.message_type === 'booking_card') {
-    return (
-      <Animated.View entering={FadeInUp.duration(220).springify()} style={styles.systemWrap}>
-        <View style={styles.systemPill}>
-          <Text style={styles.systemText}>{systemLabel(message)}</Text>
-        </View>
-      </Animated.View>
-    );
+    return <SystemPill message={message} />;
   }
 
   const isAttachment = message.message_type === 'attachment';
+  const groupMargin: ViewStyle = { marginBottom: isGroupEnd ? 10 : 2 };
 
   if (isOwn) {
+    const ownRadius: ViewStyle = {
+      borderTopLeftRadius: BUBBLE_RADIUS,
+      borderBottomLeftRadius: BUBBLE_RADIUS,
+      borderTopRightRadius: isGroupStart ? BUBBLE_RADIUS : BUBBLE_TIGHT,
+      borderBottomRightRadius: isGroupEnd ? BUBBLE_RADIUS : BUBBLE_TIGHT,
+    };
     return (
-      <Animated.View entering={FadeInUp.duration(220).springify()} style={styles.ownWrap}>
+      <Animated.View
+        entering={FadeInUp.duration(220).springify()}
+        style={[styles.ownWrap, groupMargin]}
+      >
         <LinearGradient
           colors={['#FF3CAC', theme.colors.rose]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.ownBubble}
+          style={[styles.ownBubble, ownRadius]}
         >
           {isAttachment ? (
             <AttachmentContent message={message} />
@@ -88,9 +125,27 @@ export function MessageBubble({ message, isOwn, showSeenReceipt }: Props) {
     );
   }
 
+  const otherRadius: ViewStyle = {
+    borderTopRightRadius: BUBBLE_RADIUS,
+    borderBottomRightRadius: BUBBLE_RADIUS,
+    borderTopLeftRadius: isGroupStart ? BUBBLE_RADIUS : BUBBLE_TIGHT,
+    borderBottomLeftRadius: isGroupEnd ? BUBBLE_RADIUS : BUBBLE_TIGHT,
+  };
+
   return (
-    <Animated.View entering={FadeInUp.duration(220).springify()} style={styles.otherWrap}>
-      <GlassCard style={styles.otherBubbleShell} contentStyle={styles.otherBubbleContent}>
+    <Animated.View
+      entering={FadeInUp.duration(220).springify()}
+      style={[styles.otherWrap, groupMargin]}
+    >
+      <View style={styles.avatarColumn}>
+        {showAvatar ? (
+          <BrandAvatar imageUri={avatarUri} name={avatarName} size={AVATAR_SIZE} textSize={12} />
+        ) : null}
+      </View>
+      <GlassCard
+        style={{ ...styles.otherBubbleShell, ...otherRadius }}
+        contentStyle={styles.otherBubbleContent}
+      >
         {isAttachment ? (
           <AttachmentContent message={message} />
         ) : (
@@ -103,15 +158,14 @@ export function MessageBubble({ message, isOwn, showSeenReceipt }: Props) {
   );
 }
 
+export const MessageBubble = memo(MessageBubbleComponent);
+
 const styles = StyleSheet.create({
   ownWrap: {
     alignItems: 'flex-end',
     paddingHorizontal: 16,
-    marginBottom: 3,
   },
   ownBubble: {
-    borderRadius: 20,
-    borderBottomRightRadius: 5,
     paddingHorizontal: 14,
     paddingVertical: 10,
     maxWidth: '78%',
@@ -127,13 +181,18 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   otherWrap: {
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     paddingHorizontal: 16,
-    marginBottom: 3,
+    gap: 8,
+  },
+  avatarColumn: {
+    width: AVATAR_SIZE,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexShrink: 0,
   },
   otherBubbleShell: {
-    borderRadius: 20,
-    borderBottomLeftRadius: 5,
     maxWidth: '78%',
   },
   otherBubbleContent: {
@@ -146,15 +205,17 @@ const styles = StyleSheet.create({
   },
   systemWrap: {
     alignSelf: 'center',
-    marginVertical: 6,
+    marginVertical: 14,
   },
   systemPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderCurve: 'continuous',
+  },
+  systemPillContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   systemText: {
     ...theme.typography.label,

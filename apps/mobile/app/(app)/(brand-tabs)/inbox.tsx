@@ -20,14 +20,16 @@ import {
   type InboxFilterDraft,
   type InboxSort,
 } from '@/lib/filters/inbox';
+import { getConversationParty } from '@/lib/inbox/conversation-display';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import labImage from '@/assets/images/lab.png';
 import mailImage from '@/assets/images/mail.png';
 import type { InboxItem } from '@plugoh/contracts';
+import { FlashList } from '@shopify/flash-list';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TAB_BAR_CLEARANCE = 12;
@@ -128,39 +130,35 @@ export default function BrandInboxScreen() {
     [mutations.markMessagesRead],
   );
 
+  const handlePress = useCallback((item: InboxItem) => {
+    router.push(`/(app)/inbox/${item.campaign.id}`);
+  }, []);
+
   const renderItem = useCallback(
-    ({ item, index }: { item: InboxItem; index: number }) => (
-      <ConversationRow
-        item={item}
-        index={index}
-        nameLabel={
-          item.campaign.influencer_profile?.display_name ??
-          item.campaign.influencer_profile?.ig_username ??
-          null
-        }
-        avatarName={
-          item.campaign.influencer_profile?.display_name ??
-          item.campaign.influencer_profile?.ig_username ??
-          null
-        }
-        avatarImageUri={
-          item.campaign.influencer_profile?.profile_photo_url ??
-          item.campaign.influencer_profile?.avatar_url ??
-          null
-        }
-        onPress={() => {
-          router.push(`/(app)/inbox/${item.campaign.id}`);
-        }}
-        onLongPress={() => {
-          handleLongPress(item);
-        }}
-      />
-    ),
-    [handleLongPress],
+    ({ item, index }: { item: InboxItem; index: number }) => {
+      const party = getConversationParty(item.campaign, 'business');
+      return (
+        <ConversationRow
+          item={item}
+          index={index}
+          nameLabel={party.name}
+          avatarName={party.avatarName}
+          avatarImageUri={party.avatarUri}
+          onPress={handlePress}
+          onLongPress={handleLongPress}
+        />
+      );
+    },
+    [handlePress, handleLongPress],
   );
 
   const keyExtractor = useCallback((item: InboxItem) => item.campaign.id, []);
   const Separator = useCallback(() => <View style={styles.separator} />, []);
+
+  const listContentStyle = useMemo(
+    () => ({ paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE }),
+    [insets.bottom],
+  );
 
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
@@ -225,21 +223,20 @@ export default function BrandInboxScreen() {
             <SkeletonRow key={i} />
           ))}
         </View>
+      ) : filtered.length === 0 ? (
+        <EmptyInboxState title="No messages" />
       ) : (
-        <FlatList
-          style={styles.list}
-          data={filtered}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          ItemSeparatorComponent={Separator}
-          ListEmptyComponent={<EmptyInboxState title="No messages" />}
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE,
-          }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
+        <View style={styles.list}>
+          <FlashList
+            data={filtered}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            ItemSeparatorComponent={Separator}
+            contentContainerStyle={listContentStyle}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          />
+        </View>
       )}
 
       <InboxFilterSheet

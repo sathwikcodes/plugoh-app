@@ -1,41 +1,42 @@
 import { BrandAvatar } from '@/components/inbox/brand-avatar';
 import { theme } from '@/constants/theme';
 import type { InboxItem } from '@plugoh/contracts';
-import { LinearGradient } from 'expo-linear-gradient';
+import { memo } from 'react';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type Props = {
   item: InboxItem;
   index: number;
-  onPress: () => void;
-  onLongPress: () => void;
-  /** Override the secondary name shown below the campaign title (e.g. creator name for brand view). */
+  onPress: (item: InboxItem) => void;
+  onLongPress: (item: InboxItem) => void;
+  /** Name shown as the conversation title (e.g. brand name, or creator name for brand view). */
   nameLabel?: string | null;
   avatarImageUri?: string | null;
   avatarName?: string | null;
 };
 
-function formatTimestamp(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  const isThisYear = d.getFullYear() === now.getFullYear();
-  if (isToday) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  if (isThisYear) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+const RELATIVE_HOUR_MS = 3_600_000;
+const RELATIVE_DAY_MS = 86_400_000;
+
+// Instagram-style coarse relative time: only "now", hours, and days — no minutes.
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < RELATIVE_HOUR_MS) return 'now';
+  if (diff < RELATIVE_DAY_MS) return `${Math.floor(diff / RELATIVE_HOUR_MS)}h`;
+  return `${Math.floor(diff / RELATIVE_DAY_MS)}d`;
 }
 
 function previewText(item: InboxItem): string {
   const msg = item.latestMessage;
-  if (!msg) return 'Start the conversation from this campaign thread.';
+  if (!msg) return 'No messages yet';
   if (msg.message_type === 'attachment') return msg.content || 'A file was shared';
   if (msg.message_type === 'booking_card') return msg.content || 'Booking details were created';
   if (msg.message_type === 'system') return msg.content;
   return msg.content;
 }
 
-export function ConversationRow({
+function ConversationRowComponent({
   item,
   index,
   onPress,
@@ -57,18 +58,18 @@ export function ConversationRow({
     item.campaign.business_profile?.ig_profile_picture_url ??
     item.campaign.business_profile?.avatar_url ??
     null;
-  const timestamp = item.latestMessage?.created_at;
   const title = participantName || item.campaign.title;
-  const secondaryLine =
-    participantName && participantName.trim() !== item.campaign.title.trim()
-      ? item.campaign.title
-      : null;
+  const sentAt = item.latestMessage?.created_at;
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 30).duration(300)}>
       <Pressable
-        onPress={onPress}
-        onLongPress={onLongPress}
+        onPress={() => {
+          onPress(item);
+        }}
+        onLongPress={() => {
+          onLongPress(item);
+        }}
         style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         accessibilityRole="button"
         accessibilityLabel={`${item.campaign.title} conversation`}
@@ -83,35 +84,22 @@ export function ConversationRow({
         </View>
 
         <View style={styles.body}>
-          <View style={styles.topRow}>
-            <Text style={styles.primaryTitle} numberOfLines={1} ellipsizeMode="tail">
-              {title}
-            </Text>
-            {timestamp ? <Text style={styles.timestamp}>{formatTimestamp(timestamp)}</Text> : null}
-          </View>
-
-          {secondaryLine ? (
-            <Text style={styles.secondaryLine} numberOfLines={1} ellipsizeMode="tail">
-              {secondaryLine}
-            </Text>
-          ) : null}
+          <Text style={styles.primaryTitle} numberOfLines={1} ellipsizeMode="tail">
+            {title}
+          </Text>
 
           <View style={styles.bottomRow}>
             <Text style={styles.preview} numberOfLines={1} ellipsizeMode="tail">
               {previewText(item)}
             </Text>
-            {item.unreadCount > 0 ? (
-              <LinearGradient
-                colors={['#FF3CAC', theme.colors.rose]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.badge}
-              >
-                <Text style={styles.badgeText}>
-                  {item.unreadCount > 99 ? '99+' : String(item.unreadCount)}
-                </Text>
-              </LinearGradient>
+            {sentAt ? (
+              <View style={styles.metaWrap}>
+                <View style={styles.metaDot} />
+                <Text style={styles.time}>{formatRelativeTime(sentAt)}</Text>
+              </View>
             ) : null}
+            <View style={styles.spacer} />
+            {item.unreadCount > 0 ? <View style={styles.unreadDot} /> : null}
           </View>
         </View>
       </Pressable>
@@ -119,10 +107,12 @@ export function ConversationRow({
   );
 }
 
+export const ConversationRow = memo(ConversationRowComponent);
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
     minHeight: 88,
@@ -141,51 +131,50 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: 4,
-    paddingTop: 2,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   primaryTitle: {
     ...theme.typography.cardTitle,
-    color: theme.colors.foreground,
-    flex: 1,
-  },
-  timestamp: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.42)',
-    flexShrink: 0,
-    fontVariant: ['tabular-nums'],
-  },
-  secondaryLine: {
-    ...theme.typography.caption,
-    color: 'rgba(255,255,255,0.42)',
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   preview: {
     ...theme.typography.callout,
     color: 'rgba(255,255,255,0.66)',
-    flex: 1,
-    fontWeight: '500',
+    flexShrink: 1,
+    minWidth: 0,
+    fontWeight: '400',
   },
-  badge: {
-    borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    minWidth: 20,
+  metaWrap: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     flexShrink: 0,
   },
-  badgeText: {
-    ...theme.typography.labelSmall,
-    color: '#FFFFFF',
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.42)',
+    marginHorizontal: 6,
+  },
+  time: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.42)',
+    fontWeight: '500',
     fontVariant: ['tabular-nums'],
+  },
+  spacer: {
+    flex: 1,
+  },
+  unreadDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: '#FF3CAC',
+    flexShrink: 0,
+    marginLeft: 10,
   },
 });

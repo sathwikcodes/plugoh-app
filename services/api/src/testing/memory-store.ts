@@ -63,6 +63,14 @@ export class MemoryDataStore implements DataStore {
     return this.insert<T>(table, values);
   }
 
+  async upsertMany<T extends Row>(table: string, values: Row[], onConflict = 'id', select = '*') {
+    const results: T[] = [];
+    for (const value of values) {
+      results.push(await this.upsert<T>(table, value, onConflict, select));
+    }
+    return results;
+  }
+
   async rpc<T extends Row>(fnName: string, params: Row) {
     switch (fnName) {
       case 'accept_campaign':
@@ -83,6 +91,8 @@ export class MemoryDataStore implements DataStore {
         return this.recordCampaignRefund(params) as T;
       case 'claim_idempotency':
         return this.claimIdempotency(params) as T;
+      case 'inbox_summary':
+        return this.inboxSummary(params) as T;
       default:
         throw new Error(`Unsupported RPC in MemoryDataStore: ${fnName}`);
     }
@@ -356,6 +366,37 @@ export class MemoryDataStore implements DataStore {
       updated_at: new Date().toISOString(),
     });
     return { ...campaign };
+  }
+
+  private inboxSummary(params: Row) {
+    const userId = String(params.p_user_id);
+    const role = String(params.p_role);
+    const key = role === 'business' ? 'business_id' : 'influencer_id';
+    const campaigns = this.rows('campaigns').filter((campaign) => campaign[key] === userId);
+    const messages = this.rows('campaign_messages');
+    const reads = this.rows('campaign_message_reads');
+    const result = campaigns.map((campaign) => {
+      const campaignMessages = messages.filter((message) => message.campaign_id === campaign.id);
+      const latest = [...campaignMessages].sort((a, b) =>
+        compareOrderedValues(b.created_at, a.created_at),
+      )[0];
+      const unreadCount = campaignMessages.filter(
+        (message) =>
+          message.sender_id !== userId &&
+          !reads.some((read) => read.message_id === message.id && read.user_id === userId),
+      ).length;
+      return {
+        campaign: { ...campaign },
+        latest_message: latest ? { ...latest } : null,
+        unread_count: unreadCount,
+      };
+    });
+    return result.sort((a, b) =>
+      compareOrderedValues(
+        b.latest_message?.created_at ?? b.campaign.created_at,
+        a.latest_message?.created_at ?? a.campaign.created_at,
+      ),
+    );
   }
 
   private claimIdempotency(params: Row) {
