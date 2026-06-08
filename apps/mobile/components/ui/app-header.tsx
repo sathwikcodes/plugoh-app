@@ -1,6 +1,8 @@
 import { GlassCircleButton } from '@/components/ui/glass-circle-button';
 import { NativeIconButton } from '@/components/ui/native-icon-button';
+import plugohLogo from '@/assets/images/logo.png';
 import { theme } from '@/constants/theme';
+import { Image } from 'expo-image';
 import type { ComponentProps, ReactNode } from 'react';
 import {
   StyleSheet,
@@ -17,7 +19,16 @@ export const APP_HEADER_ACTION_SIZE = 40;
 export const APP_HEADER_ACTION_SYMBOL_SIZE = 18;
 export const APP_HEADER_HORIZONTAL_PADDING = 2;
 export const APP_HEADER_SCREEN_TOP_PADDING = 0;
+export const APP_HEADER_SHELL_TOP_GAP = 20;
 export const APP_HEADER_PROFILE_GLASS_RENDERING = 'blur';
+
+export function getAppHeaderScreenTopPadding(insetTop: number) {
+  return Math.max(insetTop + APP_HEADER_SCREEN_TOP_PADDING - theme.spacing.hero, theme.spacing.sm);
+}
+
+export function getAppHeaderShellTopPadding(insetTop: number) {
+  return insetTop + APP_HEADER_SCREEN_TOP_PADDING + APP_HEADER_SHELL_TOP_GAP;
+}
 
 type ProfileIconProps = {
   imageUri?: string | null;
@@ -29,18 +40,40 @@ type ProfileIconProps = {
 
 type AppHeaderProps = {
   title: string;
+  showLogoTitle?: boolean;
+  logoAccessibilityLabel?: string;
   profile?: ProfileIconProps;
   right?: ReactNode;
   style?: StyleProp<ViewStyle>;
   titleStyle?: StyleProp<TextStyle>;
 };
 
-export function AppHeader({ title, profile, right, style, titleStyle }: AppHeaderProps) {
+export function AppHeader({
+  title,
+  showLogoTitle = false,
+  logoAccessibilityLabel,
+  profile,
+  right,
+  style,
+  titleStyle,
+}: AppHeaderProps) {
   return (
     <View style={[styles.row, style]}>
-      <Text style={[styles.title, titleStyle]} numberOfLines={1}>
-        {title}
-      </Text>
+      {showLogoTitle ? (
+        <View style={styles.logoTitle}>
+          <Image
+            source={plugohLogo}
+            style={styles.logoImage}
+            contentFit="contain"
+            accessible
+            accessibilityLabel={logoAccessibilityLabel ?? title}
+          />
+        </View>
+      ) : (
+        <Text style={[styles.title, titleStyle]} numberOfLines={1}>
+          {title}
+        </Text>
+      )}
       {profile ? (
         <NativeIconButton
           symbol={profile.symbol ?? 'person.circle'}
@@ -104,10 +137,24 @@ const styles = StyleSheet.create({
   },
   title: {
     ...theme.typography.display,
+    fontWeight: '500',
     color: theme.colors.foreground,
     flex: 1,
     minWidth: 0,
     includeFontPadding: false,
+  },
+  logoTitle: {
+    flex: 1,
+    minWidth: 0,
+    height: APP_HEADER_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    overflow: 'visible',
+  },
+  logoImage: {
+    width: 118,
+    height: APP_HEADER_HEIGHT,
+    transform: [{ translateX: -theme.spacing.md }],
   },
   backButton: {
     flexShrink: 0,

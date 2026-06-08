@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   formatCompactMetric,
   formatPaiseAsINR,
+  getTierBadgeCatalog,
   getTierDisplay,
   resolveHomeBadges,
+  TIER_ORDER,
 } from '@/lib/influencer/home-tier';
 
 describe('influencer home tier helpers', () => {
@@ -54,6 +56,26 @@ describe('influencer home tier helpers', () => {
       { key: 'pricing', label: 'Rate Set', unlocked: false },
       { key: 'active', label: 'Active', unlocked: true },
       { key: 'milestone', label: 'Milestone', unlocked: false },
+    ]);
+  });
+
+  it('keeps tier badge catalog ordered for the carousel', () => {
+    expect(getTierBadgeCatalog('nano').map((item) => item.key)).toEqual([...TIER_ORDER]);
+  });
+
+  it('marks current and future tier badges for locked carousel states', () => {
+    expect(
+      getTierBadgeCatalog('mid').map(({ key, current, unlocked, lockedLabel }) => ({
+        key,
+        current,
+        unlocked,
+        lockedLabel,
+      })),
+    ).toEqual([
+      { key: 'nano', current: false, unlocked: true, lockedLabel: 'Unlocked' },
+      { key: 'micro', current: false, unlocked: true, lockedLabel: 'Unlocked' },
+      { key: 'mid', current: true, unlocked: true, lockedLabel: 'Unlocked' },
+      { key: 'macro', current: false, unlocked: false, lockedLabel: 'Reach Macro' },
     ]);
   });
 });

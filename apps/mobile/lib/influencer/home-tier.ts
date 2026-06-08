@@ -3,13 +3,43 @@ import type { EarningsSummary, InfluencerProfileResponse } from '@plugoh/contrac
 export type InfluencerTier = EarningsSummary['tier'];
 
 export type HomeBadgeKey = 'instagram' | 'pricing' | 'active' | 'milestone';
+export type TierBadgeEmblem = 'spark' | 'leaf' | 'star' | 'crown';
+
+export type TierBadgeVisual = {
+  rim: string;
+  face: string;
+  accent: string;
+  glow: string;
+  shadow: string;
+  emblem: TierBadgeEmblem;
+  material: string;
+};
+
+export type TierBadgeCatalogItem = {
+  key: InfluencerTier;
+  label: string;
+  eyebrow: string;
+  lockedLabel: string;
+  rank: number;
+  current: boolean;
+  unlocked: boolean;
+  visual: TierBadgeVisual;
+};
 
 type TierMeta = {
   label: string;
   nextLabel: string;
   eyebrow: string;
   colors: readonly [string, string, string];
+  badge: TierBadgeVisual;
 };
+
+export const TIER_ORDER = [
+  'nano',
+  'micro',
+  'mid',
+  'macro',
+] as const satisfies readonly InfluencerTier[];
 
 const TIER_META: Record<InfluencerTier, TierMeta> = {
   nano: {
@@ -17,24 +47,60 @@ const TIER_META: Record<InfluencerTier, TierMeta> = {
     nextLabel: 'Micro',
     eyebrow: 'Building signal',
     colors: ['#9AF4E4', '#87BFFF', '#F6E7B7'],
+    badge: {
+      rim: '#C7F8FF',
+      face: '#67D9F0',
+      accent: '#F6E7B7',
+      glow: '#7DD3FC',
+      shadow: '#1B7FA3',
+      emblem: 'spark',
+      material: 'Aqua silver',
+    },
   },
   micro: {
     label: 'Micro',
     nextLabel: 'Mid',
     eyebrow: 'Trusted creator',
     colors: ['#B6FFCF', '#9AF4E4', '#F4C2FF'],
+    badge: {
+      rim: '#D6FFE6',
+      face: '#65E6B2',
+      accent: '#9AF4E4',
+      glow: '#7CF6C5',
+      shadow: '#137A60',
+      emblem: 'leaf',
+      material: 'Emerald chrome',
+    },
   },
   mid: {
     label: 'Mid',
     nextLabel: 'Macro',
     eyebrow: 'Brand favorite',
     colors: ['#FFD36E', '#FF8EC3', '#A78BFA'],
+    badge: {
+      rim: '#FFE7A3',
+      face: '#F5A74B',
+      accent: '#FF8EC3',
+      glow: '#FFD36E',
+      shadow: '#A25B18',
+      emblem: 'star',
+      material: 'Rose gold',
+    },
   },
   macro: {
     label: 'Macro',
     nextLabel: 'Maxed',
     eyebrow: 'Top tier',
     colors: ['#FFFFFF', '#FFD36E', '#7DD3FC'],
+    badge: {
+      rim: '#FFFFFF',
+      face: '#E9EDF8',
+      accent: '#FFD36E',
+      glow: '#F8F7FF',
+      shadow: '#8592BC',
+      emblem: 'crown',
+      material: 'Platinum gold',
+    },
   },
 };
 
@@ -79,6 +145,30 @@ export function getTierDisplay(tier?: InfluencerTier | null, rawProgress?: numbe
         ? 'Top tier reached'
         : `${Math.round(progress * 100)}% to ${meta.nextLabel}`,
   };
+}
+
+export function getTierRank(tier?: InfluencerTier | null) {
+  const resolvedTier = tier ?? DEFAULT_TIER;
+  const rank = TIER_ORDER.indexOf(resolvedTier);
+  return rank >= 0 ? rank : 0;
+}
+
+export function getTierBadgeCatalog(currentTier?: InfluencerTier | null): TierBadgeCatalogItem[] {
+  const currentRank = getTierRank(currentTier);
+
+  return TIER_ORDER.map((tier, rank) => {
+    const meta = TIER_META[tier];
+    return {
+      key: tier,
+      label: meta.label,
+      eyebrow: meta.eyebrow,
+      lockedLabel: rank > currentRank ? `Reach ${meta.label}` : 'Unlocked',
+      rank,
+      current: rank === currentRank,
+      unlocked: rank <= currentRank,
+      visual: meta.badge,
+    };
+  });
 }
 
 export function resolveHomeBadges(

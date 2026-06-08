@@ -10,7 +10,7 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppHeader, APP_HEADER_SCREEN_TOP_PADDING } from './app-header';
+import { AppHeader, getAppHeaderShellTopPadding } from './app-header';
 import { FilterOption, FilterSheet, FilterSheetSection } from './filter-sheet';
 import { GlassSearchField } from './glass-search-field';
 import { NativeIconButton } from './native-icon-button';
@@ -252,7 +252,7 @@ export function DeckBrowseScreen<
       contentContainerStyle={{
         flexGrow: 1,
         paddingHorizontal: PAGE_HORIZONTAL_INSET,
-        paddingTop: insets.top + APP_HEADER_SCREEN_TOP_PADDING,
+        paddingTop: getAppHeaderShellTopPadding(insets.top),
         paddingBottom:
           Math.max(insets.bottom, theme.spacing.sm) + NATIVE_TAB_DOCK_HEIGHT + TAB_DOCK_GAP,
         gap: isPremiumCampaigns ? theme.spacing.md : theme.spacing.md,

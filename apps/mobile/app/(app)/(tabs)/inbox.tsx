@@ -1,6 +1,6 @@
 import { ConversationRow } from '@/components/inbox/conversation-row';
 import { InboxFilterSheet } from '@/components/inbox/inbox-filter-sheet';
-import { AppHeader, APP_HEADER_SCREEN_TOP_PADDING } from '@/components/ui/app-header';
+import { AppHeader, getAppHeaderShellTopPadding } from '@/components/ui/app-header';
 import { GlassSearchField } from '@/components/ui/glass-search-field';
 import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
@@ -138,7 +138,7 @@ export default function InboxScreen() {
         style={[
           styles.topHeader,
           {
-            paddingTop: insets.top + APP_HEADER_SCREEN_TOP_PADDING,
+            paddingTop: getAppHeaderShellTopPadding(insets.top),
             paddingHorizontal: theme.spacing.xxl,
           },
         ]}

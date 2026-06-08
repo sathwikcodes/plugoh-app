@@ -1,5 +1,5 @@
 import { GlassCard } from '@/components/ui/glass-card';
-import { AppHeader } from '@/components/ui/app-header';
+import { AppHeader, getAppHeaderScreenTopPadding } from '@/components/ui/app-header';
 import { ErrorState, PrimaryButton, Screen, StatusChip } from '@/components/ui/primitives';
 import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
@@ -19,6 +19,7 @@ import { SymbolView } from 'expo-symbols';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated2, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, {
   Circle,
   Defs,
@@ -244,6 +245,7 @@ function NextActionCard({
 }
 
 export default function BrandHomeScreen() {
+  const insets = useSafeAreaInsets();
   const bootstrap = useBootstrap();
   const profile = useBusinessProfile();
   const campaigns = useCampaigns({ sort: 'created_desc' });
@@ -263,9 +265,17 @@ export default function BrandHomeScreen() {
   const profileImageUri = businessProfileImageUri(profile.data);
 
   return (
-    <Screen contentContainerStyle={styles.screenContent}>
+    <Screen
+      contentInsetAdjustmentBehavior="never"
+      contentContainerStyle={[
+        styles.screenContent,
+        { paddingTop: getAppHeaderScreenTopPadding(insets.top) },
+      ]}
+    >
       <AppHeader
         title="Home"
+        showLogoTitle
+        logoAccessibilityLabel="Plugoh home"
         profile={{
           imageUri: profileImageUri,
           onPress: () => {
