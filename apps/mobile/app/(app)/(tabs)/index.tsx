@@ -1,6 +1,7 @@
-import campaignInsightIcon from '@/assets/images/campaign.png';
-import coinInsightIcon from '@/assets/images/coin.png';
-import medalInsightIcon from '@/assets/images/medal.png';
+import contentDeliveryImage from '@/assets/images/content_delivery.png';
+import crystalImage from '@/assets/images/crystal.png';
+import pendingEarningsImage from '@/assets/images/pending_earnings.png';
+import { BrandAvatar } from '@/components/inbox/brand-avatar';
 import { TierBadgeCarousel } from '@/components/influencer/tier-badge-carousel';
 import { AppHeader, getAppHeaderScreenTopPadding } from '@/components/ui/app-header';
 import { Screen } from '@/components/ui/primitives';
@@ -14,28 +15,13 @@ import {
 } from '@/hooks/use-marketplace';
 import { formatPaiseAsINR, getTierBadgeCatalog, getTierDisplay } from '@/lib/influencer/home-tier';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import type { CampaignListItem, CampaignStatus } from '@plugoh/contracts';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type ImageSourcePropType,
-  useWindowDimensions,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, {
-  Circle,
-  Defs,
-  LinearGradient as SvgLinearGradient,
-  Line,
-  Polygon,
-  Stop,
-  Text as SvgText,
-} from 'react-native-svg';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -63,17 +49,71 @@ function isOverdue(campaign: CampaignListItem) {
   return campaign.due_date ? campaign.due_date < localDateKey() : false;
 }
 
+function isDueTomorrow(campaign: CampaignListItem) {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return campaign.due_date === localDateKey(tomorrow);
+}
+
+function campaignDueTime(campaign: CampaignListItem) {
+  if (!campaign.due_date) return Number.MAX_SAFE_INTEGER;
+  return new Date(`${campaign.due_date}T00:00:00`).getTime();
+}
+
+function compareByDeliveryUrgency(a: CampaignListItem, b: CampaignListItem) {
+  const aOverdue = isOverdue(a) ? 0 : 1;
+  const bOverdue = isOverdue(b) ? 0 : 1;
+  if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+  return campaignDueTime(a) - campaignDueTime(b);
+}
+
+function formatDueLabel(campaign?: CampaignListItem | null) {
+  if (!campaign?.due_date) return 'No due date set';
+  if (isOverdue(campaign)) return 'Overdue';
+  if (isDueToday(campaign)) return 'Due today';
+  if (isDueTomorrow(campaign)) return 'Due tomorrow';
+
+  return new Intl.DateTimeFormat('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(`${campaign.due_date}T00:00:00`));
+}
+
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return count === 1 ? singular : plural;
 }
 
-function clampPercent(value: number) {
-  return Math.min(Math.max(value, 0), 100);
+function displayCampaignTitle(campaign: CampaignListItem) {
+  return campaign.ai_title?.trim() || campaign.title.trim() || 'Campaign delivery';
 }
 
-function averagePercent(values: readonly number[]) {
-  if (!values.length) return 0;
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+function formatPackageType(pkg?: string) {
+  if (!pkg) return 'Booked campaign';
+  return pkg
+    .replaceAll('_', ' ')
+    .replaceAll('+', ' + ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function brandName(campaign: CampaignListItem) {
+  return campaign.business_profile?.brand_name?.trim() || 'Plugoh brand';
+}
+
+function brandImageUri(campaign: CampaignListItem) {
+  return (
+    campaign.business_profile?.profile_photo_url?.trim() ||
+    campaign.business_profile?.ig_profile_picture_url?.trim() ||
+    campaign.business_profile?.avatar_url?.trim() ||
+    null
+  );
+}
+
+function campaignEarningLabel(campaign?: CampaignListItem | null) {
+  if (!campaign) return 'Awaiting approval';
+  const paise =
+    campaign.price_offered_paise ??
+    (typeof campaign.price_offered === 'number' ? campaign.price_offered * 100 : null);
+  return paise == null ? 'Awaiting approval' : formatPaiseAsINR(paise);
 }
 
 // ─── HomeTierHero ─────────────────────────────────────────────────────────────
@@ -129,191 +169,379 @@ function HomeTierHero({
   );
 }
 
-type RadarMetric = {
-  label: string;
-  value: number;
-};
-
-function radarPoint({
-  index,
-  count,
-  radius,
-  centerX,
-  centerY,
+function DeliveryFocusCard({
+  campaigns,
+  deliveryCampaigns,
+  loading,
+  width,
 }: {
-  index: number;
-  count: number;
-  radius: number;
-  centerX: number;
-  centerY: number;
+  campaigns: CampaignListItem[];
+  deliveryCampaigns: CampaignListItem[];
+  loading: boolean;
+  width: number;
 }) {
-  const angle = -Math.PI / 2 + (index * 2 * Math.PI) / count;
-  return {
-    x: centerX + Math.cos(angle) * radius,
-    y: centerY + Math.sin(angle) * radius,
-  };
-}
-
-function pointsToString(points: { x: number; y: number }[]) {
-  return points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
-}
-
-function RadarChart({
-  metrics,
-  accentColor,
-}: {
-  metrics: readonly RadarMetric[];
-  accentColor: string;
-}) {
-  const centerX = 110;
-  const centerY = 76;
-  const radius = 48;
-  const labelRadius = 70;
-  const ringLevels = [0.2, 0.4, 0.6, 0.8, 1];
-  const count = metrics.length;
-  const dataPoints = metrics.map((metric, index) =>
-    radarPoint({
-      index,
-      count,
-      radius: radius * (clampPercent(metric.value) / 100),
-      centerX,
-      centerY,
-    }),
+  const activeCampaigns = campaigns.filter((campaign) =>
+    HEALTH_TRACKED_STATUSES.has(campaign.status),
   );
-  const fullPoints = metrics.map((_, index) =>
-    radarPoint({ index, count, radius, centerX, centerY }),
-  );
-  const accessibilitySummary = metrics
-    .map((metric) => `${metric.label} ${Math.round(clampPercent(metric.value))} percent`)
-    .join(', ');
+  const displayCampaigns = activeCampaigns.length > 0 ? activeCampaigns : campaigns;
+  const sortedDeliveryCampaigns = [...deliveryCampaigns].sort(compareByDeliveryUrgency);
+  const featuredCampaign =
+    sortedDeliveryCampaigns.length > 0
+      ? sortedDeliveryCampaigns[0]
+      : displayCampaigns.length > 0
+        ? displayCampaigns[0]
+        : null;
+  const visibleCampaigns = displayCampaigns.slice(0, 5);
+  const overflowCampaignCount = Math.max(displayCampaigns.length - visibleCampaigns.length, 0);
+  const deliveryCount = deliveryCampaigns.length;
+  const deliveryLabel = loading
+    ? 'Checking deliveries'
+    : `${deliveryCount} ${pluralize(deliveryCount, 'delivery', 'deliveries')} left`;
 
   return (
-    <View
-      style={insightStyles.radarWrap}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={`Campaign health radar chart: ${accessibilitySummary}`}
-    >
-      <View style={[insightStyles.radarGlow, { backgroundColor: accentColor }]} />
-      <Svg width={220} height={164} viewBox="0 0 220 164">
-        <Defs>
-          <SvgLinearGradient id="campaignHealthRadarFill" x1="54" y1="18" x2="166" y2="130">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.34} />
-            <Stop offset="0.45" stopColor={accentColor} stopOpacity={0.3} />
-            <Stop offset="1" stopColor={accentColor} stopOpacity={0.1} />
-          </SvgLinearGradient>
-        </Defs>
+    <View style={[insightStyles.deliveryCard, { width }]}>
+      <View style={insightStyles.deliveryHeader}>
+        <View style={insightStyles.deliveryHeaderCopy}>
+          <Text
+            style={insightStyles.deliveryTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            Delivery
+          </Text>
+          <Text style={insightStyles.deliverySummary} numberOfLines={1}>
+            {deliveryLabel}
+          </Text>
+        </View>
+        <Image
+          source={contentDeliveryImage}
+          style={insightStyles.deliveryHeroImage}
+          contentFit="contain"
+          accessible
+          accessibilityLabel="Content delivery setup"
+        />
+      </View>
 
-        {ringLevels.map((level) => (
-          <Polygon
-            key={level}
-            points={pointsToString(
-              metrics.map((_, index) =>
-                radarPoint({ index, count, radius: radius * level, centerX, centerY }),
-              ),
+      {featuredCampaign ? (
+        <Pressable
+          onPress={() => {
+            router.push(`/(app)/campaigns/${featuredCampaign.id}`);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${displayCampaignTitle(featuredCampaign)} from ${brandName(
+            featuredCampaign,
+          )}`}
+          style={({ pressed }) => [
+            insightStyles.featuredCampaign,
+            pressed ? insightStyles.featuredCampaignPressed : null,
+          ]}
+        >
+          <BrandAvatar
+            imageUri={brandImageUri(featuredCampaign)}
+            name={brandName(featuredCampaign)}
+            size={46}
+            textSize={16}
+          />
+          <View style={insightStyles.featuredCopy}>
+            <Text style={insightStyles.featuredTitle} numberOfLines={1}>
+              {brandName(featuredCampaign)}
+            </Text>
+            <Text style={insightStyles.featuredBrand} numberOfLines={1}>
+              {formatPackageType(featuredCampaign.package_type)}
+            </Text>
+            <Text style={insightStyles.featuredDue} numberOfLines={1}>
+              {formatDueLabel(featuredCampaign)}
+            </Text>
+          </View>
+          <View style={insightStyles.chevronBubble} pointerEvents="none">
+            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.72)" />
+          </View>
+        </Pressable>
+      ) : (
+        <View style={insightStyles.deliveryEmpty}>
+          <Text style={insightStyles.deliveryEmptyTitle}>All clear</Text>
+          <Text style={insightStyles.deliveryEmptySubtitle}>
+            New brand campaigns will appear here when they need attention.
+          </Text>
+        </View>
+      )}
+
+      <View style={insightStyles.deliveryMeta}>
+        <View style={insightStyles.metaBlock}>
+          <Text style={insightStyles.metaLabel}>Active brand campaigns</Text>
+          <View style={insightStyles.activeAvatarRow}>
+            {visibleCampaigns.length > 0 ? (
+              <>
+                {visibleCampaigns.map((campaign, index) => (
+                  <View
+                    key={`active-${campaign.id}`}
+                    style={[
+                      insightStyles.activeAvatarItem,
+                      index > 0 ? { marginLeft: -theme.spacing.xs } : null,
+                    ]}
+                  >
+                    <BrandAvatar
+                      imageUri={brandImageUri(campaign)}
+                      name={brandName(campaign)}
+                      size={38}
+                      textSize={13}
+                    />
+                  </View>
+                ))}
+                {overflowCampaignCount > 0 ? (
+                  <View style={[insightStyles.activeAvatarMore, { marginLeft: -theme.spacing.xs }]}>
+                    <Text style={insightStyles.activeAvatarMoreText}>+{overflowCampaignCount}</Text>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <Text style={insightStyles.metaMuted}>No active brands</Text>
             )}
-            fill="none"
-            stroke="rgba(255,255,255,0.12)"
-            strokeWidth={level === 1 ? 1.15 : 0.8}
-          />
-        ))}
-
-        {fullPoints.map((point) => (
-          <Line
-            key={`${point.x}-${point.y}`}
-            x1={centerX}
-            y1={centerY}
-            x2={point.x}
-            y2={point.y}
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth={0.8}
-          />
-        ))}
-
-        <Polygon
-          points={pointsToString(dataPoints)}
-          fill="url(#campaignHealthRadarFill)"
-          stroke={accentColor}
-          strokeWidth={2}
-          strokeLinejoin="round"
-        />
-        <Polygon
-          points={pointsToString(dataPoints)}
-          fill="none"
-          stroke="#FFFFFF"
-          strokeOpacity={0.36}
-          strokeWidth={0.8}
-          strokeLinejoin="round"
-        />
-        {dataPoints.map((point) => (
-          <Circle key={`${point.x}-${point.y}`} cx={point.x} cy={point.y} r={2.6} fill="#FFFFFF" />
-        ))}
-
-        {metrics.map((metric, index) => {
-          const point = radarPoint({ index, count, radius: labelRadius, centerX, centerY });
-          const anchor = point.x < centerX - 8 ? 'end' : point.x > centerX + 8 ? 'start' : 'middle';
-          return (
-            <SvgText
-              key={metric.label}
-              x={point.x}
-              y={point.y + 3}
-              fill="rgba(255,255,255,0.62)"
-              fontSize={8.4}
-              fontWeight="500"
-              textAnchor={anchor}
-            >
-              {metric.label}
-            </SvgText>
-          );
-        })}
-      </Svg>
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
 
-function InsightCard({
-  imageSource,
-  title,
-  value,
-  subtitle,
-  accentColor,
+function PendingEarningsFocusCard({
+  earnings,
+  campaigns,
+  pendingCampaigns,
+  loading,
   width,
-  radarMetrics,
 }: {
-  imageSource?: ImageSourcePropType;
-  title: string;
-  value: string;
-  subtitle: string;
-  accentColor: string;
+  earnings: ReturnType<typeof useEarnings>['data'];
+  campaigns: CampaignListItem[];
+  pendingCampaigns: CampaignListItem[];
+  loading: boolean;
   width: number;
-  radarMetrics?: readonly RadarMetric[];
 }) {
+  const activeCampaigns = campaigns.filter((campaign) =>
+    HEALTH_TRACKED_STATUSES.has(campaign.status),
+  );
+  const displayCampaigns =
+    pendingCampaigns.length > 0
+      ? pendingCampaigns
+      : activeCampaigns.length > 0
+        ? activeCampaigns
+        : campaigns;
+  const featuredCampaign =
+    pendingCampaigns.length > 0
+      ? pendingCampaigns[0]
+      : displayCampaigns.length > 0
+        ? displayCampaigns[0]
+        : null;
+  const visibleCampaigns = displayCampaigns.slice(0, 5);
+  const overflowCampaignCount = Math.max(displayCampaigns.length - visibleCampaigns.length, 0);
+  const earningsLabel = loading
+    ? 'Checking earnings'
+    : formatPaiseAsINR(earnings?.pending_earnings);
+
   return (
-    <View style={[insightStyles.card, radarMetrics && insightStyles.radarCard, { width }]}>
-      {radarMetrics ? (
-        <RadarChart metrics={radarMetrics} accentColor={accentColor} />
-      ) : imageSource ? (
-        <View style={insightStyles.assetStage}>
-          <View style={[insightStyles.assetGlow, { backgroundColor: accentColor }]} />
-          <Image
-            source={imageSource}
-            style={insightStyles.assetImage}
-            contentFit="contain"
-            accessible
-            accessibilityLabel={`${title} insight`}
-          />
+    <View style={[insightStyles.deliveryCard, { width }]}>
+      <View style={insightStyles.deliveryHeader}>
+        <View style={insightStyles.deliveryHeaderCopy}>
+          <Text
+            style={insightStyles.deliveryTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            Pending Earnings
+          </Text>
+          <Text style={insightStyles.deliverySummary} numberOfLines={1}>
+            {earningsLabel}
+          </Text>
         </View>
-      ) : null}
-      <View style={insightStyles.cardCopy}>
-        <Text style={insightStyles.cardTitle} numberOfLines={1} adjustsFontSizeToFit>
-          {title}
-        </Text>
-        <Text style={insightStyles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
-          {value}
-        </Text>
-        <Text style={insightStyles.cardSubtitle} numberOfLines={2}>
-          {subtitle}
-        </Text>
+        <Image
+          source={pendingEarningsImage}
+          style={insightStyles.deliveryHeroImage}
+          contentFit="contain"
+          accessible
+          accessibilityLabel="Pending earnings"
+        />
+      </View>
+
+      {featuredCampaign ? (
+        <Pressable
+          onPress={() => {
+            router.push(`/(app)/campaigns/${featuredCampaign.id}`);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`View pending earnings for ${brandName(featuredCampaign)}`}
+          style={({ pressed }) => [
+            insightStyles.featuredCampaign,
+            pressed ? insightStyles.featuredCampaignPressed : null,
+          ]}
+        >
+          <BrandAvatar
+            imageUri={brandImageUri(featuredCampaign)}
+            name={brandName(featuredCampaign)}
+            size={46}
+            textSize={16}
+          />
+          <View style={insightStyles.featuredCopy}>
+            <Text style={insightStyles.featuredTitle} numberOfLines={1}>
+              {brandName(featuredCampaign)}
+            </Text>
+            <Text style={insightStyles.featuredBrand} numberOfLines={1}>
+              {formatPackageType(featuredCampaign.package_type)}
+            </Text>
+            <Text style={insightStyles.featuredDue} numberOfLines={1}>
+              {campaignEarningLabel(featuredCampaign)}
+            </Text>
+          </View>
+          <View style={insightStyles.chevronBubble} pointerEvents="none">
+            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.72)" />
+          </View>
+        </Pressable>
+      ) : (
+        <View style={insightStyles.deliveryEmpty}>
+          <Text style={insightStyles.deliveryEmptyTitle}>Nothing pending</Text>
+          <Text style={insightStyles.deliveryEmptySubtitle}>
+            Campaign earnings will appear here after delivery or approval.
+          </Text>
+        </View>
+      )}
+
+      <View style={insightStyles.deliveryMeta}>
+        <View style={insightStyles.metaBlock}>
+          <Text style={insightStyles.metaLabel}>Pending campaigns</Text>
+          <View style={insightStyles.activeAvatarRow}>
+            {visibleCampaigns.length > 0 ? (
+              <>
+                {visibleCampaigns.map((campaign, index) => (
+                  <View
+                    key={`earning-${campaign.id}`}
+                    style={[
+                      insightStyles.activeAvatarItem,
+                      index > 0 ? { marginLeft: -theme.spacing.xs } : null,
+                    ]}
+                  >
+                    <BrandAvatar
+                      imageUri={brandImageUri(campaign)}
+                      name={brandName(campaign)}
+                      size={38}
+                      textSize={13}
+                    />
+                  </View>
+                ))}
+                {overflowCampaignCount > 0 ? (
+                  <View style={[insightStyles.activeAvatarMore, { marginLeft: -theme.spacing.xs }]}>
+                    <Text style={insightStyles.activeAvatarMoreText}>+{overflowCampaignCount}</Text>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <Text style={insightStyles.metaMuted}>No pending campaigns</Text>
+            )}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function TierProgressFocusCard({
+  earnings,
+  loading,
+  width,
+}: {
+  earnings: ReturnType<typeof useEarnings>['data'];
+  loading: boolean;
+  width: number;
+}) {
+  const tier = getTierDisplay(earnings?.tier, earnings?.tier_progress);
+  const badgeCatalog = getTierBadgeCatalog(tier.key);
+  const currentBadge = badgeCatalog.find((item) => item.current) ?? badgeCatalog[0];
+
+  return (
+    <View style={[insightStyles.deliveryCard, { width }]}>
+      <View style={insightStyles.deliveryHeader}>
+        <View style={insightStyles.deliveryHeaderCopy}>
+          <Text
+            style={insightStyles.deliveryTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+          >
+            Tier Progress
+          </Text>
+          <Text style={insightStyles.deliverySummary} numberOfLines={1}>
+            {loading ? 'Checking tier' : `${tier.progressPercent}% complete`}
+          </Text>
+        </View>
+        <Image
+          source={crystalImage}
+          style={insightStyles.deliveryHeroImage}
+          contentFit="contain"
+          accessible
+          accessibilityLabel="Tier progress crystal"
+        />
+      </View>
+
+      <Pressable
+        onPress={() => {
+          router.push('/(app)/profile');
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${tier.label} tier progress`}
+        style={({ pressed }) => [
+          insightStyles.featuredCampaign,
+          pressed ? insightStyles.featuredCampaignPressed : null,
+        ]}
+      >
+        <View
+          style={[
+            insightStyles.tierBadge,
+            {
+              backgroundColor: currentBadge.visual.face,
+              borderColor: currentBadge.visual.rim,
+            },
+          ]}
+        >
+          <Text style={insightStyles.tierBadgeText}>{currentBadge.label.charAt(0)}</Text>
+        </View>
+        <View style={insightStyles.featuredCopy}>
+          <Text style={insightStyles.featuredTitle} numberOfLines={1}>
+            {tier.label} tier
+          </Text>
+          <Text style={insightStyles.featuredBrand} numberOfLines={1}>
+            {tier.progressLabel}
+          </Text>
+          <Text style={insightStyles.featuredDue} numberOfLines={1}>
+            {currentBadge.visual.material}
+          </Text>
+        </View>
+        <View style={insightStyles.chevronBubble} pointerEvents="none">
+          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.72)" />
+        </View>
+      </Pressable>
+
+      <View style={insightStyles.deliveryMeta}>
+        <View style={insightStyles.metaBlock}>
+          <Text style={insightStyles.metaLabel}>Tier milestones</Text>
+          <View style={insightStyles.tierMilestoneRow}>
+            {badgeCatalog.map((badge, index) => (
+              <View
+                key={badge.key}
+                style={[
+                  insightStyles.tierMilestoneItem,
+                  {
+                    backgroundColor: badge.unlocked ? badge.visual.face : 'rgba(255,255,255,0.08)',
+                    borderColor: badge.current ? badge.visual.rim : 'rgba(255,255,255,0.14)',
+                    opacity: badge.unlocked ? 1 : 0.48,
+                  },
+                  index > 0 ? { marginLeft: -theme.spacing.xs } : null,
+                ]}
+              >
+                <Text style={insightStyles.tierMilestoneText}>{badge.label.charAt(0)}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -329,97 +557,14 @@ function DailyInsightsSection({
   loading: boolean;
 }) {
   const window = useWindowDimensions();
-  const cardWidth = Math.min(Math.max(window.width * 0.72, 248), 304);
+  const cardWidth = Math.min(Math.max(window.width * 0.82, 300), 348);
   const sidePeekPadding = Math.max(0, (window.width - cardWidth) / 2);
-  const tier = getTierDisplay(earnings?.tier, earnings?.tier_progress);
   const deliveryCampaigns = campaigns.filter((campaign) =>
     DELIVERY_ACTION_STATUSES.has(campaign.status),
   );
-  const dueTodayCount = deliveryCampaigns.filter(isDueToday).length;
   const pendingEarningCampaigns = campaigns.filter((campaign) =>
     PENDING_EARNING_STATUSES.has(campaign.status),
   );
-  const overdueCount = deliveryCampaigns.filter(isOverdue).length;
-  const submittedCount = campaigns.filter(
-    (campaign) => campaign.status === 'delivery_submitted',
-  ).length;
-  const completedCount = campaigns.filter((campaign) => campaign.status === 'completed').length;
-  const trackedHealthCount = campaigns.filter((campaign) =>
-    HEALTH_TRACKED_STATUSES.has(campaign.status),
-  ).length;
-  const deliveryScore = trackedHealthCount
-    ? clampPercent(Math.round(((submittedCount + completedCount) / trackedHealthCount) * 100))
-    : 78;
-  const approvalScore =
-    submittedCount + completedCount > 0
-      ? clampPercent(Math.round((completedCount / (submittedCount + completedCount)) * 82) + 18)
-      : 72;
-  const earningsScore =
-    pendingEarningCampaigns.length > 0
-      ? clampPercent(
-          Math.round((pendingEarningCampaigns.length / Math.max(trackedHealthCount, 1)) * 100),
-        )
-      : earnings?.total_earnings
-        ? 82
-        : 58;
-  const reliabilityScore =
-    deliveryCampaigns.length > 0 ? clampPercent(100 - overdueCount * 28 - dueTodayCount * 8) : 92;
-  const healthRadarMetrics = [
-    { label: 'Delivery', value: deliveryScore },
-    { label: 'Approval', value: approvalScore },
-    { label: 'Earnings', value: earningsScore },
-    { label: 'Tier', value: tier.progressPercent },
-    { label: 'Reliable', value: reliabilityScore },
-  ];
-  const healthScore = averagePercent(healthRadarMetrics.map((metric) => metric.value));
-  const cards = [
-    {
-      imageSource: campaignInsightIcon,
-      title: 'Delivery Due',
-      value: loading
-        ? '--'
-        : dueTodayCount > 0
-          ? `${dueTodayCount} today`
-          : `${deliveryCampaigns.length} open`,
-      subtitle:
-        dueTodayCount > 0
-          ? `Ship ${pluralize(dueTodayCount, 'campaign')} before the day ends`
-          : deliveryCampaigns.length > 0
-            ? 'Accepted campaigns waiting for content'
-            : 'No delivery tasks due today',
-      accentColor: '#F6C967',
-    },
-    {
-      imageSource: coinInsightIcon,
-      title: 'Pending Earnings',
-      value: loading ? '--' : formatPaiseAsINR(earnings?.pending_earnings),
-      subtitle:
-        pendingEarningCampaigns.length > 0
-          ? `${pendingEarningCampaigns.length} ${pluralize(
-              pendingEarningCampaigns.length,
-              'campaign',
-            )} tied to delivery or approval`
-          : 'No secured earnings waiting right now',
-      accentColor: '#F4B860',
-    },
-    {
-      imageSource: medalInsightIcon,
-      title: 'Tier Progress',
-      value: loading ? '--' : `${tier.progressPercent}%`,
-      subtitle: tier.progressLabel,
-      accentColor: '#FFE0A4',
-    },
-    {
-      title: 'Campaign Health',
-      value: loading ? '--' : `${healthScore}%`,
-      subtitle:
-        trackedHealthCount > 0
-          ? 'Radar across your active creator cycle'
-          : 'Radar across 5 creator signals',
-      accentColor: '#9AF4E4',
-      radarMetrics: healthRadarMetrics,
-    },
-  ];
 
   return (
     <View style={insightStyles.section}>
@@ -435,9 +580,20 @@ function DailyInsightsSection({
         style={insightStyles.scrollerFrame}
         contentContainerStyle={[insightStyles.scroller, { paddingHorizontal: sidePeekPadding }]}
       >
-        {cards.map((card) => (
-          <InsightCard key={card.title} {...card} width={cardWidth} />
-        ))}
+        <DeliveryFocusCard
+          campaigns={campaigns}
+          deliveryCampaigns={deliveryCampaigns}
+          loading={loading}
+          width={cardWidth}
+        />
+        <PendingEarningsFocusCard
+          earnings={earnings}
+          campaigns={campaigns}
+          pendingCampaigns={pendingEarningCampaigns}
+          loading={loading}
+          width={cardWidth}
+        />
+        <TierProgressFocusCard earnings={earnings} loading={loading} width={cardWidth} />
       </ScrollView>
     </View>
   );
@@ -558,93 +714,225 @@ const insightStyles = StyleSheet.create({
   scroller: {
     gap: theme.spacing.md,
   },
-  card: {
-    minHeight: 284,
+  deliveryCard: {
     borderRadius: 24,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.045)',
     overflow: 'hidden',
-    paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
-    alignItems: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  deliveryHeader: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: theme.spacing.sm,
   },
-  radarCard: {
-    paddingTop: theme.spacing.md,
+  deliveryHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: theme.spacing.sm,
+    paddingTop: theme.spacing.xs,
   },
-  assetStage: {
-    width: 92,
-    height: 92,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  assetGlow: {
-    position: 'absolute',
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    opacity: 0.2,
-    shadowColor: '#FFFFFF',
-    shadowOpacity: 0.42,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  assetImage: {
-    width: 74,
-    height: 74,
-  },
-  radarWrap: {
-    width: 220,
-    height: 164,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.xs,
-  },
-  radarGlow: {
-    position: 'absolute',
-    width: 118,
-    height: 118,
-    borderRadius: 59,
-    opacity: 0.12,
-    shadowColor: '#FFFFFF',
-    shadowOpacity: 0.38,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  cardCopy: {
-    width: '100%',
-    alignItems: 'center',
-    gap: 6,
-  },
-  cardTitle: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '400',
-    color: 'rgba(255,255,255,0.58)',
-    textAlign: 'center',
-    includeFontPadding: false,
-  },
-  cardValue: {
+  deliveryTitle: {
     fontFamily: theme.typography.display.fontFamily,
-    fontSize: 27,
-    lineHeight: 33,
-    fontWeight: '500',
+    fontSize: 25,
+    lineHeight: 31,
+    fontWeight: '700',
     color: 'rgba(255,255,255,0.96)',
-    textAlign: 'center',
     includeFontPadding: false,
   },
-  cardSubtitle: {
+  deliverySummary: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    includeFontPadding: false,
+  },
+  deliveryHeroImage: {
+    width: 82,
+    height: 76,
+    marginTop: -theme.spacing.xs,
+    marginRight: -theme.spacing.xs,
+    flexShrink: 0,
+  },
+  featuredCampaign: {
+    minHeight: 98,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    borderRadius: 22,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+  },
+  featuredCampaignPressed: {
+    opacity: 0.78,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  featuredCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  featuredTitle: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.96)',
+    includeFontPadding: false,
+  },
+  featuredBrand: {
     fontFamily: theme.typography.body.fontFamily,
     fontSize: 13,
     lineHeight: 18,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.64)',
+    includeFontPadding: false,
+  },
+  featuredDue: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 11,
+    lineHeight: 17,
+    fontWeight: '700',
+    color: '#F6C967',
+    includeFontPadding: false,
+  },
+  chevronBubble: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tierBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tierBadgeText: {
+    fontFamily: theme.typography.display.fontFamily,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    includeFontPadding: false,
+    textShadowColor: 'rgba(0,0,0,0.22)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  deliveryEmpty: {
+    minHeight: 98,
+    justifyContent: 'center',
+    borderRadius: 22,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    padding: theme.spacing.md,
+    gap: 4,
+  },
+  deliveryEmptyTitle: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.92)',
+    includeFontPadding: false,
+  },
+  deliveryEmptySubtitle: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '400',
-    color: 'rgba(255,255,255,0.48)',
-    textAlign: 'center',
+    color: 'rgba(255,255,255,0.5)',
+    includeFontPadding: false,
+  },
+  deliveryMeta: {
+    gap: theme.spacing.sm,
+  },
+  metaBlock: {
+    gap: theme.spacing.md,
+  },
+  metaLabel: {
+    fontFamily: theme.typography.display.fontFamily,
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.92)',
+    includeFontPadding: false,
+  },
+  activeAvatarRow: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  activeAvatarItem: {
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: 'rgba(5,5,9,0.86)',
+  },
+  activeAvatarMore: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: 'rgba(5,5,9,0.86)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeAvatarMoreText: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.74)',
+    includeFontPadding: false,
+  },
+  tierMilestoneRow: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tierMilestoneItem: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tierMilestoneText: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    includeFontPadding: false,
+    textShadowColor: 'rgba(0,0,0,0.24)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  metaMuted: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.38)',
     includeFontPadding: false,
   },
 });
