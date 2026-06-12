@@ -466,6 +466,8 @@ export class DiscoveryService {
     profiles = profiles.map((profile) => ({
       ...profile,
       starter_price_paise: Number.isFinite(starterPrice(profile)) ? starterPrice(profile) : null,
+      starterPrice: Number.isFinite(starterPrice(profile)) ? starterPrice(profile) / 100 : null,
+      price_per_reel: Number.isFinite(starterPrice(profile)) ? starterPrice(profile) / 100 : null,
     }));
     switch (query.sort) {
       case 'followers_desc':

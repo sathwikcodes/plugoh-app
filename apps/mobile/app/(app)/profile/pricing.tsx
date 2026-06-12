@@ -168,7 +168,9 @@ export default function PricingScreen() {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await mutations.updatePricing.mutateAsync(values);
+      await mutations.updatePricing.mutateAsync({
+        price_per_reel_paise: values.price_per_reel * 100,
+      });
       router.back();
     } catch (error) {
       Alert.alert(

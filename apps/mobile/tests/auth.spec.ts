@@ -112,6 +112,24 @@ describe('mobile auth helpers', () => {
     await expect(signInWithSupabaseGoogle()).rejects.toMatchObject({ code: 'missing_session' });
   });
 
+  it('rejects token callbacks when Supabase does not create a session', async () => {
+    const { signInWithSupabaseGoogle } = await import('@/lib/auth/google');
+    supabaseAuthMock.signInWithOAuth.mockResolvedValue({
+      data: { url: 'https://project.supabase.co/auth/v1/authorize?provider=google' },
+      error: null,
+    });
+    googleMock.openAuthSessionAsync.mockResolvedValue({
+      type: 'success',
+      url: 'plugoh://auth/callback#access_token=access-token&refresh_token=refresh-token',
+    });
+    supabaseAuthMock.setSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+
+    await expect(signInWithSupabaseGoogle()).rejects.toMatchObject({ code: 'missing_session' });
+  });
+
   it('maps provider failures without leaking raw OAuth errors', async () => {
     const { signInWithSupabaseGoogle, userMessageForGoogleAuth } =
       await import('@/lib/auth/google');

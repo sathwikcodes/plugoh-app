@@ -51,8 +51,6 @@ function makeApp(seed = {}) {
         display_name: 'Creator One',
         city: 'Hyderabad',
         category: 'food',
-        price_per_reel_paise: 10000,
-        price_per_reel_paise: 8000,
         price_per_reel_paise: 3000,
         follower_count: 25000,
         avg_likes_per_reel: 500,
@@ -64,6 +62,7 @@ function makeApp(seed = {}) {
     notifications: [],
     deliveries: [],
     escrow_ledger_entries: [],
+    payment_orders: [],
     instagram_media: [],
     influencer_payout_accounts: [],
     ...seed,
@@ -141,7 +140,8 @@ describe('Plugoh API', () => {
     const body = await json(res);
     expect(res.status).toBe(200);
     expect(body.data.items).toHaveLength(1);
-    expect(body.data.items[0].starterPrice).toBe(3000);
+    expect(body.data.items[0].starter_price_paise).toBe(3000);
+    expect(body.data.items[0].starterPrice).toBe(30);
     expect(body.data.nextOffset).toBeNull();
     expect(body.data.total).toBe(1);
   });
@@ -328,7 +328,7 @@ describe('Plugoh API', () => {
       store,
       config: { port: 4000, demoEnabled: false },
       authVerifier: async () => ({ id: businessId, email: 'brand@test.dev' }),
-      providers: {},
+      providers: { geocoding: new FakeGeocodingProvider() },
     });
     const res = await app.request('/business/onboarding', {
       method: 'POST',
@@ -597,6 +597,17 @@ describe('Plugoh API', () => {
           total_charged_paise: 11200,
         },
       ],
+      payment_orders: [
+        {
+          id: 'payment-order-accept',
+          campaign_id: campaignId,
+          provider: 'razorpay',
+          provider_order_id: 'order_accept',
+          status: 'authorized',
+          amount_paise: 11200,
+          currency: 'INR',
+        },
+      ],
     });
     const res = await app.request(`/campaigns/${campaignId}/accept`, {
       method: 'POST',
@@ -621,6 +632,17 @@ describe('Plugoh API', () => {
           platform_fee_paise: 1200,
           total_charged_paise: 11200,
           razorpay_order_id: orderId,
+        },
+      ],
+      payment_orders: [
+        {
+          id: 'payment-order-verify',
+          campaign_id: campaignId,
+          provider: 'razorpay',
+          provider_order_id: orderId,
+          status: 'created',
+          amount_paise: 11200,
+          currency: 'INR',
         },
       ],
     });
@@ -661,7 +683,7 @@ describe('Plugoh API', () => {
           business_id: businessId,
           influencer_id: influencerId,
           title: 'Booking',
-          status: 'capture_pending',
+          status: 'pre_authorized',
           price_offered_paise: 10000,
           platform_fee_paise: 1200,
           total_charged_paise: 11200,
@@ -698,7 +720,7 @@ describe('Plugoh API', () => {
         razorpay_signature: signature('order_paid_for_small_amount', 'pay_card'),
         influencer_id: influencerId,
         influencer_profile_id: influencerProfileId,
-        package_type: 'post',
+        package_type: 'instagram_reel',
         objective: 'feature_product',
         timing_mode: 'asap',
         business_contact_email: 'brand@test.dev',
@@ -709,7 +731,21 @@ describe('Plugoh API', () => {
   });
 
   it('generates campaign creative after successful booking payment verification', async () => {
-    const { app, store } = makeApp();
+    const { app, store } = makeApp({
+      influencer_profiles: [
+        {
+          id: influencerProfileId,
+          user_id: influencerId,
+          display_name: 'Creator One',
+          city: 'Hyderabad',
+          category: 'food',
+          price_per_reel_paise: 10000,
+          follower_count: 25000,
+          avg_likes_per_reel: 500,
+          is_active: true,
+        },
+      ],
+    });
     const orderId = 'order_booking_ok';
     const paymentId = 'pay_card';
 
@@ -739,10 +775,10 @@ describe('Plugoh API', () => {
     const campaign = store.tables
       .get('campaigns')
       ?.find((row) => row.id === campaignIdFromResponse);
-    const escrow = store.tables
-      .get('escrow_ledger_entries')
+    const paymentOrder = store.tables
+      .get('payment_orders')
       ?.find((row) => row.campaign_id === campaignIdFromResponse);
-    expect(escrow?.type).toBe('escrow_lock');
+    expect(paymentOrder?.status).toBe('authorized');
     expect(campaign?.ai_title).toBe('Aura Weekend Reel');
     expect(campaign?.card_image_url).toContain(`campaigns/${campaignIdFromResponse}/card.png`);
   });
@@ -792,9 +828,9 @@ describe('Plugoh API', () => {
     const body = await json(res);
     expect(res.status).toBe(200);
     expect(body.data.keyId).toBe('rzp_test_public');
-    expect(body.data.priceOffered).toBe(13000);
-    expect(body.data.platformFee).toBe(1560);
-    expect(body.data.total).toBe(14560);
+    expect(body.data.price_offered_paise).toBe(3000);
+    expect(body.data.platform_fee_paise).toBe(360);
+    expect(body.data.total_charged_paise).toBe(3360);
   });
 
   it('rejects booking order creation before taking payment when the business profile is incomplete', async () => {
@@ -996,6 +1032,19 @@ describe('Plugoh API', () => {
           total_charged_paise: 11200,
         },
       ],
+      payment_orders: [
+        {
+          id: 'payment-order-delivery',
+          campaign_id: campaignId,
+          provider: 'razorpay',
+          provider_order_id: 'order_delivery',
+          provider_payment_id: 'pay_delivery',
+          payment_method: 'card',
+          status: 'captured',
+          amount_paise: 11200,
+          currency: 'INR',
+        },
+      ],
     });
     const submit = await app.request(`/campaigns/${campaignId}/deliver`, {
       method: 'POST',
@@ -1019,7 +1068,7 @@ describe('Plugoh API', () => {
           business_id: businessId,
           influencer_id: influencerId,
           title: 'Booking',
-          status: 'in_escrow',
+          status: 'delivery_submitted',
           price_offered_paise: 10000,
           platform_fee_paise: 1200,
           total_charged_paise: 11200,
@@ -1031,6 +1080,7 @@ describe('Plugoh API', () => {
           campaign_id: campaignId,
           submitted_by: influencerId,
           storage_path: 'path/file.mp4',
+          submitted_at: '2026-05-16T01:00:00.000Z',
         },
       ],
     });
@@ -1060,16 +1110,29 @@ describe('Plugoh API', () => {
         {
           id: 'tx-1',
           campaign_id: campaignId,
-          type: 'payout_influencer',
+          entry_type: 'payout_influencer',
           amount_paise: 1000000,
           status: 'pending',
         },
         {
           id: 'tx-2',
           campaign_id: campaignId,
-          type: 'platform_fee',
+          entry_type: 'platform_fee',
           amount_paise: 120000,
-          status: 'success',
+          status: 'succeeded',
+        },
+      ],
+      payment_orders: [
+        {
+          id: 'payment-order-release',
+          campaign_id: campaignId,
+          provider: 'razorpay',
+          provider_order_id: 'order_release',
+          provider_payment_id: 'pay_release',
+          payment_method: 'card',
+          status: 'captured',
+          amount_paise: 11200,
+          currency: 'INR',
         },
       ],
     });
@@ -1094,8 +1157,17 @@ describe('Plugoh API', () => {
           business_id: businessId,
           influencer_id: influencerId,
           status: 'capture_pending',
-          razorpay_order_id: 'order_failed',
-          payment_status: 'authorized',
+        },
+      ],
+      payment_orders: [
+        {
+          id: 'payment-order-failed',
+          campaign_id: campaignId,
+          provider: 'razorpay',
+          provider_order_id: 'order_failed',
+          status: 'authorized',
+          amount_paise: 11200,
+          currency: 'INR',
         },
       ],
     });
@@ -1115,7 +1187,7 @@ describe('Plugoh API', () => {
       body,
     });
     expect(valid.status).toBe(200);
-    expect(store.tables.get('campaigns')?.[0].payment_status).toBe('unpaid');
+    expect(store.tables.get('payment_orders')?.[0].status).toBe('failed');
   });
 
   it('rejects instagram connect when query user does not match auth user', async () => {
@@ -1143,7 +1215,7 @@ describe('Plugoh API', () => {
     expect((await json(res)).data.url).toContain('instagram.test/oauth');
   });
 
-  it('records a refund for declined UPI pre-authorized campaigns and reconciles the webhook', async () => {
+  it('voids declined UPI pre-authorized campaigns without issuing a refund', async () => {
     const { app, store, payment } = makeApp({
       campaigns: [
         {
@@ -1160,32 +1232,28 @@ describe('Plugoh API', () => {
           total_charged_paise: 11200,
         },
       ],
+      payment_orders: [
+        {
+          id: 'payment-order-upi',
+          campaign_id: campaignId,
+          provider: 'razorpay',
+          provider_order_id: 'order_upi',
+          provider_payment_id: 'pay_upi',
+          payment_method: 'upi',
+          status: 'authorized',
+          amount_paise: 11200,
+          currency: 'INR',
+        },
+      ],
     });
     const declined = await app.request(`/campaigns/${campaignId}/decline`, {
       method: 'POST',
       headers: { authorization: 'Bearer influencer' },
     });
     expect(declined.status).toBe(200);
-    expect(payment.refunds).toHaveLength(1);
-    const refundRow = store.tables
-      .get('escrow_ledger_entries')
-      ?.find((row) => row.type === 'refund');
-    expect(refundRow?.razorpay_refund_id).toBe(payment.refunds[0].id);
-    expect(refundRow?.status).toBe('pending');
-
-    const body = JSON.stringify({
-      event: 'refund.processed',
-      payload: { refund: { entity: { id: payment.refunds[0].id } } },
-    });
-    const webhook = await app.request('/payment/webhook', {
-      method: 'POST',
-      headers: { 'x-razorpay-signature': webhookSignature(body) },
-      body,
-    });
-    expect(webhook.status).toBe(200);
-    expect(
-      store.tables.get('escrow_ledger_entries')?.find((row) => row.type === 'refund')?.status,
-    ).toBe('success');
+    expect(payment.refunds).toHaveLength(0);
+    expect(store.tables.get('payment_orders')?.[0].status).toBe('voided');
+    expect(store.tables.get('escrow_ledger_entries') ?? []).toHaveLength(0);
   });
 
   it('does not refund card pre-authorized campaigns on decline because Razorpay auto-voids them', async () => {
@@ -1213,7 +1281,7 @@ describe('Plugoh API', () => {
     expect(payment.refunds).toHaveLength(0);
   });
 
-  it('refunds expired UPI pre-authorized campaigns from the cron flow', async () => {
+  it('voids expired UPI pre-authorized campaigns from the cron flow', async () => {
     const { app, store, payment } = makeApp({
       campaigns: [
         {
@@ -1231,11 +1299,25 @@ describe('Plugoh API', () => {
           total_charged_paise: 11200,
         },
       ],
+      payment_orders: [
+        {
+          id: 'payment-order-expired-upi',
+          campaign_id: campaignId,
+          provider: 'razorpay',
+          provider_order_id: 'order_upi',
+          provider_payment_id: 'pay_upi',
+          payment_method: 'upi',
+          status: 'authorized',
+          amount_paise: 11200,
+          currency: 'INR',
+        },
+      ],
     });
     const res = await app.request('/cron/auto-release', { headers: { 'x-cron-secret': 'cron' } });
     expect(res.status).toBe(200);
-    expect(payment.refunds).toHaveLength(1);
+    expect(payment.refunds).toHaveLength(0);
     expect(store.tables.get('campaigns')?.[0].status).toBe('expired');
+    expect(store.tables.get('payment_orders')?.[0].status).toBe('voided');
   });
 
   it('guards internal AI and cron endpoints', async () => {
@@ -1263,8 +1345,6 @@ describe('Plugoh API', () => {
           display_name: 'Creator One',
           city: 'Hyderabad',
           ig_biography: 'Food reels and restaurant reviews',
-          price_per_reel_paise: null,
-          price_per_reel_paise: null,
           price_per_reel_paise: null,
           category: null,
           languages: null,

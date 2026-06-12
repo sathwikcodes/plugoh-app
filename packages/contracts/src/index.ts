@@ -63,11 +63,14 @@ export const CONTENT_TYPES = [
   'Brand Integration',
 ] as const;
 export const CAMPAIGN_STATUSES = [
+  'requested',
+  'payment_pending',
   'pre_authorized',
   'capture_pending',
   'in_escrow',
   'delivery_submitted',
   'changes_requested',
+  'disputed',
   'completed',
   'declined',
   'expired',

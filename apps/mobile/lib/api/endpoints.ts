@@ -259,16 +259,16 @@ export async function deliveryUrl(campaignId: string) {
 
 export async function createBookingOrder(input: {
   influencer_profile_id: string;
-  package_type: 'reel' | 'post' | 'story' | 'reel+story' | 'reel+post';
+  package_type: 'instagram_reel';
 }) {
   return api<{
     orderId: string;
     keyId?: string;
     amount: number;
     currency: string;
-    priceOffered: number;
-    platformFee: number;
-    total: number;
+    price_offered_paise: number;
+    platform_fee_paise: number;
+    total_charged_paise: number;
   }>('/payment/create-booking-order', {
     method: 'POST',
     ...jsonRequest(input),
@@ -281,7 +281,7 @@ export async function verifyBookingPayment(
     razorpay_payment_id: string;
     razorpay_signature: string;
     influencer_profile_id: string;
-    package_type: 'reel' | 'post' | 'story' | 'reel+story' | 'reel+post';
+    package_type: 'instagram_reel';
     objective:
       | 'visit_place'
       | 'feature_product'

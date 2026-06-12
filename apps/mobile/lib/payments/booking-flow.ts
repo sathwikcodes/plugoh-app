@@ -6,11 +6,11 @@ import {
 } from '@/lib/payments/escrow-flow';
 import { openRazorpayCheckout } from '@/lib/payments/razorpay';
 
-type PackageType = 'reel' | 'post' | 'story' | 'reel+story' | 'reel+post';
+type BookingPackageType = Parameters<typeof createBookingOrder>[0]['package_type'];
 
 type BookingInput = {
   influencer_profile_id: string;
-  package_type: PackageType;
+  package_type: BookingPackageType;
   objective:
     | 'visit_place'
     | 'feature_product'

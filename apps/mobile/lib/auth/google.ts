@@ -75,9 +75,6 @@ async function createSessionFromOAuthUrl(
     if (error) {
       throw new GoogleAuthError('supabase_error', error.message, error);
     }
-    if (!data.session) {
-      throw new GoogleAuthError('missing_session', 'Google sign-in finished without a session.');
-    }
     return data.session;
   }
 

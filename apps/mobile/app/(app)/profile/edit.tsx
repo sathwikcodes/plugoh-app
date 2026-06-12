@@ -50,6 +50,18 @@ const categories = [
 
 type Category = (typeof categories)[number];
 
+const categoryApiValues = {
+  Food: 'food',
+  Fitness: 'fitness',
+  Beauty: 'beauty',
+  Lifestyle: 'lifestyle',
+  Travel: 'travel',
+  Education: 'education',
+  Tech: 'tech',
+  Fashion: 'fashion',
+  Other: 'other',
+} as const;
+
 const schema = z.object({
   display_name: z.string().trim().min(1),
   bio: z.string().trim().min(1),
@@ -58,7 +70,8 @@ const schema = z.object({
 });
 
 function toCategory(value?: string | null): Category {
-  return categories.includes(value as Category) ? (value as Category) : 'Lifestyle';
+  const normalized = value?.toLowerCase();
+  return categories.find((category) => categoryApiValues[category] === normalized) ?? 'Lifestyle';
 }
 
 function GlassFormField({
@@ -205,7 +218,10 @@ export default function EditProfileScreen() {
           >[0]['brand_type'],
         });
       } else {
-        await mutations.updateProfile.mutateAsync(data);
+        await mutations.updateProfile.mutateAsync({
+          ...data,
+          category: categoryApiValues[data.category],
+        });
       }
       router.back();
     } catch (error) {

@@ -1,3 +1,4 @@
+import { PACKAGE_TYPES } from '@plugoh/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -9,8 +10,6 @@ import { getInfluencer } from '@/lib/api/endpoints';
 import { runBookingPaymentFlow } from '@/lib/payments/booking-flow';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 
-const PACKAGE_TYPES = ['reel', 'post', 'story', 'reel+story', 'reel+post'] as const;
-
 export default function BookingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const influencer = useQuery({
@@ -18,7 +17,7 @@ export default function BookingScreen() {
     queryFn: () => getInfluencer(id),
     enabled: Boolean(id),
   });
-  const [packageType, setPackageType] = useState<(typeof PACKAGE_TYPES)[number]>('reel');
+  const [packageType, setPackageType] = useState<(typeof PACKAGE_TYPES)[number]>('instagram_reel');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [eventName, setEventName] = useState('');
@@ -81,7 +80,7 @@ export default function BookingScreen() {
         label="Package type"
         value={packageType}
         onChangeText={(value) => {
-          setPackageType(PACKAGE_TYPES.find((item) => item === value) ?? 'reel');
+          setPackageType(PACKAGE_TYPES.find((item) => item === value) ?? 'instagram_reel');
         }}
       />
       <LabeledField
