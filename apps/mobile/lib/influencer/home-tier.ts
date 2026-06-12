@@ -30,6 +30,8 @@ type TierMeta = {
   label: string;
   nextLabel: string;
   eyebrow: string;
+  thresholdPaise: number;
+  nextThresholdPaise: number | null;
   colors: readonly [string, string, string];
   badge: TierBadgeVisual;
 };
@@ -46,6 +48,8 @@ const TIER_META: Record<InfluencerTier, TierMeta> = {
     label: 'Nano',
     nextLabel: 'Micro',
     eyebrow: 'Building signal',
+    thresholdPaise: 0,
+    nextThresholdPaise: 1_000_000,
     colors: ['#9AF4E4', '#87BFFF', '#F6E7B7'],
     badge: {
       rim: '#C7F8FF',
@@ -61,6 +65,8 @@ const TIER_META: Record<InfluencerTier, TierMeta> = {
     label: 'Micro',
     nextLabel: 'Mid',
     eyebrow: 'Trusted creator',
+    thresholdPaise: 1_000_000,
+    nextThresholdPaise: 10_000_000,
     colors: ['#B6FFCF', '#9AF4E4', '#F4C2FF'],
     badge: {
       rim: '#D6FFE6',
@@ -76,6 +82,8 @@ const TIER_META: Record<InfluencerTier, TierMeta> = {
     label: 'Mid',
     nextLabel: 'Macro',
     eyebrow: 'Brand favorite',
+    thresholdPaise: 10_000_000,
+    nextThresholdPaise: 50_000_000,
     colors: ['#FFD36E', '#FF8EC3', '#A78BFA'],
     badge: {
       rim: '#FFE7A3',
@@ -91,6 +99,8 @@ const TIER_META: Record<InfluencerTier, TierMeta> = {
     label: 'Macro',
     nextLabel: 'Maxed',
     eyebrow: 'Top tier',
+    thresholdPaise: 50_000_000,
+    nextThresholdPaise: null,
     colors: ['#FFFFFF', '#FFD36E', '#7DD3FC'],
     badge: {
       rim: '#FFFFFF',
@@ -145,6 +155,23 @@ export function getTierDisplay(tier?: InfluencerTier | null, rawProgress?: numbe
         ? 'Top tier reached'
         : `${Math.round(progress * 100)}% to ${meta.nextLabel}`,
   };
+}
+
+export function getTierUnlockCopy(
+  tier?: InfluencerTier | null,
+  totalEarningsPaise?: number | null,
+) {
+  const resolvedTier = tier ?? DEFAULT_TIER;
+  const meta = TIER_META[resolvedTier];
+
+  if (!meta.nextThresholdPaise) {
+    return 'Top tier reached';
+  }
+
+  const earnedPaise = Number.isFinite(totalEarningsPaise ?? 0) ? (totalEarningsPaise ?? 0) : 0;
+  const remainingPaise = Math.max(meta.nextThresholdPaise - earnedPaise, 0);
+
+  return `Earn ${formatPaiseAsINR(remainingPaise)} more to unlock ${meta.nextLabel}`;
 }
 
 export function getTierRank(tier?: InfluencerTier | null) {

@@ -19,6 +19,7 @@ import {
   type InboxFilterDraft,
   type InboxSort,
 } from '@/lib/filters/inbox';
+import { influencerProfileImageUri } from '@/lib/influencer/profile-image';
 import { getConversationParty } from '@/lib/inbox/conversation-display';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import labImage from '@/assets/images/lab.png';
@@ -65,6 +66,7 @@ export default function InboxScreen() {
   const [filters, setFilters] = useState<InboxFilterDraft>(DEFAULT_INBOX_FILTERS);
   const [sort, setSort] = useState<InboxSort>(DEFAULT_INBOX_SORT);
   const [filtersVisible, setFiltersVisible] = useState(false);
+  const profileImageUri = influencerProfileImageUri(influencerProfile.data);
   const appliedFilterCount =
     inboxActiveFilterCount(filters) + (sort !== DEFAULT_INBOX_SORT ? 1 : 0);
 
@@ -146,7 +148,7 @@ export default function InboxScreen() {
         <AppHeader
           title="Messages"
           profile={{
-            imageUri: influencerProfile.data?.profile_photo_url,
+            imageUri: profileImageUri,
             onPress: () => {
               router.push('/(app)/profile');
             },

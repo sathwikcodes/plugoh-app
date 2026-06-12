@@ -26,6 +26,7 @@
     "api:test": "npm run contracts:build && npm run --workspace @plugoh/api test",
     "api:test:coverage": "npm run contracts:build && npm run --workspace @plugoh/api test:coverage",
     "jobs:dev": "npm run --workspace @plugoh/jobs dev",
+    "graphify:build": "node scripts/graphify-build.mjs",
     "lint": "npm run contracts:build && eslint --no-warn-ignored --max-warnings=0 services/**/*.ts packages/**/*.ts apps/mobile/**/*.{ts,tsx}",
     "typecheck": "npm run contracts:build && npm run db:build && npm run --workspace @plugoh/api build && npm run --workspace @plugoh/jobs build && npm run --workspace @plugoh/mobile typecheck",
     "prepare": "simple-git-hooks",

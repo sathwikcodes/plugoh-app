@@ -83,6 +83,7 @@ export function AppHeader({
           size={APP_HEADER_ACTION_SIZE}
           symbolSize={APP_HEADER_ACTION_SYMBOL_SIZE}
           imageUri={profile.imageUri}
+          preserveImageOnEmpty
           accessibilityLabel={profile.routeLabel ?? 'Open profile'}
           glassRendering={APP_HEADER_PROFILE_GLASS_RENDERING}
           onPress={profile.onPress}

@@ -32,6 +32,12 @@ Run from repo root unless noted.
 - Prefer the `@/` alias over long relative imports.
 - Remove old route files when intentionally restructuring navigation.
 
+## Graphify Context Anchors
+
+- Before broad UI, bootstrap, auth/session, API, query-cache, or navigation changes, query/inspect Graphify nodes around `theme`, `useBootstrap()`, `createQueryClient()`, `queryKeys`, `coreInvalidationKeys`, route `_layout.tsx` files, and the target screen/component.
+- For API-backed screens, trace from the screen/hook to `lib/api`, `lib/query`, shared contracts, and the matching API route before changing request or response assumptions.
+- Treat Graphify INFERRED edges as leads only; verify with direct reads of cited source files and tests.
+
 ## React Native Conventions
 
 - Use `Pressable` instead of `TouchableOpacity` or `TouchableHighlight`.

@@ -33,6 +33,12 @@ The root `api:*` commands build `@plugoh/contracts` first.
 - Data access belongs in repositories such as `src/repositories/data-store.ts`.
 - Job-callable API behavior is exported from `src/jobs` where needed by workers.
 
+## Graphify Context Anchors
+
+- Before changing auth, env, routing, data, or error behavior, query/inspect Graphify nodes around `AuthUser`, `EnvConfig`, `DataStore`, `createApp()`, `badRequest()`, `notFound()`, `mountDomainRoutes()`, and the target route module.
+- For marketplace, payment, campaign, cron, delivery, Instagram, notification, or AI behavior, trace the relevant route to service/provider/repository nodes before editing.
+- Treat Graphify INFERRED edges as leads only; verify with direct reads of cited source files and tests.
+
 ## Contracts And Validation
 
 - Put shared API/domain types and schemas in `packages/contracts` when mobile, API, or jobs must agree on shape.

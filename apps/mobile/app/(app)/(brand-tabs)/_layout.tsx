@@ -1,3 +1,4 @@
+import { plugohNativeTabOptions } from '@/components/navigation/native-tab-config';
 import { theme } from '@/constants/theme';
 import { useBootstrap } from '@/hooks/use-marketplace';
 import { Redirect } from 'expo-router';
@@ -13,7 +14,7 @@ export default function BrandTabsLayout() {
 
   return (
     <View style={styles.root}>
-      <NativeTabs blurEffect="systemChromeMaterialDark" disableTransparentOnScrollEdge>
+      <NativeTabs {...plugohNativeTabOptions}>
         <NativeTabs.Trigger name="index">
           <Icon sf={{ default: 'house', selected: 'house.fill' }} />
           <Label>Home</Label>
@@ -28,7 +29,7 @@ export default function BrandTabsLayout() {
 
         <NativeTabs.Trigger name="campaigns">
           <Icon sf={{ default: 'briefcase', selected: 'briefcase.fill' }} />
-          <Label>Camps</Label>
+          <Label>Work</Label>
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="inbox">

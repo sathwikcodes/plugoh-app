@@ -5,6 +5,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     'expo-router',
     'expo-secure-store',
     'expo-notifications',
+    ['expo-maps', { requestLocationPermission: false }],
     ['expo-web-browser', { experimentalLauncherActivity: false }],
     [
       'expo-splash-screen',
@@ -36,6 +37,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       ...config.android,
       package: config.android?.package ?? 'app.plugoh.mobile',
+      config: {
+        ...config.android?.config,
+        googleMaps: {
+          ...config.android?.config?.googleMaps,
+          apiKey:
+            process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY ||
+            process.env.GOOGLE_MAPS_ANDROID_API_KEY ||
+            process.env.GOOGLE_MAPS_API_KEY,
+        },
+      },
       adaptiveIcon: {
         backgroundColor: '#000000',
         foregroundImage: './assets/images/android-icon-foreground.png',

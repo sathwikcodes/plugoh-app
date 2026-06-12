@@ -1,7 +1,7 @@
 import contentDeliveryImage from '@/assets/images/content_delivery.png';
 import crystalImage from '@/assets/images/crystal.png';
 import pendingEarningsImage from '@/assets/images/pending_earnings.png';
-import { BrandAvatar } from '@/components/inbox/brand-avatar';
+import { TierAssetBadge } from '@/components/influencer/tier-asset-badge';
 import { TierBadgeCarousel } from '@/components/influencer/tier-badge-carousel';
 import { AppHeader, getAppHeaderScreenTopPadding } from '@/components/ui/app-header';
 import { Screen } from '@/components/ui/primitives';
@@ -13,27 +13,28 @@ import {
   useEarnings,
   useInfluencerProfile,
 } from '@/hooks/use-marketplace';
-import { formatPaiseAsINR, getTierBadgeCatalog, getTierDisplay } from '@/lib/influencer/home-tier';
+import {
+  formatPaiseAsINR,
+  getTierBadgeCatalog,
+  getTierDisplay,
+  getTierUnlockCopy,
+} from '@/lib/influencer/home-tier';
+import { influencerProfileImageUri } from '@/lib/influencer/profile-image';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import type { CampaignListItem, CampaignStatus } from '@plugoh/contracts';
+import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 const DELIVERY_ACTION_STATUSES = new Set<CampaignStatus>(['in_escrow', 'changes_requested']);
 const PENDING_EARNING_STATUSES = new Set<CampaignStatus>(['in_escrow', 'delivery_submitted']);
-const HEALTH_TRACKED_STATUSES = new Set<CampaignStatus>([
-  'in_escrow',
-  'delivery_submitted',
-  'completed',
-  'changes_requested',
-]);
-
 function localDateKey(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -49,12 +50,6 @@ function isOverdue(campaign: CampaignListItem) {
   return campaign.due_date ? campaign.due_date < localDateKey() : false;
 }
 
-function isDueTomorrow(campaign: CampaignListItem) {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return campaign.due_date === localDateKey(tomorrow);
-}
-
 function campaignDueTime(campaign: CampaignListItem) {
   if (!campaign.due_date) return Number.MAX_SAFE_INTEGER;
   return new Date(`${campaign.due_date}T00:00:00`).getTime();
@@ -67,53 +62,33 @@ function compareByDeliveryUrgency(a: CampaignListItem, b: CampaignListItem) {
   return campaignDueTime(a) - campaignDueTime(b);
 }
 
-function formatDueLabel(campaign?: CampaignListItem | null) {
-  if (!campaign?.due_date) return 'No due date set';
-  if (isOverdue(campaign)) return 'Overdue';
-  if (isDueToday(campaign)) return 'Due today';
-  if (isDueTomorrow(campaign)) return 'Due tomorrow';
-
-  return new Intl.DateTimeFormat('en-IN', {
-    day: 'numeric',
-    month: 'short',
-  }).format(new Date(`${campaign.due_date}T00:00:00`));
-}
-
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return count === 1 ? singular : plural;
 }
 
-function displayCampaignTitle(campaign: CampaignListItem) {
-  return campaign.ai_title?.trim() || campaign.title.trim() || 'Campaign delivery';
-}
+function formatPaiseAsCompactEarnings(value?: number | null) {
+  const paise = value ?? 0;
+  const rupees = Number.isFinite(paise) ? paise / 100 : 0;
+  const absoluteRupees = Math.abs(rupees);
 
-function formatPackageType(pkg?: string) {
-  if (!pkg) return 'Booked campaign';
-  return pkg
-    .replaceAll('_', ' ')
-    .replaceAll('+', ' + ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
+  if (absoluteRupees < 1000) {
+    return {
+      value: new Intl.NumberFormat('en-IN', {
+        maximumFractionDigits: 0,
+      }).format(rupees),
+      suffix: '',
+    };
+  }
 
-function brandName(campaign: CampaignListItem) {
-  return campaign.business_profile?.brand_name?.trim() || 'Plugoh brand';
-}
+  const thousands = rupees / 1000;
+  const compactValue = new Intl.NumberFormat('en-IN', {
+    maximumFractionDigits: absoluteRupees >= 100000 ? 0 : 1,
+  }).format(thousands);
 
-function brandImageUri(campaign: CampaignListItem) {
-  return (
-    campaign.business_profile?.profile_photo_url?.trim() ||
-    campaign.business_profile?.ig_profile_picture_url?.trim() ||
-    campaign.business_profile?.avatar_url?.trim() ||
-    null
-  );
-}
-
-function campaignEarningLabel(campaign?: CampaignListItem | null) {
-  if (!campaign) return 'Awaiting approval';
-  const paise =
-    campaign.price_offered_paise ??
-    (typeof campaign.price_offered === 'number' ? campaign.price_offered * 100 : null);
-  return paise == null ? 'Awaiting approval' : formatPaiseAsINR(paise);
+  return {
+    value: compactValue,
+    suffix: 'k',
+  };
 }
 
 // ─── HomeTierHero ─────────────────────────────────────────────────────────────
@@ -169,381 +144,371 @@ function HomeTierHero({
   );
 }
 
-function DeliveryFocusCard({
-  campaigns,
-  deliveryCampaigns,
-  loading,
-  width,
+function LiquidInsightSurface({
+  children,
+  contentStyle,
 }: {
-  campaigns: CampaignListItem[];
-  deliveryCampaigns: CampaignListItem[];
-  loading: boolean;
-  width: number;
+  children: ReactNode;
+  contentStyle: StyleProp<ViewStyle>;
 }) {
-  const activeCampaigns = campaigns.filter((campaign) =>
-    HEALTH_TRACKED_STATUSES.has(campaign.status),
+  const content = (
+    <View style={[insightStyles.glassContent, contentStyle]}>
+      <View pointerEvents="none" style={insightStyles.glassTopHighlight} />
+      <View pointerEvents="none" style={insightStyles.glassBottomShade} />
+      {children}
+    </View>
   );
-  const displayCampaigns = activeCampaigns.length > 0 ? activeCampaigns : campaigns;
-  const sortedDeliveryCampaigns = [...deliveryCampaigns].sort(compareByDeliveryUrgency);
-  const featuredCampaign =
-    sortedDeliveryCampaigns.length > 0
-      ? sortedDeliveryCampaigns[0]
-      : displayCampaigns.length > 0
-        ? displayCampaigns[0]
-        : null;
-  const visibleCampaigns = displayCampaigns.slice(0, 5);
-  const overflowCampaignCount = Math.max(displayCampaigns.length - visibleCampaigns.length, 0);
-  const deliveryCount = deliveryCampaigns.length;
-  const deliveryLabel = loading
-    ? 'Checking deliveries'
-    : `${deliveryCount} ${pluralize(deliveryCount, 'delivery', 'deliveries')} left`;
+
+  if (isLiquidGlassAvailable()) {
+    return (
+      <GlassView
+        isInteractive
+        glassEffectStyle="clear"
+        colorScheme="dark"
+        tintColor="rgba(255,255,255,0.04)"
+        style={insightStyles.glassShell}
+      >
+        {content}
+      </GlassView>
+    );
+  }
 
   return (
-    <View style={[insightStyles.deliveryCard, { width }]}>
-      <View style={insightStyles.deliveryHeader}>
-        <View style={insightStyles.deliveryHeaderCopy}>
-          <Text
-            style={insightStyles.deliveryTitle}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.72}
-          >
-            Delivery
-          </Text>
-          <Text style={insightStyles.deliverySummary} numberOfLines={1}>
-            {deliveryLabel}
-          </Text>
-        </View>
-        <Image
-          source={contentDeliveryImage}
-          style={insightStyles.deliveryHeroImage}
-          contentFit="contain"
-          accessible
-          accessibilityLabel="Content delivery setup"
-        />
-      </View>
+    <BlurView tint="dark" intensity={58} style={insightStyles.glassShell}>
+      {content}
+    </BlurView>
+  );
+}
 
-      {featuredCampaign ? (
-        <Pressable
-          onPress={() => {
-            router.push(`/(app)/campaigns/${featuredCampaign.id}`);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`View ${displayCampaignTitle(featuredCampaign)} from ${brandName(
-            featuredCampaign,
-          )}`}
-          style={({ pressed }) => [
-            insightStyles.featuredCampaign,
-            pressed ? insightStyles.featuredCampaignPressed : null,
-          ]}
-        >
-          <BrandAvatar
-            imageUri={brandImageUri(featuredCampaign)}
-            name={brandName(featuredCampaign)}
-            size={46}
-            textSize={16}
-          />
-          <View style={insightStyles.featuredCopy}>
-            <Text style={insightStyles.featuredTitle} numberOfLines={1}>
-              {brandName(featuredCampaign)}
-            </Text>
-            <Text style={insightStyles.featuredBrand} numberOfLines={1}>
-              {formatPackageType(featuredCampaign.package_type)}
-            </Text>
-            <Text style={insightStyles.featuredDue} numberOfLines={1}>
-              {formatDueLabel(featuredCampaign)}
-            </Text>
-          </View>
-          <View style={insightStyles.chevronBubble} pointerEvents="none">
-            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.72)" />
-          </View>
-        </Pressable>
-      ) : (
-        <View style={insightStyles.deliveryEmpty}>
-          <Text style={insightStyles.deliveryEmptyTitle}>All clear</Text>
-          <Text style={insightStyles.deliveryEmptySubtitle}>
-            New brand campaigns will appear here when they need attention.
-          </Text>
-        </View>
-      )}
+function PendingEscrowPill() {
+  const content = (
+    <View style={insightStyles.pendingEscrowPillContent}>
+      <Text style={insightStyles.pendingEscrowText} numberOfLines={1}>
+        In escrow
+      </Text>
+    </View>
+  );
 
-      <View style={insightStyles.deliveryMeta}>
-        <View style={insightStyles.metaBlock}>
-          <Text style={insightStyles.metaLabel}>Active brand campaigns</Text>
-          <View style={insightStyles.activeAvatarRow}>
-            {visibleCampaigns.length > 0 ? (
-              <>
-                {visibleCampaigns.map((campaign, index) => (
-                  <View
-                    key={`active-${campaign.id}`}
-                    style={[
-                      insightStyles.activeAvatarItem,
-                      index > 0 ? { marginLeft: -theme.spacing.xs } : null,
-                    ]}
-                  >
-                    <BrandAvatar
-                      imageUri={brandImageUri(campaign)}
-                      name={brandName(campaign)}
-                      size={38}
-                      textSize={13}
-                    />
-                  </View>
-                ))}
-                {overflowCampaignCount > 0 ? (
-                  <View style={[insightStyles.activeAvatarMore, { marginLeft: -theme.spacing.xs }]}>
-                    <Text style={insightStyles.activeAvatarMoreText}>+{overflowCampaignCount}</Text>
-                  </View>
-                ) : null}
-              </>
-            ) : (
-              <Text style={insightStyles.metaMuted}>No active brands</Text>
-            )}
-          </View>
-        </View>
+  if (isLiquidGlassAvailable()) {
+    return (
+      <GlassView
+        glassEffectStyle="clear"
+        colorScheme="dark"
+        tintColor="rgba(255,203,82,0.2)"
+        style={insightStyles.pendingEscrowPill}
+      >
+        {content}
+      </GlassView>
+    );
+  }
+
+  return (
+    <BlurView tint="light" intensity={20} style={insightStyles.pendingEscrowPill}>
+      {content}
+    </BlurView>
+  );
+}
+
+function DeliveryActionPill() {
+  const content = (
+    <View style={insightStyles.pendingEscrowPillContent}>
+      <Text
+        style={[insightStyles.pendingEscrowText, insightStyles.deliveryActionText]}
+        numberOfLines={1}
+      >
+        Deliver
+      </Text>
+    </View>
+  );
+
+  if (isLiquidGlassAvailable()) {
+    return (
+      <GlassView
+        glassEffectStyle="clear"
+        colorScheme="dark"
+        tintColor="rgba(73,220,137,0.22)"
+        style={[insightStyles.pendingEscrowPill, insightStyles.deliveryActionPill]}
+      >
+        {content}
+      </GlassView>
+    );
+  }
+
+  return (
+    <BlurView
+      tint="light"
+      intensity={20}
+      style={[insightStyles.pendingEscrowPill, insightStyles.deliveryActionPill]}
+    >
+      {content}
+    </BlurView>
+  );
+}
+
+function TierProgressBadgePreview({
+  item,
+}: {
+  item: ReturnType<typeof getTierBadgeCatalog>[number];
+}) {
+  return (
+    <View style={insightStyles.tierBadgePreviewFrame}>
+      <View style={insightStyles.tierBadgePreviewScale}>
+        <TierAssetBadge item={item} active />
       </View>
     </View>
   );
 }
 
-function PendingEarningsFocusCard({
-  earnings,
-  campaigns,
-  pendingCampaigns,
+function getDeliveryInsight(deliveryCampaigns: CampaignListItem[], loading: boolean) {
+  if (loading) {
+    return {
+      value: '...',
+      pillLabel: 'Checking',
+      shortLabel: 'Checking',
+      pillTone: 'muted' as const,
+    };
+  }
+
+  const deliveryCount = deliveryCampaigns.length;
+  const overdueCount = deliveryCampaigns.filter(isOverdue).length;
+  const todayCount = deliveryCampaigns.filter(isDueToday).length;
+
+  if (deliveryCount === 0) {
+    return {
+      value: '0',
+      pillLabel: 'All clear',
+      shortLabel: 'deliveries left',
+      pillTone: 'success' as const,
+    };
+  }
+
+  if (overdueCount > 0) {
+    return {
+      value: String(deliveryCount),
+      pillLabel: `${overdueCount} overdue`,
+      shortLabel: `${pluralize(deliveryCount, 'delivery')} left`,
+      pillTone: 'warning' as const,
+    };
+  }
+
+  if (todayCount > 0) {
+    return {
+      value: String(deliveryCount),
+      pillLabel: `${todayCount} due today`,
+      shortLabel: `${pluralize(deliveryCount, 'delivery')} left`,
+      pillTone: 'warning' as const,
+    };
+  }
+
+  return {
+    value: String(deliveryCount),
+    pillLabel: `${deliveryCount} ${pluralize(deliveryCount, 'delivery')} left`,
+    shortLabel: `${pluralize(deliveryCount, 'delivery')} left`,
+    pillTone: 'muted' as const,
+  };
+}
+
+function routeToCampaignOrList(campaigns: CampaignListItem[]) {
+  if (campaigns.length > 0) {
+    const [campaign] = campaigns;
+    router.push(`/(app)/campaigns/${campaign.id}`);
+    return;
+  }
+
+  router.push('/(app)/(tabs)/campaigns');
+}
+
+function DeliveryFocusCard({
+  deliveryCampaigns,
   loading,
-  width,
 }: {
-  earnings: ReturnType<typeof useEarnings>['data'];
-  campaigns: CampaignListItem[];
-  pendingCampaigns: CampaignListItem[];
+  deliveryCampaigns: CampaignListItem[];
   loading: boolean;
-  width: number;
 }) {
-  const activeCampaigns = campaigns.filter((campaign) =>
-    HEALTH_TRACKED_STATUSES.has(campaign.status),
-  );
-  const displayCampaigns =
-    pendingCampaigns.length > 0
-      ? pendingCampaigns
-      : activeCampaigns.length > 0
-        ? activeCampaigns
-        : campaigns;
-  const featuredCampaign =
-    pendingCampaigns.length > 0
-      ? pendingCampaigns[0]
-      : displayCampaigns.length > 0
-        ? displayCampaigns[0]
-        : null;
-  const visibleCampaigns = displayCampaigns.slice(0, 5);
-  const overflowCampaignCount = Math.max(displayCampaigns.length - visibleCampaigns.length, 0);
-  const earningsLabel = loading
-    ? 'Checking earnings'
-    : formatPaiseAsINR(earnings?.pending_earnings);
+  const sortedDeliveryCampaigns = [...deliveryCampaigns].sort(compareByDeliveryUrgency);
+  const insight = getDeliveryInsight(deliveryCampaigns, loading);
 
   return (
-    <View style={[insightStyles.deliveryCard, { width }]}>
-      <View style={insightStyles.deliveryHeader}>
-        <View style={insightStyles.deliveryHeaderCopy}>
-          <Text
-            style={insightStyles.deliveryTitle}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.72}
-          >
-            Pending Earnings
-          </Text>
-          <Text style={insightStyles.deliverySummary} numberOfLines={1}>
-            {earningsLabel}
-          </Text>
-        </View>
-        <Image
-          source={pendingEarningsImage}
-          style={insightStyles.deliveryHeroImage}
-          contentFit="contain"
-          accessible
-          accessibilityLabel="Pending earnings"
-        />
-      </View>
-
-      {featuredCampaign ? (
-        <Pressable
-          onPress={() => {
-            router.push(`/(app)/campaigns/${featuredCampaign.id}`);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`View pending earnings for ${brandName(featuredCampaign)}`}
-          style={({ pressed }) => [
-            insightStyles.featuredCampaign,
-            pressed ? insightStyles.featuredCampaignPressed : null,
-          ]}
-        >
-          <BrandAvatar
-            imageUri={brandImageUri(featuredCampaign)}
-            name={brandName(featuredCampaign)}
-            size={46}
-            textSize={16}
+    <Pressable
+      onPress={() => {
+        routeToCampaignOrList(sortedDeliveryCampaigns);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`${insight.value} delivery campaigns. ${insight.pillLabel}`}
+      style={({ pressed }) => [insightStyles.focusNode, pressed ? insightStyles.tilePressed : null]}
+    >
+      <LiquidInsightSurface contentStyle={insightStyles.focusNodeContent}>
+        <View style={[insightStyles.focusNodeHeader, insightStyles.deliveryNodeHeader]}>
+          <Image
+            source={contentDeliveryImage}
+            style={[insightStyles.focusNodeImage, insightStyles.focusNodeLargeImage]}
+            contentFit="contain"
+            accessible
+            accessibilityLabel="Content delivery"
           />
-          <View style={insightStyles.featuredCopy}>
-            <Text style={insightStyles.featuredTitle} numberOfLines={1}>
-              {brandName(featuredCampaign)}
-            </Text>
-            <Text style={insightStyles.featuredBrand} numberOfLines={1}>
-              {formatPackageType(featuredCampaign.package_type)}
-            </Text>
-            <Text style={insightStyles.featuredDue} numberOfLines={1}>
-              {campaignEarningLabel(featuredCampaign)}
-            </Text>
+          <View style={insightStyles.deliveryNodeTitleWrap}>
+            <View style={insightStyles.deliveryNodeMetricRow}>
+              <Text
+                style={insightStyles.deliveryNodeValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                {insight.value}
+              </Text>
+              <Text style={insightStyles.deliveryNodeSubtitle} numberOfLines={1}>
+                {insight.shortLabel}
+              </Text>
+            </View>
           </View>
-          <View style={insightStyles.chevronBubble} pointerEvents="none">
-            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.72)" />
-          </View>
-        </Pressable>
-      ) : (
-        <View style={insightStyles.deliveryEmpty}>
-          <Text style={insightStyles.deliveryEmptyTitle}>Nothing pending</Text>
-          <Text style={insightStyles.deliveryEmptySubtitle}>
-            Campaign earnings will appear here after delivery or approval.
-          </Text>
         </View>
-      )}
 
-      <View style={insightStyles.deliveryMeta}>
-        <View style={insightStyles.metaBlock}>
-          <Text style={insightStyles.metaLabel}>Pending campaigns</Text>
-          <View style={insightStyles.activeAvatarRow}>
-            {visibleCampaigns.length > 0 ? (
-              <>
-                {visibleCampaigns.map((campaign, index) => (
-                  <View
-                    key={`earning-${campaign.id}`}
-                    style={[
-                      insightStyles.activeAvatarItem,
-                      index > 0 ? { marginLeft: -theme.spacing.xs } : null,
-                    ]}
-                  >
-                    <BrandAvatar
-                      imageUri={brandImageUri(campaign)}
-                      name={brandName(campaign)}
-                      size={38}
-                      textSize={13}
-                    />
-                  </View>
-                ))}
-                {overflowCampaignCount > 0 ? (
-                  <View style={[insightStyles.activeAvatarMore, { marginLeft: -theme.spacing.xs }]}>
-                    <Text style={insightStyles.activeAvatarMoreText}>+{overflowCampaignCount}</Text>
-                  </View>
-                ) : null}
-              </>
-            ) : (
-              <Text style={insightStyles.metaMuted}>No pending campaigns</Text>
-            )}
+        <View style={insightStyles.focusNodeSpacer} />
+
+        <View style={insightStyles.pendingEscrowDock}>
+          <DeliveryActionPill />
+        </View>
+      </LiquidInsightSurface>
+    </Pressable>
+  );
+}
+
+function PendingEarningsFocusCard({
+  earnings,
+  pendingCampaigns,
+  loading,
+}: {
+  earnings: ReturnType<typeof useEarnings>['data'];
+  pendingCampaigns: CampaignListItem[];
+  loading: boolean;
+}) {
+  const earningsMetric = loading
+    ? { value: '...', suffix: '' }
+    : formatPaiseAsCompactEarnings(earnings?.pending_earnings);
+  const earningsLabel = `${earningsMetric.value}${earningsMetric.suffix}`;
+
+  return (
+    <Pressable
+      onPress={() => {
+        routeToCampaignOrList(pendingCampaigns);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`${earningsLabel} pending earnings in escrow`}
+      style={({ pressed }) => [insightStyles.focusNode, pressed ? insightStyles.tilePressed : null]}
+    >
+      <LiquidInsightSurface contentStyle={insightStyles.focusNodeContent}>
+        <View style={[insightStyles.focusNodeHeader, insightStyles.pendingNodeHeader]}>
+          <Image
+            source={pendingEarningsImage}
+            style={[insightStyles.focusNodeImage, insightStyles.focusNodeLargeImage]}
+            contentFit="contain"
+            accessible
+            accessibilityLabel="Pending earnings"
+          />
+          <View style={insightStyles.pendingNodeTitleWrap}>
+            <View style={insightStyles.pendingNodeMetricRow}>
+              <Text
+                style={insightStyles.pendingNodeAmount}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.64}
+              >
+                {earningsMetric.value}
+              </Text>
+              {earningsMetric.suffix ? (
+                <Text style={insightStyles.pendingNodeSuffix} numberOfLines={1}>
+                  {earningsMetric.suffix}
+                </Text>
+              ) : null}
+            </View>
           </View>
         </View>
-      </View>
-    </View>
+
+        <View style={insightStyles.focusNodeSpacer} />
+
+        <View style={insightStyles.pendingEscrowDock}>
+          <PendingEscrowPill />
+        </View>
+      </LiquidInsightSurface>
+    </Pressable>
   );
 }
 
 function TierProgressFocusCard({
   earnings,
   loading,
-  width,
 }: {
   earnings: ReturnType<typeof useEarnings>['data'];
   loading: boolean;
-  width: number;
 }) {
   const tier = getTierDisplay(earnings?.tier, earnings?.tier_progress);
-  const badgeCatalog = getTierBadgeCatalog(tier.key);
-  const currentBadge = badgeCatalog.find((item) => item.current) ?? badgeCatalog[0];
+  const tierBadges = getTierBadgeCatalog(tier.key);
+  const currentBadge = tierBadges.find((item) => item.current) ?? tierBadges[0];
+  const progressPercent = loading ? 0 : tier.progressPercent;
+  const progressLabel = loading ? '--' : `${progressPercent}%`;
+  const unlockCopy = loading
+    ? 'Checking next tier'
+    : getTierUnlockCopy(tier.key, earnings?.total_earnings);
 
   return (
-    <View style={[insightStyles.deliveryCard, { width }]}>
-      <View style={insightStyles.deliveryHeader}>
-        <View style={insightStyles.deliveryHeaderCopy}>
+    <Pressable
+      onPress={() => {
+        router.push('/(app)/profile');
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${tier.label} tier progress, ${tier.progressPercent}% complete`}
+      style={({ pressed }) => [
+        insightStyles.tierProgressCard,
+        pressed ? insightStyles.tilePressed : null,
+      ]}
+    >
+      <LiquidInsightSurface contentStyle={insightStyles.tierProgressContent}>
+        <View style={insightStyles.tierProgressHeader}>
           <Text
-            style={insightStyles.deliveryTitle}
+            style={insightStyles.tierProgressTitle}
             numberOfLines={1}
             adjustsFontSizeToFit
-            minimumFontScale={0.72}
+            minimumFontScale={0.76}
           >
-            Tier Progress
+            Progress
           </Text>
-          <Text style={insightStyles.deliverySummary} numberOfLines={1}>
-            {loading ? 'Checking tier' : `${tier.progressPercent}% complete`}
-          </Text>
+          <Image
+            source={crystalImage}
+            style={insightStyles.tierCrystalImage}
+            contentFit="contain"
+            accessible
+            accessibilityLabel="Next tier crystal"
+          />
         </View>
-        <Image
-          source={crystalImage}
-          style={insightStyles.deliveryHeroImage}
-          contentFit="contain"
-          accessible
-          accessibilityLabel="Tier progress crystal"
-        />
-      </View>
 
-      <Pressable
-        onPress={() => {
-          router.push('/(app)/profile');
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={`View ${tier.label} tier progress`}
-        style={({ pressed }) => [
-          insightStyles.featuredCampaign,
-          pressed ? insightStyles.featuredCampaignPressed : null,
-        ]}
-      >
-        <View
-          style={[
-            insightStyles.tierBadge,
-            {
-              backgroundColor: currentBadge.visual.face,
-              borderColor: currentBadge.visual.rim,
-            },
-          ]}
-        >
-          <Text style={insightStyles.tierBadgeText}>{currentBadge.label.charAt(0)}</Text>
-        </View>
-        <View style={insightStyles.featuredCopy}>
-          <Text style={insightStyles.featuredTitle} numberOfLines={1}>
-            {tier.label} tier
-          </Text>
-          <Text style={insightStyles.featuredBrand} numberOfLines={1}>
-            {tier.progressLabel}
-          </Text>
-          <Text style={insightStyles.featuredDue} numberOfLines={1}>
-            {currentBadge.visual.material}
-          </Text>
-        </View>
-        <View style={insightStyles.chevronBubble} pointerEvents="none">
-          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.72)" />
-        </View>
-      </Pressable>
-
-      <View style={insightStyles.deliveryMeta}>
-        <View style={insightStyles.metaBlock}>
-          <Text style={insightStyles.metaLabel}>Tier milestones</Text>
-          <View style={insightStyles.tierMilestoneRow}>
-            {badgeCatalog.map((badge, index) => (
-              <View
-                key={badge.key}
-                style={[
-                  insightStyles.tierMilestoneItem,
-                  {
-                    backgroundColor: badge.unlocked ? badge.visual.face : 'rgba(255,255,255,0.08)',
-                    borderColor: badge.current ? badge.visual.rim : 'rgba(255,255,255,0.14)',
-                    opacity: badge.unlocked ? 1 : 0.48,
-                  },
-                  index > 0 ? { marginLeft: -theme.spacing.xs } : null,
-                ]}
-              >
-                <Text style={insightStyles.tierMilestoneText}>{badge.label.charAt(0)}</Text>
-              </View>
-            ))}
+        <View style={insightStyles.tierProgressBody}>
+          <TierProgressBadgePreview item={currentBadge} />
+          <View style={insightStyles.tierProgressStats}>
+            <Text style={insightStyles.tierCurrentLabel} numberOfLines={1}>
+              {tier.label}
+            </Text>
+            <Text style={insightStyles.tierMaterialLabel} numberOfLines={1}>
+              {currentBadge.visual.material}
+            </Text>
           </View>
+          <Text style={insightStyles.tierPercent} numberOfLines={1}>
+            {progressLabel}
+          </Text>
         </View>
-      </View>
-    </View>
+
+        <View style={insightStyles.progressTrack}>
+          <LinearGradient
+            colors={['#E0A728', '#FFE7A3', '#C88718']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[insightStyles.progressFill, { width: `${progressPercent}%` }]}
+          />
+        </View>
+        <Text style={insightStyles.tierUnlockText} numberOfLines={1}>
+          {unlockCopy}
+        </Text>
+      </LiquidInsightSurface>
+    </Pressable>
   );
 }
 
@@ -556,9 +521,6 @@ function DailyInsightsSection({
   campaigns: CampaignListItem[];
   loading: boolean;
 }) {
-  const window = useWindowDimensions();
-  const cardWidth = Math.min(Math.max(window.width * 0.82, 300), 348);
-  const sidePeekPadding = Math.max(0, (window.width - cardWidth) / 2);
   const deliveryCampaigns = campaigns.filter((campaign) =>
     DELIVERY_ACTION_STATUSES.has(campaign.status),
   );
@@ -572,29 +534,17 @@ function DailyInsightsSection({
         <Text style={insightStyles.title}>Daily Insights</Text>
         <Text style={insightStyles.subtitle}>{"Today's update on your focus"}</Text>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={cardWidth + theme.spacing.md}
-        style={insightStyles.scrollerFrame}
-        contentContainerStyle={[insightStyles.scroller, { paddingHorizontal: sidePeekPadding }]}
-      >
-        <DeliveryFocusCard
-          campaigns={campaigns}
-          deliveryCampaigns={deliveryCampaigns}
-          loading={loading}
-          width={cardWidth}
-        />
-        <PendingEarningsFocusCard
-          earnings={earnings}
-          campaigns={campaigns}
-          pendingCampaigns={pendingEarningCampaigns}
-          loading={loading}
-          width={cardWidth}
-        />
-        <TierProgressFocusCard earnings={earnings} loading={loading} width={cardWidth} />
-      </ScrollView>
+      <View style={insightStyles.insightStack}>
+        <View style={insightStyles.focusPair}>
+          <DeliveryFocusCard deliveryCampaigns={deliveryCampaigns} loading={loading} />
+          <PendingEarningsFocusCard
+            earnings={earnings}
+            pendingCampaigns={pendingEarningCampaigns}
+            loading={loading}
+          />
+        </View>
+        <TierProgressFocusCard earnings={earnings} loading={loading} />
+      </View>
     </View>
   );
 }
@@ -613,6 +563,7 @@ export default function HomeScreen() {
   const earningsLoading = bootstrapLoading || shouldShowInitialLoader(earnings);
   const campaignsLoading = bootstrapLoading || shouldShowInitialLoader(campaigns);
   const heroLoading = profileLoading || earningsLoading;
+  const profileImageUri = influencerProfileImageUri(profile.data);
 
   return (
     <Screen
@@ -626,7 +577,7 @@ export default function HomeScreen() {
         showLogoTitle
         logoAccessibilityLabel="Plugoh home"
         profile={{
-          imageUri: profile.data?.profile_photo_url,
+          imageUri: profileImageUri,
           onPress: () => {
             router.push('/(app)/profile');
           },
@@ -708,231 +659,294 @@ const insightStyles = StyleSheet.create({
     ...theme.typography.caption,
     color: 'rgba(255,255,255,0.58)',
   },
-  scrollerFrame: {
-    marginHorizontal: -theme.spacing.xxl,
-  },
-  scroller: {
+  insightStack: {
     gap: theme.spacing.md,
   },
-  deliveryCard: {
-    borderRadius: 24,
+  focusPair: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  glassShell: {
+    flex: 1,
+    borderRadius: 32,
     borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(255,255,255,0.045)',
     overflow: 'hidden',
-    paddingTop: theme.spacing.lg,
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.sm,
-    gap: theme.spacing.md,
+    backgroundColor: 'transparent',
   },
-  deliveryHeader: {
-    minHeight: 72,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: theme.spacing.sm,
+  glassContent: {
+    flex: 1,
+    position: 'relative',
   },
-  deliveryHeaderCopy: {
+  glassTopHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 18,
+    right: 18,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.32)',
+  },
+  glassBottomShade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '42%',
+    backgroundColor: 'rgba(3,9,14,0.1)',
+  },
+  focusNode: {
     flex: 1,
     minWidth: 0,
-    gap: theme.spacing.sm,
-    paddingTop: theme.spacing.xs,
+    minHeight: 198,
+    borderRadius: 32,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.18,
+    shadowRadius: 26,
+    elevation: 5,
   },
-  deliveryTitle: {
+  focusNodeContent: {
+    justifyContent: 'space-between',
+    padding: theme.spacing.md,
+  },
+  tilePressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
+  },
+  focusNodeHeader: {
+    minHeight: 118,
+    gap: theme.spacing.lg,
+  },
+  deliveryNodeHeader: {
+    minHeight: 122,
+  },
+  pendingNodeHeader: {
+    minHeight: 122,
+  },
+  focusNodeImage: {
+    width: 36,
+    height: 36,
+    flexShrink: 0,
+  },
+  focusNodeLargeImage: {
+    width: 46,
+    height: 46,
+  },
+  deliveryNodeTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    paddingTop: theme.spacing.xs,
+    justifyContent: 'flex-end',
+  },
+  deliveryNodeMetricRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 5,
+    paddingLeft: theme.spacing.sm,
+  },
+  deliveryNodeValue: {
     fontFamily: theme.typography.display.fontFamily,
-    fontSize: 25,
-    lineHeight: 31,
-    fontWeight: '700',
+    fontSize: 42,
+    lineHeight: 46,
+    fontWeight: '800',
     color: 'rgba(255,255,255,0.96)',
     includeFontPadding: false,
   },
-  deliverySummary: {
+  deliveryNodeSubtitle: {
     fontFamily: theme.typography.body.fontFamily,
     fontSize: 14,
     lineHeight: 19,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.74)',
+    paddingBottom: 5,
     includeFontPadding: false,
   },
-  deliveryHeroImage: {
-    width: 82,
-    height: 76,
-    marginTop: -theme.spacing.xs,
-    marginRight: -theme.spacing.xs,
-    flexShrink: 0,
-  },
-  featuredCampaign: {
-    minHeight: 98,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    borderRadius: 22,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-  },
-  featuredCampaignPressed: {
-    opacity: 0.78,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  featuredCopy: {
+  pendingNodeTitleWrap: {
     flex: 1,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
     minWidth: 0,
-    gap: 3,
   },
-  featuredTitle: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: '700',
+  pendingNodeMetricRow: {
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    paddingLeft: theme.spacing.sm,
+  },
+  pendingNodeAmount: {
+    flexShrink: 1,
+    fontFamily: theme.typography.display.fontFamily,
+    fontSize: 48,
+    lineHeight: 52,
+    fontWeight: '800',
     color: 'rgba(255,255,255,0.96)',
     includeFontPadding: false,
   },
-  featuredBrand: {
+  pendingNodeSuffix: {
     fontFamily: theme.typography.body.fontFamily,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.64)',
+    color: 'rgba(255,255,255,0.62)',
+    paddingBottom: 5,
     includeFontPadding: false,
   },
-  featuredDue: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 11,
-    lineHeight: 17,
-    fontWeight: '700',
-    color: '#F6C967',
-    includeFontPadding: false,
-  },
-  chevronBubble: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tierBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tierBadgeText: {
-    fontFamily: theme.typography.display.fontFamily,
-    fontSize: 20,
-    lineHeight: 24,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    includeFontPadding: false,
-    textShadowColor: 'rgba(0,0,0,0.22)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  deliveryEmpty: {
-    minHeight: 98,
-    justifyContent: 'center',
-    borderRadius: 22,
+  pendingEscrowPill: {
+    width: '100%',
+    minHeight: 38,
+    borderRadius: 19,
     borderCurve: 'continuous',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    padding: theme.spacing.md,
-    gap: 4,
+    borderColor: 'rgba(255,216,112,0.42)',
+    backgroundColor: 'rgba(255,198,66,0.18)',
   },
-  deliveryEmptyTitle: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.92)',
-    includeFontPadding: false,
+  deliveryActionPill: {
+    borderColor: 'rgba(118,255,172,0.42)',
+    backgroundColor: 'rgba(57,199,112,0.18)',
   },
-  deliveryEmptySubtitle: {
+  deliveryActionText: {
+    color: '#BFFFD2',
+  },
+  pendingEscrowDock: {
+    alignItems: 'stretch',
+  },
+  pendingEscrowPillContent: {
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.sm,
+  },
+  pendingEscrowText: {
     fontFamily: theme.typography.body.fontFamily,
     fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '400',
-    color: 'rgba(255,255,255,0.5)',
+    lineHeight: 15,
+    fontWeight: '700',
+    color: '#FFE7A8',
     includeFontPadding: false,
+    textAlign: 'center',
+    textTransform: 'uppercase',
   },
-  deliveryMeta: {
+  focusNodeSpacer: {
+    flex: 1,
+    minHeight: 6,
+  },
+  tierProgressCard: {
+    minHeight: 190,
+    borderRadius: 32,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.18,
+    shadowRadius: 26,
+    elevation: 5,
+  },
+  tierProgressContent: {
+    padding: theme.spacing.lg,
     gap: theme.spacing.sm,
   },
-  metaBlock: {
-    gap: theme.spacing.md,
+  tierProgressHeader: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: theme.spacing.lg,
   },
-  metaLabel: {
-    fontFamily: theme.typography.display.fontFamily,
-    fontSize: 20,
-    lineHeight: 25,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.92)',
+  tierProgressTitle: {
+    fontFamily: theme.typography.body.fontFamily,
+    flex: 1,
+    minWidth: 0,
+    paddingLeft: theme.spacing.sm,
+    paddingTop: 1,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.82)',
     includeFontPadding: false,
   },
-  activeAvatarRow: {
-    minHeight: 42,
+  tierCrystalImage: {
+    width: 40,
+    height: 40,
+    marginRight: theme.spacing.sm,
+  },
+  tierProgressBody: {
+    minHeight: 62,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: theme.spacing.sm,
   },
-  activeAvatarItem: {
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: 'rgba(5,5,9,0.86)',
-  },
-  activeAvatarMore: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: 'rgba(5,5,9,0.86)',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+  tierBadgePreviewFrame: {
+    width: 62,
+    height: 62,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+    marginLeft: -theme.spacing.xs,
   },
-  activeAvatarMoreText: {
+  tierBadgePreviewScale: {
+    width: 222,
+    height: 222,
+    transform: [{ scale: 0.3 }],
+  },
+  tierProgressStats: {
+    flex: 1,
+    minWidth: 0,
+    gap: 1,
+  },
+  tierCurrentLabel: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.86)',
+    includeFontPadding: false,
+  },
+  tierMaterialLabel: {
     fontFamily: theme.typography.body.fontFamily,
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.74)',
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.56)',
     includeFontPadding: false,
   },
-  tierMilestoneRow: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tierMilestoneItem: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tierMilestoneText: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: 13,
-    lineHeight: 17,
+  tierPercent: {
+    minWidth: 78,
+    fontFamily: theme.typography.display.fontFamily,
+    fontSize: 31,
+    lineHeight: 37,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: 'rgba(255,255,255,0.96)',
     includeFontPadding: false,
-    textShadowColor: 'rgba(0,0,0,0.24)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    marginLeft: theme.spacing.sm,
+    textAlign: 'right',
+    transform: [{ translateY: 5 }],
   },
-  metaMuted: {
+  progressTrack: {
+    width: '92%',
+    alignSelf: 'center',
+    marginTop: theme.spacing.xs,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,221,142,0.24)',
+    backgroundColor: 'rgba(8,15,20,0.28)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  tierUnlockText: {
+    width: '92%',
+    alignSelf: 'center',
+    marginTop: 2,
+    paddingLeft: theme.spacing.xs,
     fontFamily: theme.typography.body.fontFamily,
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.38)',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.48)',
     includeFontPadding: false,
   },
 });

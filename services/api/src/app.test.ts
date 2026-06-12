@@ -5,6 +5,7 @@ import { createServices } from './services/marketplace.js';
 import {
   FakeAiProvider,
   FakeEmailProvider,
+  FakeGeocodingProvider,
   FakeInstagramProvider,
   FakePaymentProvider,
   FakeStorageProvider,
@@ -70,6 +71,7 @@ function makeApp(seed = {}) {
   const payment = new FakePaymentProvider();
   const storage = new FakeStorageProvider();
   const ai = new FakeAiProvider();
+  const geocoding = new FakeGeocodingProvider();
   const app = createApp({
     store,
     config: {
@@ -89,11 +91,12 @@ function makeApp(seed = {}) {
       payment,
       storage,
       email: new FakeEmailProvider(),
+      geocoding,
       instagram: new FakeInstagramProvider(),
       ai,
     },
   });
-  return { app, store, payment, storage, ai };
+  return { app, store, payment, storage, ai, geocoding };
 }
 
 class SearchFallbackStore extends MemoryDataStore {
@@ -341,7 +344,10 @@ describe('Plugoh API', () => {
     expect(res.status).toBe(200);
     expect(store.tables.get('user_roles')?.[0].role).toBe('business');
     expect(store.tables.get('profiles')?.[0].full_name).toBe('Brand Owner');
-    expect(store.tables.get('business_profiles')?.[0].brand_name).toBe('Plugoh Cafe');
+    const businessProfile = store.tables.get('business_profiles')?.[0];
+    expect(businessProfile?.brand_name).toBe('Plugoh Cafe');
+    expect(businessProfile?.brand_latitude).toBe(17.4065);
+    expect(businessProfile?.brand_longitude).toBe(78.4772);
   });
 
   it('creates a campaign and notifies the influencer', async () => {
@@ -367,8 +373,56 @@ describe('Plugoh API', () => {
     expect(store.tables.get('notifications')?.[0].type).toBe('new_booking');
     const campaign = store.tables.get('campaigns')?.[0];
     expect(campaign?.ai_title).toBe('Aura Weekend Reel');
+    expect(campaign?.due_date).toBe('2026-07-01');
+    expect(campaign?.brief).toContain('Due date: 2026-07-01');
+    expect(campaign?.brief).not.toContain('choose_date');
+    expect(campaign?.place_latitude).toBe(17.4065);
+    expect(campaign?.place_longitude).toBe(78.4772);
     expect(campaign?.card_image_url).toContain('https://storage.test/campaigns/');
     expect(campaign?.creative_status).toBe('ready');
+
+    const detail = await app.request(`/campaigns/${campaign?.id}`, {
+      headers: { authorization: 'Bearer business' },
+    });
+    const detailBody = await json(detail);
+    expect(detailBody.data.place_latitude).toBe(17.4065);
+    expect(detailBody.data.place_longitude).toBe(78.4772);
+
+    const list = await app.request('/campaigns?role=business', {
+      headers: { authorization: 'Bearer business' },
+    });
+    const listBody = await json(list);
+    expect(listBody.data.items[0].place_latitude).toBe(17.4065);
+    expect(listBody.data.items[0].place_longitude).toBe(78.4772);
+  });
+
+  it('keeps campaign creation successful when geocoding fails', async () => {
+    const { app, store, geocoding } = makeApp();
+    geocoding.shouldFail = true;
+
+    const res = await app.request('/campaigns', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        influencer_id: influencerId,
+        influencer_profile_id: influencerProfileId,
+        package_type: 'instagram_reel',
+        price_offered_paise: 10000,
+        objective: 'visit_place',
+        timing_mode: 'choose_date',
+        due_date: '2026-07-01',
+        place_name: 'Hyderabad',
+        business_contact_email: 'brand@test.dev',
+        business_contact_phone: '+919999999999',
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const campaign = store.tables.get('campaigns')?.[0];
+    expect(geocoding.calls).toContain('Hyderabad');
+    expect(campaign?.place_name).toBe('Hyderabad');
+    expect(campaign?.place_latitude).toBeNull();
+    expect(campaign?.place_longitude).toBeNull();
   });
 
   it('keeps campaign creation successful when campaign creative generation fails', async () => {

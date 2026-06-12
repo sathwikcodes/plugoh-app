@@ -59,3 +59,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Graphify local context outputs
+graphify-out/
+.graphify-work/

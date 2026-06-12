@@ -7,6 +7,7 @@ import { impactAsync, ImpactFeedbackStyle, selectionAsync } from 'expo-haptics';
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import type { ComponentProps } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, Pressable, View, type ImageSourcePropType, type ViewStyle } from 'react-native';
 import type { SFSymbol } from 'sf-symbols-typescript';
 
@@ -32,6 +33,8 @@ type Props = {
   haptic?: HapticFlavor;
   /** When set, shows this image (e.g. profile photo) instead of the SF Symbol */
   imageUri?: string | null;
+  /** Keeps the most recent non-empty imageUri visible across brief loading gaps. */
+  preserveImageOnEmpty?: boolean;
   /** Static local image used as the button icon. Ignored when imageUri is present. */
   imageSource?: ImageSourcePropType;
   imageSize?: number;
@@ -75,6 +78,7 @@ export function NativeIconButton({
   style,
   haptic = 'light',
   imageUri,
+  preserveImageOnEmpty = false,
   imageSource,
   imageSize,
   accessibilityLabel,
@@ -92,7 +96,17 @@ export function NativeIconButton({
   };
 
   const resolvedUri = typeof imageUri === 'string' ? imageUri.trim() : '';
-  const showPhoto = resolvedUri.length > 0;
+  const [stableImageUri, setStableImageUri] = useState(resolvedUri);
+  useEffect(() => {
+    if (resolvedUri) {
+      setStableImageUri(resolvedUri);
+    } else if (!preserveImageOnEmpty) {
+      setStableImageUri('');
+    }
+  }, [preserveImageOnEmpty, resolvedUri]);
+
+  const displayImageUri = resolvedUri || (preserveImageOnEmpty ? stableImageUri : '');
+  const showPhoto = displayImageUri.length > 0;
   const iconImageSize = imageSize ?? fallbackSize ?? iconSize;
   const fallbackIconNode = fallbackIcon ? (
     <View
@@ -121,7 +135,7 @@ export function NativeIconButton({
 
   const icon = showPhoto ? (
     <Image
-      source={{ uri: resolvedUri }}
+      source={{ uri: displayImageUri }}
       style={{
         width: containerSize - 6,
         height: containerSize - 6,

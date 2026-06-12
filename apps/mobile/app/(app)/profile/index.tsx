@@ -6,6 +6,7 @@ import { theme } from '@/constants/theme';
 import { useBootstrap, useInfluencerProfile, usePayout } from '@/hooks/use-marketplace';
 import { unregisterPush } from '@/lib/api/endpoints';
 import { logout } from '@/lib/auth/logout';
+import { influencerProfileImageUri } from '@/lib/influencer/profile-image';
 import {
   getPushNotificationsPreference,
   setPushNotificationsPreference,
@@ -234,11 +235,11 @@ export default function ProfileScreen() {
   const profileLoading = bootstrapLoading || shouldShowInitialLoader(profile);
   const payoutLoading = bootstrapLoading || shouldShowInitialLoader(payout);
   const email = bootstrap.data?.user.email?.trim();
+  const profileImageUri = influencerProfileImageUri(data);
 
-  const pricingSet = !!(data?.price_per_reel || data?.price_per_post || data?.price_per_story);
-  const pricingSubtitle = pricingSet
-    ? `Starts at ${fmtINR(data.price_per_story ?? data.price_per_post ?? data.price_per_reel)}`
-    : 'Add your rates';
+  const starterPrice = data?.price_per_story ?? data?.price_per_post ?? data?.price_per_reel;
+  const pricingSet = starterPrice != null && starterPrice > 0;
+  const pricingSubtitle = pricingSet ? `Starts at ${fmtINR(starterPrice)}` : 'Add your rates';
   const profileLocation = profileLocationLine(data);
 
   const handleSignOut = () => {
@@ -271,8 +272,8 @@ export default function ProfileScreen() {
       {/* ── profile row ── */}
       <View style={styles.profileRow}>
         <View style={styles.avatarWrap}>
-          {data?.profile_photo_url ? (
-            <Image source={{ uri: data.profile_photo_url }} style={styles.avatar} />
+          {profileImageUri ? (
+            <Image source={{ uri: profileImageUri }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarFallback]}>
               <Text style={styles.avatarInitials}>{initials(data?.display_name)}</Text>

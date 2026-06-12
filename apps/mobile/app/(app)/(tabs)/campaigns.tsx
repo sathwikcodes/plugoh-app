@@ -5,6 +5,7 @@ import {
   useMarketplaceMutations,
 } from '@/hooks/use-marketplace';
 import labImage from '@/assets/images/lab.png';
+import { influencerProfileImageUri } from '@/lib/influencer/profile-image';
 import type { CampaignListItem } from '@plugoh/contracts';
 import { router } from 'expo-router';
 import { useCallback } from 'react';
@@ -22,6 +23,7 @@ export default function CampaignsScreen() {
   const influencerProfile = useInfluencerProfile();
   const campaigns = useCampaigns({ sort: 'created_desc' });
   const mutations = useMarketplaceMutations();
+  const profileImageUri = influencerProfileImageUri(influencerProfile.data);
 
   const handleOpenCampaign = useCallback((id: string) => {
     router.push(`/(app)/campaigns/${id}`);
@@ -56,7 +58,7 @@ export default function CampaignsScreen() {
       role="influencer"
       campaigns={campaigns.data?.items ?? []}
       isLoading={campaigns.isLoading}
-      profileImageUri={influencerProfile.data?.profile_photo_url}
+      profileImageUri={profileImageUri}
       profileSymbol="person.circle"
       profileFallbackIcon="person-circle-outline"
       profileRoute="/(app)/profile"

@@ -83,6 +83,135 @@ export interface PaymentProvider {
   verifySignature(input: { orderId: string; paymentId: string; signature: string }): boolean;
 }
 
+export type GeocodingResult = {
+  latitude: number;
+  longitude: number;
+};
+
+export interface GeocodingProvider {
+  geocode(address: string): Promise<GeocodingResult | null>;
+}
+
+export type WeatherSummary = {
+  temperature_celsius: number;
+  condition?: string;
+  icon?: string;
+  is_daytime?: boolean;
+  observed_at?: string;
+};
+
+export interface WeatherProvider {
+  current(input: { latitude: number; longitude: number }): Promise<WeatherSummary | null>;
+}
+
+export class GoogleGeocodingProvider implements GeocodingProvider {
+  private readonly apiKey: string;
+
+  constructor(config: EnvConfig) {
+    this.apiKey = requireConfig(config.googleMapsGeocodingApiKey, 'GOOGLE_MAPS_GEOCODING_API_KEY');
+  }
+
+  async geocode(address: string) {
+    const trimmed = address.trim();
+    if (!trimmed) return null;
+
+    const params = new URLSearchParams({ address: trimmed, key: this.apiKey });
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`, {
+            signal,
+          }),
+        10_000,
+      ),
+    );
+    if (!response.ok) {
+      if (response.status >= 500) throw new HttpStatusError(response.status, 'Geocoding failed');
+      throw badRequest('GEOCODING_PROVIDER_ERROR', 'Google Geocoding rejected request');
+    }
+
+    const payload = (await response.json()) as {
+      status?: string;
+      results?: Array<{ geometry?: { location?: { lat?: number; lng?: number } } }>;
+      error_message?: string;
+    };
+    if (payload.status === 'ZERO_RESULTS') return null;
+    if (payload.status !== 'OK') {
+      throw badRequest(
+        'GEOCODING_PROVIDER_ERROR',
+        payload.error_message || `Google Geocoding returned ${payload.status || 'an error'}`,
+      );
+    }
+
+    const location = payload.results?.[0]?.geometry?.location;
+    if (
+      typeof location?.lat === 'number' &&
+      Number.isFinite(location.lat) &&
+      typeof location.lng === 'number' &&
+      Number.isFinite(location.lng)
+    ) {
+      return { latitude: location.lat, longitude: location.lng };
+    }
+    return null;
+  }
+}
+
+export class GoogleWeatherProvider implements WeatherProvider {
+  private readonly apiKey: string;
+
+  constructor(config: EnvConfig) {
+    this.apiKey = requireConfig(config.googleMapsWeatherApiKey, 'GOOGLE_MAPS_WEATHER_API_KEY');
+  }
+
+  async current(input: { latitude: number; longitude: number }) {
+    if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)) return null;
+
+    const params = new URLSearchParams({
+      key: this.apiKey,
+      'location.latitude': String(input.latitude),
+      'location.longitude': String(input.longitude),
+      unitsSystem: 'METRIC',
+      languageCode: 'en',
+    });
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch(`https://weather.googleapis.com/v1/currentConditions:lookup?${params.toString()}`, {
+            signal,
+          }),
+        10_000,
+      ),
+    );
+    if (!response.ok) {
+      if (response.status >= 500) throw new HttpStatusError(response.status, 'Weather failed');
+      throw badRequest('WEATHER_PROVIDER_ERROR', 'Google Weather rejected request');
+    }
+
+    const payload = (await response.json()) as {
+      currentTime?: string;
+      isDaytime?: boolean;
+      weatherCondition?: {
+        iconBaseUri?: string;
+        description?: { text?: string };
+      };
+      temperature?: { degrees?: number };
+    };
+    const temperature = payload.temperature?.degrees;
+    if (typeof temperature !== 'number' || !Number.isFinite(temperature)) return null;
+
+    const result: WeatherSummary = {
+      temperature_celsius: temperature,
+    };
+    const condition = payload.weatherCondition?.description?.text;
+    const icon = payload.weatherCondition?.iconBaseUri;
+    if (condition) result.condition = condition;
+    if (icon) result.icon = icon;
+    if (typeof payload.isDaytime === 'boolean') result.is_daytime = payload.isDaytime;
+    if (payload.currentTime) result.observed_at = payload.currentTime;
+    return result;
+  }
+}
+
 export class RazorpayProvider implements PaymentProvider {
   private readonly razorpay: any;
   private readonly keySecret: string;

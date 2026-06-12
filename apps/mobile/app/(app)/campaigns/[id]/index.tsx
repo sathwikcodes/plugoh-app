@@ -1,19 +1,21 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import coinImage from '@/assets/images/coin.png';
+import postImage from '@/assets/images/post.png';
+import reelImage from '@/assets/images/reel.png';
 import { BlurView } from 'expo-blur';
-import { Image } from 'expo-image';
+import { Image, type ImageProps } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppleMaps, GoogleMaps, type Coordinates } from 'expo-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import type { ReactNode } from 'react';
 import {
   Alert,
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  type StyleProp,
-  type ViewStyle,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,9 +38,23 @@ function formatPackageType(pkg?: string) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function packageIconSource(pkg?: string): ImageProps['source'] | undefined {
+  const value = pkg?.toLowerCase() ?? '';
+  if (value.includes('reel')) return reelImage;
+  if (value.includes('post') || value.includes('story')) return postImage;
+  return undefined;
+}
+
 function formatCurrency(amount?: number) {
   if (amount == null) return 'Not set';
-  return `₹${Math.round(amount).toLocaleString('en-IN')}`;
+  return Math.round(amount).toLocaleString('en-IN');
+}
+
+function formatCampaignPayout(item?: CampaignListItem) {
+  if (item?.price_offered_paise != null) {
+    return formatCurrency(item.price_offered_paise / 100);
+  }
+  return formatCurrency(item?.price_offered);
 }
 
 function brandImageUrl(campaign?: CampaignListItem) {
@@ -48,6 +64,10 @@ function brandImageUrl(campaign?: CampaignListItem) {
     campaign?.business_profile?.avatar_url ||
     undefined
   );
+}
+
+function brandOwnerEmail(campaign?: CampaignListItem) {
+  return campaign?.business_profile?.email?.trim() || '';
 }
 
 function creatorImageUrl(campaign?: CampaignListItem) {
@@ -80,9 +100,40 @@ function displayBrief(brief?: string) {
   if (!brief) return '';
   return brief
     .split('\n')
-    .filter((line) => !/^(Objective|Package|Timing|Venue):/i.test(line.trim()))
+    .filter((line) => !/^(Objective|Package|Timing|Due date|Venue|Place):/i.test(line.trim()))
     .join('\n')
     .trim();
+}
+
+function dateFromDateKey(value?: string) {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function ordinalDay(day: number) {
+  if (day > 3 && day < 21) return `${day}th`;
+  switch (day % 10) {
+    case 1:
+      return `${day}st`;
+    case 2:
+      return `${day}nd`;
+    case 3:
+      return `${day}rd`;
+    default:
+      return `${day}th`;
+  }
+}
+
+function formatFullDate(value?: string) {
+  const date = dateFromDateKey(value);
+  if (!date) return null;
+  const weekday = date.toLocaleDateString('en-IN', { weekday: 'long' });
+  const month = date.toLocaleDateString('en-IN', { month: 'long' });
+  return `${weekday}, ${ordinalDay(date.getDate())} ${month} ${date.getFullYear()}`;
 }
 
 function formatDateTime(value?: string) {
@@ -97,10 +148,22 @@ function formatDateTime(value?: string) {
   });
 }
 
+function formatTimingLine(value?: string | null) {
+  if (!value) return null;
+  const dueDateMatch = /\b(\d{4}-\d{2}-\d{2})\b/.exec(value);
+  if (dueDateMatch) return formatFullDate(dueDateMatch[1]) ?? dueDateMatch[1];
+  if (value === 'asap') return 'ASAP';
+  if (value === 'choose_date') return null;
+  return value.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function campaignDateLine(item?: CampaignListItem) {
   if (!item) return 'Timing not specified';
+  const dueDate = formatFullDate(item.due_date);
+  if (dueDate) return dueDate;
   const timing = parseBriefValue(item.brief, 'Timing');
-  if (timing) return timing.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const formattedTiming = formatTimingLine(timing);
+  if (formattedTiming) return formattedTiming;
   return (
     formatDateTime(item.completed_at) ||
     formatDateTime(item.delivery_submitted_at) ||
@@ -112,31 +175,11 @@ function campaignDateLine(item?: CampaignListItem) {
 function campaignLocation(item?: CampaignListItem) {
   return (
     parseBriefValue(item?.brief, 'Venue') ||
+    parseBriefValue(item?.brief, 'Place') ||
+    item?.place_name?.trim() ||
     item?.business_profile?.brand_location?.trim() ||
     'Location not specified'
   );
-}
-
-function scheduleTitle(item?: CampaignListItem) {
-  const value = item?.completed_at || item?.delivery_submitted_at || item?.expires_at;
-  if (!value) return 'Schedule';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Schedule';
-
-  const today = new Date();
-  if (
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth() &&
-    date.getDate() === today.getDate()
-  ) {
-    return 'Today';
-  }
-
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-  });
 }
 
 function locationParts(location: string) {
@@ -151,6 +194,28 @@ function locationParts(location: string) {
   };
 }
 
+function coordinatePair(item?: CampaignListItem): Coordinates | null {
+  const latitude = Number(item?.place_latitude ?? item?.business_profile?.brand_latitude);
+  const longitude = Number(item?.place_longitude ?? item?.business_profile?.brand_longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
+}
+
+function weatherIconName(condition?: string, isDaytime = true): keyof typeof Ionicons.glyphMap {
+  const value = condition?.toLowerCase() ?? '';
+  if (value.includes('thunder')) return 'thunderstorm-outline';
+  if (value.includes('rain') || value.includes('drizzle') || value.includes('shower')) {
+    return 'rainy-outline';
+  }
+  if (value.includes('snow') || value.includes('sleet') || value.includes('hail')) {
+    return 'snow-outline';
+  }
+  if (value.includes('cloud') || value.includes('overcast') || value.includes('fog')) {
+    return isDaytime ? 'partly-sunny-outline' : 'cloudy-night-outline';
+  }
+  return isDaytime ? 'sunny-outline' : 'moon-outline';
+}
+
 function creatorDisplayName(campaign?: CampaignListItem) {
   return (
     campaign?.influencer_profile?.display_name?.trim() ||
@@ -162,6 +227,28 @@ function creatorDisplayName(campaign?: CampaignListItem) {
 function creatorMeta(campaign?: CampaignListItem) {
   const handle = campaign?.influencer_profile?.ig_username?.trim();
   return handle ? `@${handle.replace(/^@/, '')}` : '';
+}
+
+function actionIconForStatus(status?: string): keyof typeof Ionicons.glyphMap {
+  switch (status) {
+    case 'completed':
+      return 'checkmark-done';
+    case 'delivery_submitted':
+      return 'cloud-done';
+    case 'in_escrow':
+      return 'lock-closed';
+    case 'requested':
+    case 'payment_pending':
+    case 'pre_authorized':
+      return 'hourglass-outline';
+    case 'declined':
+    case 'expired':
+    case 'cancelled':
+    case 'disputed':
+      return 'alert-circle-outline';
+    default:
+      return 'sparkles';
+  }
 }
 
 function ActionPill({
@@ -226,127 +313,306 @@ function ActionPill({
   );
 }
 
-function InfoGroup({
-  title,
-  children,
-  style,
-}: {
-  title: string;
-  children: ReactNode;
-  style?: StyleProp<ViewStyle>;
-}) {
-  return (
-    <View style={[styles.infoGroup, style]}>
-      <Text style={styles.groupTitle}>{title}</Text>
-      <View style={styles.infoRows}>{children}</View>
-    </View>
-  );
-}
-
-function InfoLine({
+function QuickActionTile({
   icon,
   label,
-  value,
-  loading,
-  isLast,
+  onPress,
+  disabled,
+  active,
+  accessibilityLabel,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  value: string;
-  loading?: boolean;
-  isLast?: boolean;
+  onPress?: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  accessibilityLabel: string;
 }) {
+  const content = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => [
+        styles.quickActionPressable,
+        pressed && !disabled ? styles.pressed : null,
+        active ? styles.quickActionPressableActive : null,
+      ]}
+    >
+      <View pointerEvents="none" style={styles.quickActionGlassTint} />
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          active ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.18)',
+          'rgba(255,255,255,0.04)',
+          'rgba(255,255,255,0)',
+        ]}
+        locations={[0, 0.48, 1]}
+        start={{ x: 0.12, y: 0 }}
+        end={{ x: 0.88, y: 1 }}
+        style={styles.quickActionSheen}
+      />
+      <View pointerEvents="none" style={styles.quickActionInnerStroke} />
+      <Ionicons name={icon} size={20} color={disabled ? 'rgba(255,255,255,0.34)' : '#FFFFFF'} />
+      <Text
+        style={[styles.quickActionText, disabled ? styles.quickActionTextDisabled : null]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+
+  if (isLiquidGlassAvailable()) {
+    return (
+      <GlassView
+        isInteractive
+        glassEffectStyle="clear"
+        colorScheme="dark"
+        style={[styles.quickActionGlass, active ? styles.quickActionGlassActive : null]}
+      >
+        {content}
+      </GlassView>
+    );
+  }
+
   return (
-    <View style={[styles.infoLine, isLast ? styles.infoLineLast : null]}>
-      <View style={styles.infoLineIcon}>
-        <Ionicons name={icon} size={18} color="rgba(255,255,255,0.78)" />
+    <BlurView
+      tint="systemUltraThinMaterialDark"
+      intensity={active ? 88 : 78}
+      style={[styles.quickActionGlass, active ? styles.quickActionGlassActive : null]}
+    >
+      {content}
+    </BlurView>
+  );
+}
+
+function ProfileGlassTab({
+  name,
+  meta,
+  imageUrl,
+  fallbackInitial,
+  loading,
+  disabled,
+  onPress,
+  accessibilityLabel,
+}: {
+  name: string;
+  meta?: string;
+  imageUrl?: string;
+  fallbackInitial: string;
+  loading?: boolean;
+  disabled?: boolean;
+  onPress?: () => void;
+  accessibilityLabel: string;
+}) {
+  const secondaryText = meta?.trim() || 'No email provided';
+  const content = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => [
+        styles.profileTabPressable,
+        pressed && !disabled ? styles.pressed : null,
+        disabled ? styles.profileTabDisabled : null,
+      ]}
+    >
+      <View pointerEvents="none" style={styles.profileTabTint} />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.055)', 'rgba(255,255,255,0)']}
+        locations={[0, 0.46, 1]}
+        start={{ x: 0.08, y: 0 }}
+        end={{ x: 0.92, y: 1 }}
+        style={styles.profileTabSheen}
+      />
+      <View pointerEvents="none" style={styles.profileTabInnerStroke} />
+      <View style={styles.brandAvatar}>
+        {loading ? (
+          <ShimmerCircle size={42} />
+        ) : imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.brandAvatarImage} contentFit="cover" />
+        ) : (
+          <Text style={styles.brandAvatarInitial}>{fallbackInitial}</Text>
+        )}
       </View>
-      <View style={styles.infoLineCopy}>
-        <Text style={styles.infoLineLabel}>{label}</Text>
+      <View style={styles.profileCopy}>
         <AsyncText
           loading={Boolean(loading)}
-          value={value}
+          value={name}
           selectable
-          style={styles.infoLineValue}
-          numberOfLines={2}
-          shimmerWidth="70%"
-          shimmerHeight={18}
+          style={styles.brandOwnerName}
+          numberOfLines={1}
+          shimmerWidth="56%"
+          shimmerHeight={20}
         />
+        {loading ? (
+          <ShimmerText width="48%" height={14} />
+        ) : (
+          <Text selectable style={styles.profileMeta} numberOfLines={1}>
+            {secondaryText}
+          </Text>
+        )}
       </View>
+      <Ionicons name="chevron-forward" size={17} color="rgba(255,255,255,0.5)" />
+    </Pressable>
+  );
+
+  if (isLiquidGlassAvailable()) {
+    return (
+      <GlassView
+        isInteractive
+        glassEffectStyle="clear"
+        colorScheme="dark"
+        style={styles.profileTabGlass}
+      >
+        {content}
+      </GlassView>
+    );
+  }
+
+  return (
+    <BlurView tint="systemUltraThinMaterialDark" intensity={82} style={styles.profileTabGlass}>
+      {content}
+    </BlurView>
+  );
+}
+
+function CampaignFactLine({
+  icon,
+  image,
+  value,
+  loading,
+}: {
+  icon?: keyof typeof Ionicons.glyphMap;
+  image?: ImageProps['source'];
+  value: string;
+  loading?: boolean;
+}) {
+  return (
+    <View style={styles.campaignFactLine}>
+      <View style={styles.campaignFactIcon}>
+        {image ? (
+          <Image source={image} style={styles.campaignFactImage} contentFit="contain" />
+        ) : icon ? (
+          <Ionicons name={icon} size={18} color="rgba(255,255,255,0.78)" />
+        ) : null}
+      </View>
+      <AsyncText
+        loading={Boolean(loading)}
+        value={value}
+        selectable
+        style={styles.campaignFactText}
+        numberOfLines={2}
+        shimmerWidth="66%"
+        shimmerHeight={18}
+      />
     </View>
   );
 }
 
-function ScheduleCard({ item, loading }: { item?: CampaignListItem; loading?: boolean }) {
+function LocationMapCard({ item, loading }: { item?: CampaignListItem; loading?: boolean }) {
   const location = campaignLocation(item);
   const { primary, secondary } = locationParts(location);
+  const coordinates = coordinatePair(item);
+  const weather = item?.location_weather;
+  const cameraPosition = coordinates ? { coordinates, zoom: 15 } : undefined;
+  const markers = coordinates
+    ? [
+        {
+          id: 'campaign-location',
+          coordinates,
+          title: location,
+        },
+      ]
+    : [];
 
   return (
-    <View style={styles.infoGroup}>
-      <View style={styles.scheduleCard}>
-        <View style={styles.scheduleTopRow}>
-          <View style={styles.scheduleTimeBlock}>
-            {loading ? (
-              <>
-                <ShimmerText width={96} height={28} />
-                <ShimmerText width={190} height={24} />
-              </>
-            ) : (
-              <>
-                <Text style={styles.scheduleTitle}>{scheduleTitle(item)}</Text>
-                <Text style={styles.scheduleTime} numberOfLines={1}>
-                  {campaignDateLine(item)}
-                </Text>
-              </>
-            )}
-          </View>
-          <View style={styles.scheduleIconBlock}>
-            <Ionicons name="moon-outline" size={22} color="rgba(255,255,255,0.86)" />
-          </View>
-        </View>
-
-        <View style={styles.scheduleDivider} />
-
+    <View style={styles.locationSection}>
+      <Text style={styles.groupTitle}>Location</Text>
+      <View style={styles.sectionDivider} />
+      <View style={styles.locationMetaRow}>
         {loading ? (
-          <View style={styles.scheduleLocationBlock}>
-            <ShimmerText width={102} height={28} />
-            <ShimmerText width="72%" height={23} />
+          <View style={styles.locationTextBlock}>
+            <ShimmerText width={190} height={26} />
+            <ShimmerText width={160} height={22} />
           </View>
         ) : (
-          <View style={styles.scheduleLocationBlock}>
-            <Text selectable style={styles.scheduleLocationPrimary} numberOfLines={1}>
+          <View style={styles.locationTextBlock}>
+            <Text selectable style={styles.locationPrimary} numberOfLines={1}>
               {primary}
             </Text>
             {secondary ? (
-              <Text selectable style={styles.scheduleLocationSecondary} numberOfLines={2}>
+              <Text selectable style={styles.locationSecondary} numberOfLines={1}>
                 {secondary}
               </Text>
             ) : null}
           </View>
         )}
-
-        <View style={styles.mapPreview} accessibilityLabel={`Map preview for ${location}`}>
-          <View style={[styles.mapPark, styles.mapParkTop]} />
-          <View style={[styles.mapPark, styles.mapParkBottom]} />
-          <View style={[styles.mapRoad, styles.mapRoadPrimary]} />
-          <View style={[styles.mapRoad, styles.mapRoadSecondary]} />
-          <View style={[styles.mapRoad, styles.mapRoadTertiary]} />
-          <View style={[styles.mapRoadThin, styles.mapRoadThinOne]} />
-          <View style={[styles.mapRoadThin, styles.mapRoadThinTwo]} />
-          <Text style={styles.mapCityLabel} numberOfLines={1}>
-            {primary}
-          </Text>
-          <Text style={styles.mapPlaceLabel} numberOfLines={1}>
-            {secondary || 'Campaign location'}
-          </Text>
-          <View style={styles.mapPin}>
-            <Ionicons name="location" size={20} color="#FFFFFF" />
+        {weather ? (
+          <View
+            style={styles.weatherBlock}
+            accessibilityLabel={
+              weather.condition
+                ? `${Math.round(weather.temperature_celsius)} degrees Celsius, ${weather.condition}`
+                : `${Math.round(weather.temperature_celsius)} degrees Celsius`
+            }
+          >
+            <Ionicons
+              name={weatherIconName(weather.condition, weather.is_daytime ?? true)}
+              size={24}
+              color="rgba(255,255,255,0.9)"
+            />
+            <Text style={styles.weatherTemp} numberOfLines={1}>
+              {Math.round(weather.temperature_celsius)}°C
+            </Text>
           </View>
-          <View style={styles.mapBadge}>
-            <Ionicons name="map" size={16} color="rgba(42,42,42,0.92)" />
-            <Text style={styles.mapBadgeText}>Maps</Text>
+        ) : null}
+      </View>
+      <View style={styles.locationCard}>
+        {loading ? (
+          <View style={styles.mapLoading}>
+            <ShimmerText width="64%" height={18} />
           </View>
-        </View>
+        ) : coordinates && Platform.OS === 'ios' ? (
+          <AppleMaps.View
+            style={styles.nativeMap}
+            cameraPosition={cameraPosition}
+            markers={markers}
+            uiSettings={{
+              compassEnabled: false,
+              myLocationButtonEnabled: false,
+              scaleBarEnabled: false,
+            }}
+          />
+        ) : coordinates && Platform.OS === 'android' ? (
+          <GoogleMaps.View
+            style={styles.nativeMap}
+            cameraPosition={cameraPosition}
+            markers={markers}
+            uiSettings={{
+              compassEnabled: false,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
+              rotationGesturesEnabled: false,
+              tiltGesturesEnabled: false,
+            }}
+          />
+        ) : (
+          <View style={styles.mapFallback}>
+            <Ionicons name="location" size={18} color="rgba(255,255,255,0.72)" />
+            <Text selectable style={styles.mapFallbackText} numberOfLines={2}>
+              {location}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -366,6 +632,7 @@ export default function CampaignDetailScreen() {
   const item = campaign.data;
   const imageUrl = cardImageUrl(item);
   const ownerImageUrl = brandImageUrl(item);
+  const brandEmail = brandOwnerEmail(item);
   const creatorProfileImage = creatorImageUrl(item);
   const brandName = item?.business_profile?.brand_name?.trim() || 'Plugoh brand';
   const creatorName = creatorDisplayName(item);
@@ -373,9 +640,12 @@ export default function CampaignDetailScreen() {
   const creatorProfileMeta = creatorMeta(item);
   const title = item ? item.ai_title?.trim() || item.title.trim() || 'Campaign' : 'Campaign';
   const brief = displayBrief(item?.brief);
-  const heroHeight = Math.min(Math.max(window.height * 0.34, 280), 360);
-  const titleFontSize = title.length > 42 ? 26 : title.length > 26 ? 30 : 34;
+  const heroHeight = Math.min(Math.max(window.width * 0.48, 154), 204);
+  const titleFontSize = title.length > 42 ? 22 : title.length > 26 ? 24 : 27;
   const isResponding = mutations.acceptCampaign.isPending || mutations.declineCampaign.isPending;
+  const campaignTime = campaignDateLine(item);
+  const objective =
+    parseBriefValue(item?.brief, 'Objective') || item?.objective || formatStatus(item?.status);
 
   const canRespond =
     role === 'influencer' &&
@@ -403,284 +673,277 @@ export default function CampaignDetailScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{ paddingBottom: insets.bottom + theme.spacing.section }}
-      contentInsetAdjustmentBehavior="never"
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={[styles.hero, { height: heroHeight }]}>
-        {imageUrl ? (
-          <Image
-            source={{ uri: imageUrl }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            contentPosition="top center"
-          />
-        ) : (
-          <LinearGradient
-            colors={['#1B1D22', '#29242E', '#0E1115', '#050509']}
-            locations={[0, 0.34, 0.68, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-        )}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.34)', 'rgba(0,0,0,0.04)', 'rgba(0,0,0,0.28)', 'rgba(5,5,9,0.88)']}
-          locations={[0, 0.38, 0.66, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        <LinearGradient
-          colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0)', 'rgba(5,5,9,0.58)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-
-        <View style={[styles.heroControls, { paddingTop: insets.top + theme.spacing.md }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            onPress={() => {
-              router.back();
-            }}
-            style={({ pressed }) => [styles.circleButton, pressed ? styles.pressed : null]}
-          >
-            <Ionicons name="chevron-back" size={25} color="#FFFFFF" />
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.body}>
-        <View style={styles.titleBlock}>
-          {campaignLoading ? (
-            <>
-              <ShimmerText width={Math.min(window.width - theme.spacing.jumbo, 360)} height={38} />
-              <ShimmerText width={Math.min(window.width - theme.spacing.jumbo, 260)} height={38} />
-            </>
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingTop: insets.top + theme.spacing.md,
+          paddingBottom: insets.bottom + theme.spacing.section,
+        }}
+        contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.hero, { height: heroHeight }]}>
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              contentPosition="center"
+            />
           ) : (
-            <Text
-              selectable
-              style={[
-                styles.pageTitle,
-                {
-                  fontSize: titleFontSize,
-                  lineHeight: titleFontSize + 4,
-                },
-              ]}
-              numberOfLines={3}
-              adjustsFontSizeToFit
-              minimumFontScale={0.82}
-            >
-              {title}
-            </Text>
+            <LinearGradient
+              colors={['#FFFDE7', '#F8D7FF', '#8EC5D6', '#F8DF67']}
+              locations={[0, 0.38, 0.68, 1]}
+              start={{ x: 0.08, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
           )}
+          <LinearGradient
+            colors={['rgba(255,255,255,0.24)', 'rgba(255,255,255,0.02)', 'rgba(0,0,0,0.12)']}
+            locations={[0, 0.48, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+
+          <View style={styles.heroControls}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              onPress={() => {
+                router.back();
+              }}
+              style={({ pressed }) => [styles.circleButton, pressed ? styles.pressed : null]}
+            >
+              <Ionicons name="chevron-back" size={21} color="#FFFFFF" />
+            </Pressable>
+          </View>
         </View>
 
-        {canRespond ? (
-          <View style={styles.actionRow}>
-            <ActionPill
-              label={mutations.declineCampaign.isPending ? 'Declining...' : 'Decline'}
-              onPress={handleDecline}
-              tint="decline"
-              disabled={isResponding}
-              accessibilityLabel={`Decline ${title}`}
-            />
-            <ActionPill
-              label={mutations.acceptCampaign.isPending ? 'Accepting...' : 'Accept'}
-              onPress={handleAccept}
-              tint="accept"
-              disabled={isResponding}
-              accessibilityLabel={`Accept ${title}`}
-            />
-          </View>
-        ) : null}
-
-        {canDeliver ? (
-          <View style={styles.actionRow}>
-            <ActionPill
-              label="Submit delivery"
-              onPress={() => {
-                router.push(`/(app)/delivery/${id}`);
-              }}
-              tint="accept"
-              accessibilityLabel={`Submit delivery for ${title}`}
-            />
-          </View>
-        ) : null}
-
-        {canApprove ? (
-          <View style={styles.actionRow}>
-            <ActionPill
-              label={
-                mutations.approveCampaignDelivery.isPending ? 'Approving...' : 'Approve delivery'
-              }
-              onPress={async () => {
-                try {
-                  await mutations.approveCampaignDelivery.mutateAsync({
-                    id,
-                    idempotencyKey: `approve-${id}-${Date.now()}`,
-                  });
-                  await campaign.refetch();
-                } catch (error) {
-                  Alert.alert(
-                    'Could not approve',
-                    error instanceof Error ? error.message : 'Try again.',
-                  );
-                }
-              }}
-              tint="accept"
-              disabled={mutations.approveCampaignDelivery.isPending}
-              accessibilityLabel={`Approve delivery for ${title}`}
-            />
-            <ActionPill
-              label="Dispute"
-              onPress={async () => {
-                try {
-                  await mutations.disputeCampaignDelivery.mutateAsync({
-                    id,
-                    reason: 'Needs revision',
-                  });
-                  await campaign.refetch();
-                } catch (error) {
-                  Alert.alert(
-                    'Could not dispute',
-                    error instanceof Error ? error.message : 'Try again.',
-                  );
-                }
-              }}
-              tint="decline"
-              disabled={mutations.disputeCampaignDelivery.isPending}
-              accessibilityLabel={`Dispute delivery for ${title}`}
-            />
-          </View>
-        ) : null}
-
-        {role === 'business' ? (
-          <InfoGroup title="Booked creator">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`View ${creatorName} profile`}
-              accessibilityState={{ disabled: campaignLoading || !creatorProfileId }}
-              disabled={campaignLoading || !creatorProfileId}
-              onPress={() => {
-                if (!creatorProfileId) return;
-                router.push(`/(app)/creator/${creatorProfileId}`);
-              }}
-              style={({ pressed }) => [styles.brandRow, pressed ? styles.pressed : null]}
-            >
-              <View style={styles.brandAvatar}>
-                {campaignLoading ? (
-                  <ShimmerCircle size={44} />
-                ) : creatorProfileImage ? (
-                  <Image
-                    source={{ uri: creatorProfileImage }}
-                    style={styles.brandAvatarImage}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <Text style={styles.brandAvatarInitial}>{initial(creatorName)}</Text>
-                )}
-              </View>
-              <View style={styles.profileCopy}>
-                <AsyncText
-                  loading={campaignLoading}
-                  value={creatorName}
-                  selectable
-                  style={styles.brandOwnerName}
-                  numberOfLines={1}
-                  shimmerWidth="52%"
-                  shimmerHeight={24}
+        <View style={styles.body}>
+          <View style={styles.titleBlock}>
+            {campaignLoading ? (
+              <>
+                <ShimmerText
+                  width={Math.min(window.width - theme.spacing.jumbo, 360)}
+                  height={30}
                 />
-                {campaignLoading ? (
-                  <ShimmerText width="42%" height={14} />
-                ) : creatorProfileMeta ? (
-                  <Text style={styles.profileMeta} numberOfLines={1}>
-                    {creatorProfileMeta}
-                  </Text>
-                ) : null}
-              </View>
-              <Ionicons name="chevron-forward" size={19} color="rgba(255,255,255,0.42)" />
-            </Pressable>
-          </InfoGroup>
-        ) : (
-          <InfoGroup title="Brand">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`View ${brandName} profile`}
-              accessibilityState={{ disabled: campaignLoading || !item }}
-              disabled={campaignLoading || !item}
+                <ShimmerText
+                  width={Math.min(window.width - theme.spacing.jumbo, 260)}
+                  height={20}
+                />
+              </>
+            ) : (
+              <>
+                <Text
+                  selectable
+                  style={[
+                    styles.pageTitle,
+                    {
+                      fontSize: titleFontSize,
+                      lineHeight: titleFontSize + 4,
+                    },
+                  ]}
+                  numberOfLines={3}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.82}
+                >
+                  {title}
+                </Text>
+                <Text selectable style={styles.dateLine} numberOfLines={2}>
+                  {campaignTime}
+                </Text>
+              </>
+            )}
+          </View>
+
+          <View style={styles.quickActionRow}>
+            <QuickActionTile
+              icon={role === 'business' ? 'person-add' : 'business'}
+              label={role === 'business' ? 'Creator' : 'Brand'}
+              active
+              accessibilityLabel={role === 'business' ? `View ${creatorName}` : `View ${brandName}`}
+              disabled={campaignLoading || (role === 'business' ? !creatorProfileId : !item)}
               onPress={() => {
+                if (role === 'business') {
+                  if (!creatorProfileId) return;
+                  router.push(`/(app)/creator/${creatorProfileId}`);
+                  return;
+                }
                 router.push(`/(app)/campaigns/${id}/brand`);
               }}
-              style={({ pressed }) => [styles.brandRow, pressed ? styles.pressed : null]}
-            >
-              <View style={styles.brandAvatar}>
-                {campaignLoading ? (
-                  <ShimmerCircle size={44} />
-                ) : ownerImageUrl ? (
-                  <Image
-                    source={{ uri: ownerImageUrl }}
-                    style={styles.brandAvatarImage}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <Text style={styles.brandAvatarInitial}>{initial(brandName)}</Text>
-                )}
-              </View>
-              <AsyncText
-                loading={campaignLoading}
-                value={brandName}
-                selectable
-                style={styles.brandOwnerName}
-                numberOfLines={1}
-                shimmerWidth="52%"
-                shimmerHeight={24}
+            />
+            <QuickActionTile
+              icon="chatbubble-ellipses"
+              label="Chat"
+              accessibilityLabel={`Open chat for ${title}`}
+              disabled={campaignLoading || !item}
+              onPress={() => {
+                router.push(`/(app)/inbox/${id}`);
+              }}
+            />
+            <QuickActionTile
+              icon={canApprove ? 'checkmark-done' : 'cloud-upload'}
+              label={canApprove ? 'Review' : 'Deliver'}
+              accessibilityLabel={canApprove ? `Review ${title}` : `Deliver ${title}`}
+              disabled={campaignLoading || (!canDeliver && !canApprove)}
+              onPress={() => {
+                if (canApprove) return;
+                router.push(`/(app)/delivery/${id}`);
+              }}
+            />
+            <QuickActionTile
+              icon={actionIconForStatus(item?.status)}
+              label="Status"
+              accessibilityLabel={`Campaign status is ${formatStatus(item?.status)}`}
+              disabled={campaignLoading}
+              onPress={() => {
+                Alert.alert('Campaign status', formatStatus(item?.status));
+              }}
+            />
+          </View>
+
+          {canRespond ? (
+            <View style={styles.actionRow}>
+              <ActionPill
+                label={mutations.declineCampaign.isPending ? 'Declining...' : 'Decline'}
+                onPress={handleDecline}
+                tint="decline"
+                disabled={isResponding}
+                accessibilityLabel={`Decline ${title}`}
               />
-              <Ionicons name="chevron-forward" size={19} color="rgba(255,255,255,0.42)" />
-            </Pressable>
-          </InfoGroup>
-        )}
-
-        <InfoGroup title="Campaign details">
-          <InfoLine
-            icon="cash"
-            label="Payout"
-            value={formatCurrency(item?.price_offered)}
-            loading={campaignLoading}
-          />
-          <InfoLine
-            icon="sparkles"
-            label="Package"
-            value={formatPackageType(item?.package_type)}
-            loading={campaignLoading}
-          />
-          <InfoLine
-            icon="card"
-            label="Payment"
-            value={formatStatus(item?.payment_status)}
-            loading={campaignLoading}
-            isLast
-          />
-        </InfoGroup>
-
-        <ScheduleCard item={item} loading={campaignLoading} />
-
-        {campaignLoading ? (
-          <InfoGroup title="Campaign brief">
-            <View style={styles.briefSkeleton}>
-              <ShimmerText width="92%" height={15} />
-              <ShimmerText width="78%" height={15} />
+              <ActionPill
+                label={mutations.acceptCampaign.isPending ? 'Accepting...' : 'Accept'}
+                onPress={handleAccept}
+                tint="accept"
+                disabled={isResponding}
+                accessibilityLabel={`Accept ${title}`}
+              />
             </View>
-          </InfoGroup>
-        ) : brief ? (
-          <InfoGroup title="Campaign brief">
-            <Text selectable style={styles.briefText}>
-              {brief}
-            </Text>
-          </InfoGroup>
-        ) : null}
-      </View>
-    </ScrollView>
+          ) : null}
+
+          {canApprove ? (
+            <View style={styles.actionRow}>
+              <ActionPill
+                label={
+                  mutations.approveCampaignDelivery.isPending ? 'Approving...' : 'Approve delivery'
+                }
+                onPress={async () => {
+                  try {
+                    await mutations.approveCampaignDelivery.mutateAsync({
+                      id,
+                      idempotencyKey: `approve-${id}-${Date.now()}`,
+                    });
+                    await campaign.refetch();
+                  } catch (error) {
+                    Alert.alert(
+                      'Could not approve',
+                      error instanceof Error ? error.message : 'Try again.',
+                    );
+                  }
+                }}
+                tint="accept"
+                disabled={mutations.approveCampaignDelivery.isPending}
+                accessibilityLabel={`Approve delivery for ${title}`}
+              />
+              <ActionPill
+                label="Dispute"
+                onPress={async () => {
+                  try {
+                    await mutations.disputeCampaignDelivery.mutateAsync({
+                      id,
+                      reason: 'Needs revision',
+                    });
+                    await campaign.refetch();
+                  } catch (error) {
+                    Alert.alert(
+                      'Could not dispute',
+                      error instanceof Error ? error.message : 'Try again.',
+                    );
+                  }
+                }}
+                tint="decline"
+                disabled={mutations.disputeCampaignDelivery.isPending}
+                accessibilityLabel={`Dispute delivery for ${title}`}
+              />
+            </View>
+          ) : null}
+
+          {campaignLoading ? (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>Description</Text>
+              <View style={styles.sectionDivider} />
+              <View style={styles.briefSkeleton}>
+                <ShimmerText width="92%" height={15} />
+                <ShimmerText width="78%" height={15} />
+              </View>
+            </View>
+          ) : brief ? (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>Description</Text>
+              <View style={styles.sectionDivider} />
+              <Text selectable style={styles.descriptionText}>
+                {brief}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.campaignFacts}>
+            <CampaignFactLine
+              image={coinImage}
+              value={formatCampaignPayout(item)}
+              loading={campaignLoading}
+            />
+            <CampaignFactLine
+              icon="logo-instagram"
+              image={packageIconSource(item?.package_type)}
+              value={formatPackageType(item?.package_type)}
+              loading={campaignLoading}
+            />
+            <CampaignFactLine icon="flag" value={objective} loading={campaignLoading} />
+            <CampaignFactLine
+              icon="lock-closed"
+              value={`${formatStatus(item?.status)} · ${formatStatus(item?.payment_status)}`}
+              loading={campaignLoading}
+            />
+          </View>
+
+          {role === 'business' ? (
+            <View style={styles.brandLinkSection}>
+              <ProfileGlassTab
+                name={creatorName}
+                meta={creatorProfileMeta}
+                imageUrl={creatorProfileImage}
+                fallbackInitial={initial(creatorName)}
+                loading={campaignLoading}
+                disabled={campaignLoading || !creatorProfileId}
+                accessibilityLabel={`View ${creatorName} profile`}
+                onPress={() => {
+                  if (!creatorProfileId) return;
+                  router.push(`/(app)/creator/${creatorProfileId}`);
+                }}
+              />
+            </View>
+          ) : (
+            <View style={styles.brandLinkSection}>
+              <ProfileGlassTab
+                name={brandName}
+                meta={brandEmail}
+                imageUrl={ownerImageUrl}
+                fallbackInitial={initial(brandName)}
+                loading={campaignLoading}
+                disabled={campaignLoading || !item}
+                accessibilityLabel={`View ${brandName} profile`}
+                onPress={() => {
+                  router.push(`/(app)/campaigns/${id}/brand`);
+                }}
+              />
+            </View>
+          )}
+
+          <LocationMapCard item={item} loading={campaignLoading} />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -690,29 +953,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#050509',
   },
   hero: {
+    marginHorizontal: theme.spacing.xl,
     overflow: 'hidden',
-    borderBottomLeftRadius: 38,
-    borderBottomRightRadius: 38,
-    backgroundColor: '#100017',
+    borderCurve: 'continuous',
+    borderRadius: 24,
+    backgroundColor: '#F8F4D2',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.34)',
   },
   heroControls: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    top: theme.spacing.md,
+    left: theme.spacing.md,
     zIndex: 4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingHorizontal: theme.spacing.xxl,
   },
   circleButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
   pressed: {
     opacity: 0.72,
@@ -720,20 +986,86 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xl,
-    gap: theme.spacing.md,
+    gap: theme.spacing.lg,
   },
   titleBlock: {
     alignItems: 'flex-start',
-    gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.xs,
-    paddingBottom: theme.spacing.xs,
+    gap: theme.spacing.xs,
+    paddingHorizontal: 0,
   },
   pageTitle: {
-    ...theme.typography.display,
+    ...theme.typography.headline,
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '500',
     alignSelf: 'stretch',
     textAlign: 'left',
+  },
+  dateLine: {
+    ...theme.typography.bodyStrong,
+    color: 'rgba(255,255,255,0.72)',
+    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
+  },
+  quickActionRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: theme.spacing.sm,
+  },
+  quickActionGlass: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  quickActionGlassActive: {
+    borderColor: 'rgba(255,255,255,0.46)',
+    backgroundColor: 'rgba(255,255,255,0.11)',
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+  },
+  quickActionPressable: {
+    minHeight: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 6,
+    position: 'relative',
+  },
+  quickActionPressableActive: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  quickActionGlassTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.035)',
+  },
+  quickActionSheen: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.92,
+  },
+  quickActionInnerStroke: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.38)',
+  },
+  quickActionText: {
+    ...theme.typography.labelSmall,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  quickActionTextDisabled: {
+    color: 'rgba(255,255,255,0.34)',
   },
   actionRow: {
     flexDirection: 'row',
@@ -745,11 +1077,11 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     borderCurve: 'continuous',
-    borderRadius: 28,
+    borderRadius: 22,
     borderWidth: 1,
   },
   actionPressable: {
-    minHeight: 52,
+    minHeight: 46,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -759,87 +1091,173 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   actionText: {
-    ...theme.typography.bodyStrong,
+    ...theme.typography.callout,
     fontWeight: '700',
   },
-  infoGroup: {
+  descriptionSection: {
     gap: theme.spacing.sm,
-    paddingVertical: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
   },
-  groupTitle: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.42)',
-    textTransform: 'uppercase',
-    paddingHorizontal: theme.spacing.xs,
+  descriptionTitle: {
+    ...theme.typography.headline,
+    color: '#FFFFFF',
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: '700',
   },
-  infoRows: {
-    overflow: 'hidden',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    backgroundColor: 'rgba(255,255,255,0.055)',
+  sectionDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
-  infoLine: {
-    minHeight: 70,
+  descriptionText: {
+    ...theme.typography.body,
+    color: 'rgba(255,255,255,0.66)',
+    lineHeight: 25,
+  },
+  campaignFacts: {
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+  },
+  campaignFactLine: {
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
+  },
+  campaignFactIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  campaignFactImage: {
+    width: 24,
+    height: 24,
+  },
+  campaignFactText: {
+    ...theme.typography.bodyStrong,
+    flex: 1,
+    minWidth: 0,
+    color: 'rgba(255,255,255,0.84)',
+    fontWeight: '600',
+  },
+  infoGroup: {
+    gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+  },
+  groupTitle: {
+    ...theme.typography.headline,
+    color: '#FFFFFF',
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: '700',
+  },
+  infoRows: {
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.075)',
+  },
+  infoLine: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255,255,255,0.09)',
   },
-  brandRow: {
-    minHeight: 62,
+  profileTabGlass: {
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.24)',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 2,
+  },
+  profileTabPressable: {
+    minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
     gap: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
+    position: 'relative',
+  },
+  profileTabDisabled: {
+    opacity: 0.62,
+  },
+  profileTabTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.035)',
+  },
+  profileTabSheen: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.96,
+  },
+  profileTabInnerStroke: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 23,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.36)',
+  },
+  brandLinkSection: {
+    paddingVertical: theme.spacing.xs,
   },
   brandAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255,255,255,0.88)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.34)',
+    borderColor: 'rgba(255,255,255,0.44)',
   },
   brandAvatarImage: {
     width: '100%',
     height: '100%',
   },
   brandAvatarInitial: {
-    ...theme.typography.cardTitle,
+    ...theme.typography.callout,
     color: '#111522',
     fontWeight: '900',
   },
   brandOwnerName: {
-    ...theme.typography.cardTitle,
-    flex: 1,
-    minWidth: 0,
+    ...theme.typography.callout,
     color: '#FFFFFF',
+    fontWeight: '700',
+    lineHeight: 21,
   },
   profileCopy: {
     flex: 1,
     minWidth: 0,
+    justifyContent: 'center',
     gap: 2,
   },
   profileMeta: {
     ...theme.typography.label,
-    color: 'rgba(255,255,255,0.48)',
+    color: 'rgba(255,255,255,0.66)',
+    lineHeight: 17,
   },
   infoLineLast: {
     borderBottomWidth: 0,
   },
   infoLineIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -857,186 +1275,78 @@ const styles = StyleSheet.create({
     ...theme.typography.cardTitle,
     color: '#FFFFFF',
   },
-  scheduleCard: {
-    overflow: 'hidden',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    backgroundColor: 'rgba(255,255,255,0.055)',
-    padding: theme.spacing.md,
+  locationSection: {
     gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
   },
-  scheduleTopRow: {
+  locationMetaRow: {
+    minHeight: 48,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: theme.spacing.md,
   },
-  scheduleTimeBlock: {
+  locationTextBlock: {
     flex: 1,
     minWidth: 0,
-    gap: theme.spacing.xs,
-  },
-  scheduleTitle: {
-    ...theme.typography.cardTitle,
-    color: '#FFFFFF',
-  },
-  scheduleTime: {
-    ...theme.typography.bodyStrong,
-    fontWeight: '500',
-    color: 'rgba(255,190,210,0.9)',
-    fontVariant: ['tabular-nums'],
-  },
-  scheduleIconBlock: {
-    width: 32,
-    minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  scheduleDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  scheduleLocationBlock: {
-    gap: theme.spacing.xs,
-  },
-  scheduleLocationPrimary: {
-    ...theme.typography.section,
-    color: '#FFFFFF',
-  },
-  scheduleLocationSecondary: {
-    ...theme.typography.bodyStrong,
-    fontWeight: '500',
-    color: 'rgba(255,190,210,0.86)',
-  },
-  mapPreview: {
-    height: 112,
-    overflow: 'hidden',
-    borderRadius: 16,
-    backgroundColor: '#F4F0EA',
-    position: 'relative',
-  },
-  mapPark: {
-    position: 'absolute',
-    backgroundColor: '#CDEBC1',
-    opacity: 0.95,
-  },
-  mapParkTop: {
-    width: 120,
-    height: 58,
-    top: -14,
-    left: -20,
-    transform: [{ rotate: '-12deg' }],
-  },
-  mapParkBottom: {
-    width: 120,
-    height: 52,
-    right: -22,
-    bottom: -18,
-    transform: [{ rotate: '10deg' }],
-  },
-  mapRoad: {
-    position: 'absolute',
-    height: 13,
-    borderRadius: 99,
-    backgroundColor: '#D8D3CA',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  mapRoadPrimary: {
-    width: 320,
-    top: 52,
-    left: -34,
-    transform: [{ rotate: '-18deg' }],
-  },
-  mapRoadSecondary: {
-    width: 240,
-    top: 32,
-    right: -40,
-    transform: [{ rotate: '29deg' }],
-  },
-  mapRoadTertiary: {
-    width: 220,
-    bottom: 20,
-    left: 56,
-    transform: [{ rotate: '8deg' }],
-  },
-  mapRoadThin: {
-    position: 'absolute',
-    height: 5,
-    borderRadius: 99,
-    backgroundColor: '#E2DDD5',
-  },
-  mapRoadThinOne: {
-    width: 200,
-    top: 14,
-    left: 46,
-    transform: [{ rotate: '-3deg' }],
-  },
-  mapRoadThinTwo: {
-    width: 180,
-    bottom: 40,
-    left: -20,
-    transform: [{ rotate: '34deg' }],
-  },
-  mapCityLabel: {
-    ...theme.typography.section,
-    position: 'absolute',
-    top: 12,
-    left: 92,
-    right: 16,
-    color: 'rgba(45,45,45,0.72)',
-    fontWeight: '800',
-  },
-  mapPlaceLabel: {
-    ...theme.typography.label,
-    position: 'absolute',
-    right: 12,
-    bottom: 12,
-    maxWidth: '50%',
-    color: 'rgba(231,115,19,0.88)',
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  mapPin: {
-    position: 'absolute',
-    top: 34,
-    left: '50%',
-    width: 40,
-    height: 40,
-    marginLeft: -20,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FF4255',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  mapBadge: {
-    position: 'absolute',
-    left: 10,
-    bottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 4,
   },
-  mapBadgeText: {
-    ...theme.typography.bodyStrong,
-    color: 'rgba(42,42,42,0.92)',
+  locationPrimary: {
+    ...theme.typography.section,
+    color: '#FFFFFF',
+    fontSize: 21,
+    lineHeight: 26,
     fontWeight: '700',
   },
-  briefText: {
-    ...theme.typography.body,
-    color: 'rgba(255,255,255,0.76)',
+  locationSecondary: {
+    ...theme.typography.bodyStrong,
+    color: 'rgba(255,255,255,0.68)',
+    fontWeight: '500',
+  },
+  weatherBlock: {
+    minWidth: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  weatherTemp: {
+    ...theme.typography.callout,
+    color: 'rgba(255,255,255,0.72)',
+    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
+  },
+  locationCard: {
+    height: 148,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.075)',
+  },
+  nativeMap: {
+    width: '100%',
+    height: '100%',
+  },
+  mapLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.lg,
+  },
+  mapFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.lg,
+  },
+  mapFallbackText: {
+    ...theme.typography.callout,
+    color: 'rgba(255,255,255,0.72)',
+    textAlign: 'center',
   },
   briefSkeleton: {
-    gap: theme.spacing.md,
-    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
   },
 });

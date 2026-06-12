@@ -7,10 +7,12 @@ import type {
 import type {
   AiProvider,
   EmailProvider,
+  GeocodingProvider,
   InstagramProvider,
   PaymentProvider,
   PushProvider,
   StorageProvider,
+  WeatherProvider,
 } from '../clients/providers.js';
 import { verifyHmacSha256 } from '../clients/providers.js';
 import type { EnvConfig } from '../config/env.js';
@@ -61,6 +63,8 @@ export type Services = {
 export type ProviderBundle = {
   payment?: PaymentProvider;
   email?: EmailProvider;
+  geocoding?: GeocodingProvider;
+  weather?: WeatherProvider;
   instagram?: InstagramProvider;
   storage?: StorageProvider;
   ai?: AiProvider;
@@ -79,6 +83,8 @@ export function createServices(
     providers.payment,
     providers.storage,
     providers.ai,
+    providers.geocoding,
+    providers.weather,
   );
   const payments = new PaymentService(
     store,
@@ -89,7 +95,7 @@ export function createServices(
   );
   return {
     discovery: new DiscoveryService(store),
-    profiles: new ProfileService(store),
+    profiles: new ProfileService(store, providers.geocoding),
     campaigns: campaignCore,
     payments,
     delivery: new DeliveryService(store, notifications, providers.storage),
@@ -108,6 +114,46 @@ function nowIso() {
 
 function futureIso(ms: number) {
   return new Date(Date.now() + ms).toISOString();
+}
+
+function campaignTimingBrief(input: Row) {
+  if (input.timing_mode === 'choose_date') {
+    return input.due_date ? `Due date: ${input.due_date}` : undefined;
+  }
+  return 'Timing: ASAP';
+}
+
+function blankCoordinates(prefix: 'brand' | 'place') {
+  return {
+    [`${prefix}_latitude`]: null,
+    [`${prefix}_longitude`]: null,
+  };
+}
+
+async function geocodeValues(
+  provider: GeocodingProvider | undefined,
+  address: unknown,
+  prefix: 'brand' | 'place',
+) {
+  const value = typeof address === 'string' ? address.trim() : '';
+  if (!provider || !value) return blankCoordinates(prefix);
+  try {
+    const result = await provider.geocode(value);
+    if (!result) return blankCoordinates(prefix);
+    return {
+      [`${prefix}_latitude`]: result.latitude,
+      [`${prefix}_longitude`]: result.longitude,
+    };
+  } catch (error) {
+    logger.warn(
+      {
+        prefix,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Location geocoding failed',
+    );
+    return blankCoordinates(prefix);
+  }
 }
 
 function moneyPaise(value: unknown) {
@@ -185,6 +231,7 @@ function withBusinessProfileImage(profile?: Row | null, account?: Row | null) {
 
   return {
     ...profile,
+    email: typeof account?.email === 'string' ? account.email : undefined,
     profile_photo_url: profilePhoto,
     avatar_url: accountAvatar || undefined,
     instagram_connected: hasInstagramConnection(profile),
@@ -455,7 +502,10 @@ export class DiscoveryService {
 }
 
 export class ProfileService {
-  constructor(private readonly store: DataStore) {}
+  constructor(
+    private readonly store: DataStore,
+    private readonly geocoding?: GeocodingProvider,
+  ) {}
 
   async bootstrap(user: AuthUser, role: UserRole | null) {
     const [accountProfile, influencerProfile, businessProfile, notifications] = await Promise.all([
@@ -590,11 +640,13 @@ export class ProfileService {
       user,
       input as { full_name: string; phone: string; location: string },
     );
+    const brandLocation = input.brand_location ?? input.location;
     const values = {
       user_id: user.id,
       brand_name: input.brand_name,
       brand_category: input.brand_category,
-      brand_location: input.brand_location ?? input.location,
+      brand_location: brandLocation,
+      ...(await geocodeValues(this.geocoding, brandLocation, 'brand')),
       brand_summary: input.brand_summary,
       tagline: input.tagline,
       updated_at: nowIso(),
@@ -647,10 +699,15 @@ export class ProfileService {
   }
 
   async updateBusiness(user: AuthUser, input: Row) {
+    const coordinateValues =
+      Object.prototype.hasOwnProperty.call(input, 'brand_location') ||
+      Object.prototype.hasOwnProperty.call(input, 'location')
+        ? await geocodeValues(this.geocoding, input.brand_location ?? input.location, 'brand')
+        : {};
     const [profile] = await this.store.update<Row>(
       'business_profiles',
       { eq: { user_id: user.id } },
-      { ...input, updated_at: nowIso() },
+      { ...input, ...coordinateValues, updated_at: nowIso() },
     );
     if (!profile) throw notFound('Business profile');
     return profile;
@@ -673,6 +730,8 @@ export class CampaignService {
     private readonly payment?: PaymentProvider,
     private readonly storage?: StorageProvider,
     private readonly ai?: AiProvider,
+    private readonly geocoding?: GeocodingProvider,
+    private readonly weather?: WeatherProvider,
   ) {}
 
   async create(
@@ -681,7 +740,7 @@ export class CampaignService {
     paymentInput: Partial<Row> = {},
     options: { skipCreative?: boolean } = {},
   ) {
-    const profileService = new ProfileService(this.store);
+    const profileService = new ProfileService(this.store, this.geocoding);
     await profileService.assertBusinessComplete(user.id);
     const influencer = await this.store.findOne<Row>('influencer_profiles', {
       eq: { id: input.influencer_profile_id, is_active: true },
@@ -694,10 +753,14 @@ export class CampaignService {
     const title = `${input.objective.replaceAll('_', ' ')} with ${
       influencer.display_name ?? influencer.instagram_username ?? 'influencer'
     }`;
+    const businessProfile = await this.store.findOne<Row>('business_profiles', {
+      eq: { user_id: user.id },
+    });
+    const campaignLocation = input.place_name || businessProfile?.brand_location;
     const brief = [
       `Objective: ${input.objective}`,
       `Package: ${input.package_type}`,
-      `Timing: ${input.timing_mode}${input.due_date ? ` (${input.due_date})` : ''}`,
+      campaignTimingBrief(input),
       input.place_name ? `Place: ${input.place_name}` : undefined,
     ]
       .filter(Boolean)
@@ -713,6 +776,7 @@ export class CampaignService {
       timing_mode: input.timing_mode,
       due_date: input.due_date,
       place_name: input.place_name,
+      ...(await geocodeValues(this.geocoding, campaignLocation, 'place')),
       price_offered_paise: pricePaise,
       platform_fee_paise: feePaise,
       status: paymentInput.status ?? 'pre_authorized',
@@ -996,11 +1060,27 @@ export class CampaignService {
       this.store.findOne<Row>('influencer_profiles', { eq: { user_id: campaign.influencer_id } }),
       this.store.findOne<Row>('profiles', { eq: { id: campaign.influencer_id } }),
     ]);
+    const businessProfile = withBusinessProfileImage(business, businessAccount);
     return {
       ...campaign,
-      business_profile: withBusinessProfileImage(business, businessAccount),
+      business_profile: businessProfile,
       influencer_profile: withInfluencerProfileImage(influencer, influencerAccount),
+      location_weather: await this.locationWeather(campaign, businessProfile),
     };
+  }
+
+  private async locationWeather(campaign: Row, businessProfile?: Row | null) {
+    if (!this.weather) return null;
+    const latitude = Number(campaign.place_latitude ?? businessProfile?.brand_latitude);
+    const longitude = Number(campaign.place_longitude ?? businessProfile?.brand_longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+    try {
+      return await this.weather.current({ latitude, longitude });
+    } catch (error) {
+      logger.warn({ err: error, campaignId: campaign.id }, 'location weather lookup failed');
+      return null;
+    }
   }
 
   async withProfilesMany(campaigns: Row[]) {

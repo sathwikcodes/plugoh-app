@@ -22,6 +22,7 @@ Run from repo root unless noted.
 - Keep business logic in `services/api/src/jobs`, API service modules, or shared packages when it must be reused.
 - Do not duplicate payment release, campaign transition, or notification rules in the worker package.
 - Keep worker code explicit about scheduling, orchestration, logging, and process failure behavior.
+- Before changing worker behavior, use Graphify or direct source reads to trace the imported API job/service function and verify ownership stays in `services/api` or shared packages.
 
 ## Reliability Rules
 

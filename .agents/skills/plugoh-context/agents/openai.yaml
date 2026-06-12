@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Plugoh Context'
+  short_description: 'Graph-first Plugoh architecture context'
+  default_prompt: 'Use $plugoh-context to inspect Plugoh architecture before making changes.'
+
+policy:
+  allow_implicit_invocation: true

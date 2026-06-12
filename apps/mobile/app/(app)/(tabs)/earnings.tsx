@@ -8,6 +8,7 @@ import { AppHeader, getAppHeaderScreenTopPadding } from '@/components/ui/app-hea
 import { ErrorState, Screen } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
 import { useBootstrap, useEarnings, useInfluencerProfile } from '@/hooks/use-marketplace';
+import { influencerProfileImageUri } from '@/lib/influencer/profile-image';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { router } from 'expo-router';
 import { useCallback } from 'react';
@@ -25,6 +26,7 @@ export default function EarningsScreen() {
   const profileLoading = bootstrapLoading || shouldShowInitialLoader(influencerProfile);
   const displayName =
     influencerProfile.data?.display_name ?? influencerProfile.data?.ig_username ?? 'Influencer';
+  const profileImageUri = influencerProfileImageUri(influencerProfile.data);
 
   const onWithdraw = useCallback(() => {
     // Withdrawal flow TBD — hook bank / payout here.
@@ -40,7 +42,7 @@ export default function EarningsScreen() {
       <AppHeader
         title="Earnings"
         profile={{
-          imageUri: influencerProfile.data?.profile_photo_url,
+          imageUri: profileImageUri,
           onPress: () => {
             router.push('/(app)/profile');
           },

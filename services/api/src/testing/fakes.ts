@@ -2,11 +2,40 @@ import crypto from 'node:crypto';
 import type {
   AiProvider,
   EmailProvider,
+  GeocodingProvider,
   InstagramProvider,
   PaymentProvider,
   PushProvider,
   StorageProvider,
+  WeatherProvider,
 } from '../clients/providers.js';
+
+export class FakeGeocodingProvider implements GeocodingProvider {
+  shouldFail = false;
+  calls: string[] = [];
+
+  async geocode(address: string) {
+    this.calls.push(address);
+    if (this.shouldFail) {
+      throw new Error('fake geocoding failure');
+    }
+    return { latitude: 17.4065, longitude: 78.4772 };
+  }
+}
+
+export class FakeWeatherProvider implements WeatherProvider {
+  calls: Array<{ latitude: number; longitude: number }> = [];
+
+  async current(input: { latitude: number; longitude: number }) {
+    this.calls.push(input);
+    return {
+      temperature_celsius: 22,
+      condition: 'Sunny',
+      is_daytime: true,
+      observed_at: new Date(0).toISOString(),
+    };
+  }
+}
 
 export class FakePaymentProvider implements PaymentProvider {
   keySecret = 'test_secret';

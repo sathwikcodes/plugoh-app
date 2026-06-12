@@ -30,6 +30,8 @@ export type EnvConfig = {
   resendApiKey?: string;
   anthropicApiKey?: string;
   googleAiKey?: string;
+  googleMapsGeocodingApiKey?: string;
+  googleMapsWeatherApiKey?: string;
   cronSecret?: string;
   internalSecret?: string;
   redisConnectionString?: string;
@@ -80,6 +82,14 @@ export function readEnv(env = process.env): EnvConfig {
   setIfDefined('resendApiKey', env.RESEND_API_KEY);
   setIfDefined('anthropicApiKey', env.ANTHROPIC_API_KEY);
   setIfDefined('googleAiKey', env.GOOGLE_AI_KEY ?? env.GOOGLE_AI_API_KEY);
+  setIfDefined(
+    'googleMapsGeocodingApiKey',
+    env.GOOGLE_MAPS_GEOCODING_API_KEY ?? env.GOOGLE_MAPS_API_KEY,
+  );
+  setIfDefined(
+    'googleMapsWeatherApiKey',
+    env.GOOGLE_MAPS_WEATHER_API_KEY ?? env.GOOGLE_MAPS_API_KEY,
+  );
   setIfDefined('cronSecret', env.CRON_SECRET);
   setIfDefined('internalSecret', env.INTERNAL_SECRET);
   setIfDefined('redisConnectionString', env.REDIS_CONNECTION_STRING);

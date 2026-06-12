@@ -24,6 +24,7 @@ Run from repo root unless noted.
 - Put cross-boundary request/response/domain types in `packages/contracts`; do not duplicate them in `apps/mobile` or `services/api`.
 - Keep database provider-specific code in `packages/db` only when it is genuinely shared.
 - Keep `packages/config` limited to reusable tooling/configuration.
+- Before changing exported contracts, schemas, or package entrypoints, trace likely consumers with Graphify and update mobile/API/jobs in the same change.
 
 ## Compatibility Rules
 

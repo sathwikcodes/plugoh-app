@@ -4,16 +4,20 @@ import { MemoryStore } from 'hono-rate-limiter';
 import {
   ExpoPushProvider,
   ExternalAiProvider,
+  GoogleGeocodingProvider,
+  GoogleWeatherProvider,
   MetaInstagramProvider,
   RazorpayProvider,
   ResendEmailProvider,
   SupabaseStorageProvider,
   type AiProvider,
   type EmailProvider,
+  type GeocodingProvider,
   type InstagramProvider,
   type PaymentProvider,
   type PushProvider,
   type StorageProvider,
+  type WeatherProvider,
 } from '../clients/providers.js';
 import type { EnvConfig } from '../config/env.js';
 import { badRequest, forbidden, unauthorized } from '../core/errors.js';
@@ -33,6 +37,8 @@ export function createDefaultProviders(config: EnvConfig): ProviderBundle {
   const providers: {
     payment?: PaymentProvider;
     email?: EmailProvider;
+    geocoding?: GeocodingProvider;
+    weather?: WeatherProvider;
     instagram?: InstagramProvider;
     storage?: StorageProvider;
     ai?: AiProvider;
@@ -41,6 +47,8 @@ export function createDefaultProviders(config: EnvConfig): ProviderBundle {
   if (config.razorpayKeyId && config.razorpayKeySecret)
     providers.payment = new RazorpayProvider(config);
   if (config.resendApiKey) providers.email = new ResendEmailProvider(config);
+  if (config.googleMapsGeocodingApiKey) providers.geocoding = new GoogleGeocodingProvider(config);
+  if (config.googleMapsWeatherApiKey) providers.weather = new GoogleWeatherProvider(config);
   if (config.instagramClientId && config.instagramAppSecret && config.instagramRedirectUri)
     providers.instagram = new MetaInstagramProvider(config);
   if (config.supabaseUrl && config.supabaseServiceRoleKey)

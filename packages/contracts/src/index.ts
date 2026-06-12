@@ -167,11 +167,14 @@ export interface PaginatedResponse<T> {
 export interface BusinessProfileSummary {
   id?: string;
   user_id?: string;
+  email?: string;
   brand_name?: string;
   /** Legacy/mobile alias for brand_category. */
   brand_type?: string;
   brand_category?: string;
   brand_location?: string;
+  brand_latitude?: number | null;
+  brand_longitude?: number | null;
   brand_summary?: string;
   tagline?: string;
   instagram_username?: string;
@@ -185,6 +188,14 @@ export interface BusinessProfileSummary {
   /** Common profile avatar when set separately. */
   avatar_url?: string;
   instagram_connected?: boolean;
+}
+
+export interface LocationWeatherSummary {
+  temperature_celsius: number;
+  condition?: string;
+  icon?: string;
+  is_daytime?: boolean;
+  observed_at?: string;
 }
 
 export interface InfluencerProfileResponse extends Influencer {
@@ -208,6 +219,9 @@ export interface CampaignListItem {
   timing_mode?: string;
   due_date?: string;
   place_name?: string;
+  place_latitude?: number | null;
+  place_longitude?: number | null;
+  location_weather?: LocationWeatherSummary | null;
   card_image_url?: string;
   card_image_path?: string;
   card_image_prompt?: string;
