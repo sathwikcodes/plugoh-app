@@ -20,6 +20,9 @@
     "mobile:ios": "npm run --workspace @plugoh/mobile ios --",
     "mobile:web": "npm run --workspace @plugoh/mobile web --",
     "mobile:lint": "npm run --workspace @plugoh/mobile lint --",
+    "mobile:test": "npm run --workspace @plugoh/mobile test --",
+    "mobile:test:coverage": "npm run --workspace @plugoh/mobile test:coverage --",
+    "mobile:doctor": "npm run --workspace @plugoh/mobile doctor --",
     "mobile:reset-project": "npm run --workspace @plugoh/mobile reset-project --",
     "api:dev": "npm run contracts:build && npm run --workspace @plugoh/api dev",
     "api:build": "npm run contracts:build && npm run --workspace @plugoh/api build",
@@ -48,7 +51,7 @@
     "typescript-eslint": "^8.46.2"
   },
   "dependencies": {
-    "expo": "~54.0.34",
+    "expo": "~54.0.35",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-reanimated": "4.1.7",

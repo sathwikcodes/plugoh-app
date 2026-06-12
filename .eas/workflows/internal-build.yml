@@ -1,0 +1,30 @@
+name: mobile-internal-build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .eas/workflows/**
+      - app.json
+      - eas.json
+      - package.json
+      - package-lock.json
+      - apps/mobile/**
+      - packages/contracts/**
+      - packages/config/**
+  workflow_dispatch: {}
+
+jobs:
+  build_android_internal:
+    name: Build Android Internal
+    type: build
+    params:
+      platform: android
+      profile: preview
+
+  build_ios_internal:
+    name: Build iOS Internal
+    type: build
+    params:
+      platform: ios
+      profile: preview
