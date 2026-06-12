@@ -1,13 +1,13 @@
-import crypto from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Pool } from "pg";
-import { PostgreSqlContainer, StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import crypto from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Pool } from 'pg';
+import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
-const businessId = "11111111-1111-4111-8111-111111111111";
-const influencerId = "22222222-2222-4222-8222-222222222222";
+const businessId = '11111111-1111-4111-8111-111111111111';
+const influencerId = '22222222-2222-4222-8222-222222222222';
 
 let container: StartedPostgreSqlContainer;
 let pool: Pool;
@@ -15,7 +15,7 @@ let runtimeAvailable = true;
 
 beforeAll(async () => {
   try {
-    container = await new PostgreSqlContainer("postgres:16-alpine").start();
+    container = await new PostgreSqlContainer('postgres:16-alpine').start();
     pool = new Pool({
       host: container.getHost(),
       port: container.getMappedPort(5432),
@@ -30,6 +30,24 @@ beforeAll(async () => {
   }
 
   await pool.query(`
+    do $$
+    begin
+      create role authenticated;
+    exception
+      when duplicate_object then null;
+    end $$;
+    do $$
+    begin
+      create role anon;
+    exception
+      when duplicate_object then null;
+    end $$;
+    do $$
+    begin
+      create role service_role;
+    exception
+      when duplicate_object then null;
+    end $$;
     create table if not exists public.campaigns (
       id uuid primary key,
       business_id uuid not null,
@@ -47,7 +65,23 @@ beforeAll(async () => {
       payment_captured_at timestamptz,
       delivery_submitted_at timestamptz,
       completed_at timestamptz,
+      created_at timestamptz default now(),
       updated_at timestamptz default now()
+    );
+    create table if not exists public.campaign_messages (
+      id uuid default gen_random_uuid() primary key,
+      campaign_id uuid not null,
+      sender_id uuid not null,
+      message_type text not null default 'text',
+      content text,
+      metadata jsonb,
+      created_at timestamptz default now()
+    );
+    create table if not exists public.campaign_message_reads (
+      message_id uuid not null,
+      user_id uuid not null,
+      read_at timestamptz default now(),
+      primary key (message_id, user_id)
     );
     create table if not exists public.escrow_transactions (
       id uuid default gen_random_uuid() primary key,
@@ -74,12 +108,15 @@ beforeAll(async () => {
     );
   `);
 
-  const migrationsDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../infra/db/migrations");
+  const migrationsDir = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../../../../infra/db/migrations',
+  );
   const migrationFiles = readdirSync(migrationsDir)
-    .filter((name) => name.endsWith(".sql"))
+    .filter((name) => name.endsWith('.sql'))
     .sort();
   for (const migrationFile of migrationFiles) {
-    const migrationSql = readFileSync(resolve(migrationsDir, migrationFile), "utf8");
+    const migrationSql = readFileSync(resolve(migrationsDir, migrationFile), 'utf8');
     await pool.query(migrationSql);
   }
 }, 120_000);
@@ -94,11 +131,7 @@ function campaignId() {
   return crypto.randomUUID();
 }
 
-async function insertCampaign(
-  id: string,
-  status: string,
-  overrides: Record<string, unknown> = {},
-) {
+async function insertCampaign(id: string, status: string, overrides: Record<string, unknown> = {}) {
   await pool.query(
     `
       insert into public.campaigns (
@@ -115,56 +148,64 @@ async function insertCampaign(
   }
 }
 
-describe("campaign transition race protection", () => {
-  it("allows exactly one winner for 50 concurrent accept calls", async () => {
+describe('campaign transition race protection', () => {
+  it('allows exactly one winner for 50 concurrent accept calls', async () => {
     if (!runtimeAvailable) return;
     const id = campaignId();
-    await insertCampaign(id, "requested");
+    await insertCampaign(id, 'requested');
 
     const results = await Promise.allSettled(
       Array.from({ length: 50 }, () =>
-        pool.query("select accept_campaign($1::uuid, $2::uuid)", [id, influencerId]),
+        pool.query('select accept_campaign($1::uuid, $2::uuid)', [id, influencerId]),
       ),
     );
 
-    const successes = results.filter((result) => result.status === "fulfilled");
-    const failures = results.filter((result) => result.status === "rejected");
+    const successes = results.filter((result) => result.status === 'fulfilled');
+    const failures = results.filter((result) => result.status === 'rejected');
     expect(successes).toHaveLength(1);
     expect(failures).toHaveLength(49);
     for (const failure of failures) {
-      expect(String(failure.reason?.message ?? "")).toContain("ILLEGAL_TRANSITION");
+      expect(String(failure.reason?.message ?? '')).toContain('ILLEGAL_TRANSITION');
     }
   });
 
-  it("makes concurrent accept and decline mutually exclusive", async () => {
+  it('makes concurrent accept and decline mutually exclusive', async () => {
     if (!runtimeAvailable) return;
     const id = campaignId();
-    await insertCampaign(id, "requested");
+    await insertCampaign(id, 'requested');
 
     const [accepted, declined] = await Promise.allSettled([
-      pool.query("select accept_campaign($1::uuid, $2::uuid)", [id, influencerId]),
-      pool.query("select decline_campaign($1::uuid, $2::uuid)", [id, influencerId]),
+      pool.query('select accept_campaign($1::uuid, $2::uuid)', [id, influencerId]),
+      pool.query('select decline_campaign($1::uuid, $2::uuid)', [id, influencerId]),
     ]);
 
-    const fulfilledCount = [accepted, declined].filter((result) => result.status === "fulfilled").length;
-    const rejectedCount = [accepted, declined].filter((result) => result.status === "rejected").length;
+    const fulfilledCount = [accepted, declined].filter(
+      (result) => result.status === 'fulfilled',
+    ).length;
+    const rejectedCount = [accepted, declined].filter(
+      (result) => result.status === 'rejected',
+    ).length;
     expect(fulfilledCount).toBe(1);
     expect(rejectedCount).toBe(1);
   });
 
-  it("keeps verify_escrow idempotent and replays idempotency response", async () => {
+  it('keeps verify_escrow idempotent and replays idempotency response', async () => {
     if (!runtimeAvailable) return;
     const id = campaignId();
-    await insertCampaign(id, "payment_pending", { razorpay_order_id: "order_x" });
+    await insertCampaign(id, 'payment_pending', { razorpay_order_id: 'order_x' });
 
-    await pool.query(
-      "select verify_escrow($1::uuid, $2::uuid, $3::text, $4::text)",
-      [id, businessId, "pay_x", "card"],
-    );
-    await pool.query(
-      "select verify_escrow($1::uuid, $2::uuid, $3::text, $4::text)",
-      [id, businessId, "pay_x", "card"],
-    );
+    await pool.query('select verify_escrow($1::uuid, $2::uuid, $3::text, $4::text)', [
+      id,
+      businessId,
+      'pay_x',
+      'card',
+    ]);
+    await pool.query('select verify_escrow($1::uuid, $2::uuid, $3::text, $4::text)', [
+      id,
+      businessId,
+      'pay_x',
+      'card',
+    ]);
 
     const escrowCount = await pool.query(
       "select count(*)::int as count from public.escrow_transactions where campaign_id = $1 and type = 'escrow_lock'",
@@ -172,14 +213,14 @@ describe("campaign transition race protection", () => {
     );
     expect(escrowCount.rows[0]?.count).toBe(1);
 
-    const first = await pool.query(
-      "select claim_idempotency($1::text, $2::jsonb) as payload",
-      ["idem-1", JSON.stringify({ ok: true })],
-    );
-    const replay = await pool.query(
-      "select claim_idempotency($1::text, $2::jsonb) as payload",
-      ["idem-1", JSON.stringify({ ok: false })],
-    );
+    const first = await pool.query('select claim_idempotency($1::text, $2::jsonb) as payload', [
+      'idem-1',
+      JSON.stringify({ ok: true }),
+    ]);
+    const replay = await pool.query('select claim_idempotency($1::text, $2::jsonb) as payload', [
+      'idem-1',
+      JSON.stringify({ ok: false }),
+    ]);
 
     expect(first.rows[0]?.payload?.response).toBeNull();
     expect(replay.rows[0]?.payload?.response).toEqual({ ok: true });
