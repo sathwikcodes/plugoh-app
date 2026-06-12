@@ -1,5 +1,7 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
+const EAS_PROJECT_ID = 'f88efee0-4c94-48e4-916a-af5277b409f6';
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   const plugins: NonNullable<ExpoConfig['plugins']> = [
     'expo-router',
@@ -22,13 +24,20 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     name: 'plugoh-app',
-    slug: 'plugoh-app',
+    slug: 'plugoh',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
     scheme: 'plugoh',
     userInterfaceStyle: 'dark',
     newArchEnabled: true,
+    extra: {
+      ...config.extra,
+      eas: {
+        ...(config.extra?.eas as Record<string, unknown> | undefined),
+        projectId: EAS_PROJECT_ID,
+      },
+    },
     ios: {
       ...config.ios,
       supportsTablet: true,

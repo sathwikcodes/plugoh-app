@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 20.1.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "node": "22.13.0",
+      "environment": "preview",
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "image": "latest"
+      },
+      "ios": {
+        "image": "latest"
+      }
+    },
+    "production": {
+      "node": "22.13.0",
+      "environment": "production",
+      "autoIncrement": true,
+      "channel": "production",
+      "android": {
+        "image": "latest"
+      },
+      "ios": {
+        "image": "latest"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
