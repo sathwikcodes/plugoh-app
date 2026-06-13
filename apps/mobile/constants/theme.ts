@@ -1,5 +1,13 @@
 import type { TextStyle } from 'react-native';
-import { fontBody, fontDisplay, fontMono } from './app-fonts';
+import {
+  fontBody,
+  fontBodyBold,
+  fontBodyMedium,
+  fontBodyStrong,
+  fontDisplay,
+  fontDisplayStrong,
+  fontMono,
+} from './app-fonts';
 
 const tabularNums: NonNullable<TextStyle['fontVariant']> = ['tabular-nums'];
 
@@ -52,37 +60,37 @@ export const theme = {
   typography: {
     display: {
       fontFamily: fontDisplay,
-      fontSize: 32,
-      lineHeight: 39,
-      fontWeight: '800' as const,
+      fontSize: 34,
+      lineHeight: 40,
+      fontWeight: '600' as const,
       letterSpacing: 0,
     },
     title: {
       fontFamily: fontDisplay,
-      fontSize: 26,
-      lineHeight: 32,
-      fontWeight: '800' as const,
+      fontSize: 28,
+      lineHeight: 34,
+      fontWeight: '600' as const,
       letterSpacing: 0,
     },
     headline: {
       fontFamily: fontDisplay,
-      fontSize: 22,
-      lineHeight: 28,
-      fontWeight: '700' as const,
+      fontSize: 23,
+      lineHeight: 29,
+      fontWeight: '600' as const,
       letterSpacing: 0,
     },
     section: {
       fontFamily: fontDisplay,
       fontSize: 20,
       lineHeight: 26,
-      fontWeight: '700' as const,
+      fontWeight: '600' as const,
       letterSpacing: 0,
     },
     cardTitle: {
-      fontFamily: fontBody,
+      fontFamily: fontBodyStrong,
       fontSize: 17,
       lineHeight: 24,
-      fontWeight: '700' as const,
+      fontWeight: '600' as const,
       letterSpacing: 0,
     },
     body: {
@@ -93,53 +101,53 @@ export const theme = {
       letterSpacing: 0,
     },
     bodyStrong: {
-      fontFamily: fontBody,
+      fontFamily: fontBodyStrong,
       fontSize: 16,
       lineHeight: 24,
       fontWeight: '600' as const,
       letterSpacing: 0,
     },
     callout: {
-      fontFamily: fontBody,
+      fontFamily: fontBodyMedium,
       fontSize: 15,
       lineHeight: 22,
       fontWeight: '500' as const,
       letterSpacing: 0,
     },
     caption: {
-      fontFamily: fontBody,
+      fontFamily: fontBodyMedium,
       fontSize: 13,
       lineHeight: 18,
       fontWeight: '500' as const,
       letterSpacing: 0,
     },
     label: {
-      fontFamily: fontBody,
+      fontFamily: fontBodyStrong,
       fontSize: 12,
       lineHeight: 16,
       fontWeight: '600' as const,
       letterSpacing: 0,
     },
     labelSmall: {
-      fontFamily: fontBody,
+      fontFamily: fontBodyStrong,
       fontSize: 11,
       lineHeight: 14,
       fontWeight: '600' as const,
       letterSpacing: 0,
     },
     metric: {
-      fontFamily: fontDisplay,
-      fontSize: 32,
-      lineHeight: 38,
-      fontWeight: '800' as const,
+      fontFamily: fontDisplayStrong,
+      fontSize: 34,
+      lineHeight: 39,
+      fontWeight: '700' as const,
       letterSpacing: 0,
       fontVariant: tabularNums,
     },
     metricSmall: {
-      fontFamily: fontDisplay,
+      fontFamily: fontBodyBold,
       fontSize: 22,
       lineHeight: 28,
-      fontWeight: '800' as const,
+      fontWeight: '700' as const,
       letterSpacing: 0,
       fontVariant: tabularNums,
     },
@@ -186,11 +194,23 @@ export const Colors = {
 /** Mirrors `app-fonts` for ad-hoc `Text` styles; prefer spreading `theme.typography.*`. */
 export const Fonts = {
   display: fontDisplay,
+  displayStrong: fontDisplayStrong,
   body: fontBody,
+  bodyMedium: fontBodyMedium,
+  bodyStrong: fontBodyStrong,
+  bodyBold: fontBodyBold,
   mono: fontMono,
 };
 
-export { fontBody, fontDisplay, fontMono } from './app-fonts';
+export {
+  fontBody,
+  fontBodyBold,
+  fontBodyMedium,
+  fontBodyStrong,
+  fontDisplay,
+  fontDisplayStrong,
+  fontMono,
+} from './app-fonts';
 
 export function statusTone(status?: string) {
   switch (status) {

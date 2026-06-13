@@ -1,23 +1,48 @@
-import { Platform } from 'react-native';
+import { Text, TextInput, type TextStyle } from 'react-native';
 
-/**
- * App-wide font families aligned with Apple’s SF stack on iOS.
- * SF Pro is not bundled for Android/web — we use generic sans / monospace there.
- */
-export const fontDisplay = Platform.select({
-  ios: 'SF Pro Display',
-  android: 'sans-serif',
-  default: 'system-ui',
-});
+export const fontDisplay = 'ClashDisplay-Semibold';
+export const fontDisplayStrong = 'ClashDisplay-Bold';
+export const fontBody = 'Archivo-Regular';
+export const fontBodyMedium = 'Archivo-Medium';
+export const fontBodyStrong = 'Archivo-SemiBold';
+export const fontBodyBold = 'Archivo-Bold';
+export const fontMono = fontBodyStrong;
 
-export const fontBody = Platform.select({
-  ios: 'SF Pro Text',
-  android: 'sans-serif',
-  default: 'system-ui',
-});
+export const appFontFamilyNames = [
+  fontDisplay,
+  fontDisplayStrong,
+  fontBody,
+  fontBodyMedium,
+  fontBodyStrong,
+  fontBodyBold,
+] as const;
 
-export const fontMono = Platform.select({
-  ios: 'SF Mono',
-  android: 'monospace',
-  default: 'monospace',
-});
+type ComponentWithDefaultStyle = {
+  defaultProps?: {
+    style?: unknown;
+  };
+};
+
+const globalFontStyle: TextStyle = {
+  fontFamily: fontBody,
+};
+
+let globalTextFontDefaultsInstalled = false;
+
+function applyDefaultFontStyle(Component: ComponentWithDefaultStyle) {
+  const defaultProps = Component.defaultProps ?? {};
+  const existingStyle = defaultProps.style;
+
+  Component.defaultProps = {
+    ...defaultProps,
+    style: existingStyle ? [globalFontStyle, existingStyle] : globalFontStyle,
+  };
+}
+
+export function installGlobalTextFontDefaults() {
+  if (globalTextFontDefaultsInstalled) return;
+
+  applyDefaultFontStyle(Text as unknown as ComponentWithDefaultStyle);
+  applyDefaultFontStyle(TextInput as unknown as ComponentWithDefaultStyle);
+  globalTextFontDefaultsInstalled = true;
+}
