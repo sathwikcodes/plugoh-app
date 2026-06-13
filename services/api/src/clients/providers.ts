@@ -709,15 +709,20 @@ export class ExternalAiProvider implements AiProvider {
       [
         'You are the creative director for premium campaign imagery.',
         'Return strict JSON only with keys: title, imagePrompt.',
-        'title: 3 to 6 words, Gen Z but polished, memorable, brand-specific, collab/event energy, no hashtags, no emojis, no quotes, max 52 characters.',
+        'title: exactly 2 words only, polished, memorable, brand-specific, creator-collab energy, no hashtags, no emojis, no quotes, max 28 characters.',
+        'The 2-word title should immediately communicate the brand/campaign vibe to both the influencer and brand owner. Examples of the format only: Cafe Reel, Glow Drop, Launch Story.',
         'Avoid generic words like campaign, creator campaign, influencer, booking, package.',
         'imagePrompt: create one full-bleed vertical premium mobile image for the exact campaign, optimized for a tall 9:14 aspect ratio.',
         'The image should represent the brand owner, brand type, package/work being booked, objective, location/date/event if present, and the creator collaboration.',
-        'Place one strong hero subject in the upper image area, roughly 18% to 58% from the top, with the lower area kept smooth, quiet, and low-detail.',
+        'Place one strong hero subject in the upper image area, roughly 12% to 46% from the top. The middle and lower half must also contain meaningful continuous scene detail, not blank space.',
+        'Fill the entire vertical card with a cohesive environment: use relevant lower-half details like a counter, tabletop, product setup, floor, soft props, creator tools, city/cafe/venue atmosphere, or brand-specific visual cues. Keep it calm enough for UI overlays, but never empty, null, flat, or blank.',
         'Frame any character with breathing room: show the full toy-like body or a relaxed waist-up view with head, torso, hands, and surrounding space visible. Avoid extreme close-ups, cropped faces, cropped heads, or characters pressed against the frame edges.',
-        'Use playful stylized 3D character art, Memoji-inspired mascots or toy-like creator characters only; never use photorealistic humans, real human portraits, real animals, or documentary photography.',
+        'Use playful stylized 3D rendered character art only: Memoji-inspired mascots, toy-like creator characters, rounded clay/vinyl materials, real 3D depth, soft shadows, ambient occlusion, and studio-quality dimensional lighting.',
+        'Do not use flat 2D animation, vector illustration, anime, hand-drawn cartoon, sticker art, poster art, cel shading, or flat graphic design. The result must look like a polished 3D render, not a drawing.',
+        'Never use photorealistic humans, real human portraits, real animals, or documentary photography.',
         'Use a peaceful premium Gen Z aesthetic: happy, calm, modern, soft lighting, gentle depth, one cohesive dominant color palette, minimal supporting props, polished social energy.',
         'The image must be a single continuous scene that fills the entire frame. Avoid inset squares, panels, grids, collage blocks, divided sections, picture frames, borders, split scenes, or multiple separate images.',
+        'Do not create empty lower halves, plain gradients, blank studio voids, flat dark bottoms, or cropped compositions that only work near the top of the card.',
         'Avoid pushing too many colors. Avoid clutter, rows of people, brand logos, UI, watermarks, distorted faces, distorted hands, or unsafe content.',
         'Never include text, letters, numbers, signage, captions, labels, logos, UI, or watermark marks anywhere in the image.',
         `Campaign: ${JSON.stringify(input.campaign)}`,
@@ -1030,9 +1035,29 @@ async function fetchImageBytes(url: string) {
 }
 
 function sanitizeCampaignTitle(title: string, fallback: string) {
-  const normalized = title.replace(/["#]/g, '').replace(/\s+/g, ' ').trim();
-  if (!normalized) return fallback;
-  return normalized.length > 52 ? normalized.slice(0, 49).trimEnd() + '...' : normalized;
+  const fallbackWords = campaignTitleWords(fallback);
+  const words = campaignTitleWords(title);
+  const selected = (words.length > 0 ? words : fallbackWords).slice(0, 2);
+  while (selected.length < 2) {
+    selected.push(fallbackWords[selected.length] ?? 'Collab');
+  }
+  return selected.slice(0, 2).map(formatCampaignTitleWord).join(' ');
+}
+
+function campaignTitleWords(value: string) {
+  return value
+    .replace(/["#]/g, '')
+    .replace(/[^\p{L}\p{N}&+'-]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+}
+
+function formatCampaignTitleWord(word: string) {
+  if (!word) return word;
+  if (word.length <= 3 && word === word.toUpperCase()) return word;
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 function packageLabel(value: unknown) {
@@ -1043,24 +1068,15 @@ function packageLabel(value: unknown) {
 function buildCampaignCreativeTitle(input: CampaignCreativeInput) {
   const brandName = textValue(input.businessProfile?.brand_name, 'Brand');
   const packageName = packageLabel(input.campaign.package_type);
-  const influencerName = textValue(
-    input.influencerProfile?.display_name,
-    textValue(input.influencerProfile?.instagram_username),
-  );
   const packageVibe =
     packageName.toLowerCase().includes('reel') || packageName.toLowerCase().includes('video')
-      ? 'Reel Drop'
+      ? 'Reel'
       : packageName.toLowerCase().includes('story')
-        ? 'Story Drop'
+        ? 'Story'
         : packageName.toLowerCase().includes('post')
-          ? 'Post Drop'
-          : 'Collab Drop';
-  return sanitizeCampaignTitle(
-    influencerName
-      ? `${brandName} ${packageVibe} with ${influencerName}`
-      : `${brandName} ${packageVibe}`,
-    'Creator Campaign',
-  );
+          ? 'Post'
+          : 'Collab';
+  return sanitizeCampaignTitle(`${brandName} ${packageVibe}`, 'Brand Collab');
 }
 
 function buildCampaignImagePrompt(input: CampaignCreativeInput, title: string) {
@@ -1089,13 +1105,17 @@ function buildCampaignImagePrompt(input: CampaignCreativeInput, title: string) {
     eventName ? `Event/place cue: ${eventName}.` : undefined,
     dueDate ? `Timing cue: ${dueDate}.` : undefined,
     location ? `Location flavor: ${location}.` : undefined,
-    `Hero placement: create one clear premium hero subject in the upper image area, roughly 18% to 58% from the top, representing the ${packageName} work for ${brandName}.`,
+    `Hero placement: create one clear premium hero subject in the upper image area, roughly 12% to 46% from the top, representing the ${packageName} work for ${brandName}.`,
     'Frame any character with breathing room: show the full toy-like body or a relaxed waist-up view with head, torso, hands, and surrounding space visible. Avoid extreme close-ups, cropped faces, cropped heads, or characters pressed against the frame edges.',
-    'Keep the lower area smooth, quiet, softly darker or naturally low-detail, with no objects competing for attention.',
-    'Character style: playful stylized 3D Memoji-inspired mascot or toy-like creator characters only; no photorealistic humans, no real human portraits, no real animals, no documentary photography.',
+    'The middle and lower half must be meaningfully generated, not blank: include subtle relevant environmental detail such as a counter, tabletop, product arrangement, floor, creator tools, cafe/venue atmosphere, city texture, soft props, or brand-specific visual cues.',
+    'Keep the lower 40% calm, softly darker, and readable for overlays, but never empty, null, plain, flat, blank, or just a gradient.',
+    'Character style: playful stylized 3D rendered Memoji-inspired mascot or toy-like creator characters only, with rounded clay/vinyl materials, real 3D depth, soft shadows, ambient occlusion, and studio-quality dimensional lighting.',
+    'Do not use flat 2D animation, vector illustration, anime, hand-drawn cartoon, sticker art, poster art, cel shading, or flat graphic design. The image must look like a polished 3D render, not a drawing.',
+    'No photorealistic humans, no real human portraits, no real animals, no documentary photography.',
     'Visual style: peaceful premium Gen Z, happy and calm, one cohesive dominant color palette, minimal supporting props, gentle depth, soft studio lighting, polished modern social energy.',
     `Mood inspired by the title "${title}": warm, fresh, premium, creator-collab ready.`,
     'Composition must be one continuous scene filling the entire frame; avoid inset squares, panels, grids, collage blocks, divided sections, picture frames, borders, split scenes, or multiple separate images.',
+    'The full vertical card must look complete from top to bottom, with the hero in the upper area and supportive brand/campaign details continuing naturally through the bottom half.',
     'Avoid pushing too many colors, clutter, rows of people, brand logos, UI, watermarks, distorted faces, or distorted hands.',
     'Never include text, letters, numbers, signage, captions, labels, logos, UI, or watermark marks anywhere in the image.',
   ]

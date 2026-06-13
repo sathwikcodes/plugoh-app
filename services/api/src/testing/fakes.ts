@@ -154,7 +154,7 @@ export class FakeAiProvider implements AiProvider {
       throw new Error('fake campaign creative failure');
     }
     return {
-      title: 'Aura Weekend Reel',
+      title: 'Aura Reel',
       imagePrompt: 'Premium campaign invite photo, no text',
       imageBytes: new Uint8Array([137, 80, 78, 71]),
       imageMimeType: 'image/png' as const,

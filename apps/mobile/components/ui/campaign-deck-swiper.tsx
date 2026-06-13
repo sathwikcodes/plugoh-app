@@ -28,10 +28,6 @@ type CarouselCardProps = {
   cardWidth: number;
   cardHeight: number;
   onViewCampaign: (id: string) => void;
-  onAcceptCampaign?: (id: string) => void;
-  onDeclineCampaign?: (id: string) => void;
-  acceptingCampaignId?: string;
-  decliningCampaignId?: string;
 };
 
 const CarouselCard = memo(function CarouselCard({
@@ -40,10 +36,6 @@ const CarouselCard = memo(function CarouselCard({
   cardWidth,
   cardHeight,
   onViewCampaign,
-  onAcceptCampaign,
-  onDeclineCampaign,
-  acceptingCampaignId,
-  decliningCampaignId,
 }: CarouselCardProps) {
   return (
     <CampaignSwipeCard
@@ -54,22 +46,6 @@ const CarouselCard = memo(function CarouselCard({
       onViewPress={() => {
         onViewCampaign(campaign.id);
       }}
-      onAcceptPress={
-        onAcceptCampaign
-          ? () => {
-              onAcceptCampaign(campaign.id);
-            }
-          : undefined
-      }
-      onDeclinePress={
-        onDeclineCampaign
-          ? () => {
-              onDeclineCampaign(campaign.id);
-            }
-          : undefined
-      }
-      acceptPending={acceptingCampaignId === campaign.id}
-      declinePending={decliningCampaignId === campaign.id}
     />
   );
 });
@@ -84,10 +60,6 @@ export function CampaignDeckSwiper({
   emptyTitle,
   emptySubtitle,
   onViewCampaign,
-  onAcceptCampaign,
-  onDeclineCampaign,
-  acceptingCampaignId,
-  decliningCampaignId,
 }: Props) {
   return (
     <SnapCardDeck
@@ -109,10 +81,6 @@ export function CampaignDeckSwiper({
           cardWidth={cardWidth}
           cardHeight={cardHeight}
           onViewCampaign={onViewCampaign}
-          onAcceptCampaign={onAcceptCampaign}
-          onDeclineCampaign={onDeclineCampaign}
-          acceptingCampaignId={acceptingCampaignId}
-          decliningCampaignId={decliningCampaignId}
         />
       )}
     />

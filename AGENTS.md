@@ -88,6 +88,21 @@ Before handing off code changes, run the narrowest relevant checks plus broader 
 - Do not amend commits, force-push, reset hard, or delete files unless explicitly requested.
 - PRs should pass the same checks as CI for touched areas and include tests for behavior changes.
 
+## gstack (Required For All AI Agents)
+
+gstack provides shared skills (QA, review, ship, browse, planning) used across this repo, and the same workflows must be available to every agent — Claude Code, Codex, Cursor, and others — not just Claude.
+
+- Before doing AI-assisted work, verify gstack is installed for your host. If missing, STOP and install it, then restart the agent. Do not work around a missing gstack or ignore gstack errors.
+- Install gstack for your host (clone once, then run setup with the matching `--host`):
+  - Clone (shared by all hosts): `git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git ~/.claude/skills/gstack`
+  - Claude Code: `cd ~/.claude/skills/gstack && ./setup --team` → installs to `~/.claude/skills/gstack`
+  - OpenAI Codex: `cd ~/.claude/skills/gstack && ./setup --host codex` → installs to `~/.codex/skills/`
+  - Cursor: `./setup --host cursor` · OpenCode: `./setup --host opencode` · Factory Droid: `./setup --host factory` · Kiro: `./setup --host kiro`
+  - Auto-detect installed agents: `./setup --host auto`
+- Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools.
+- Available gstack skills: `/office-hours`, `/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`, `/design-consultation`, `/design-shotgun`, `/design-html`, `/review`, `/ship`, `/land-and-deploy`, `/canary`, `/benchmark`, `/browse`, `/connect-chrome`, `/qa`, `/qa-only`, `/design-review`, `/setup-browser-cookies`, `/setup-deploy`, `/setup-gbrain`, `/retro`, `/investigate`, `/document-release`, `/document-generate`, `/codex`, `/cso`, `/autoplan`, `/plan-devex-review`, `/devex-review`, `/careful`, `/freeze`, `/guard`, `/unfreeze`, `/gstack-upgrade`, `/learn`.
+- Common task routing (same methodology on any host): security audit → `/cso`; code review → `/review`; QA a URL → `/qa <url>`; build a feature end-to-end → `/autoplan` then implement then `/ship`; plan before building → `/office-hours` then `/autoplan` (save the plan, don't implement).
+
 ## AI Agent Guidelines
 
 - Read this file first, then the nearest nested `AGENTS.md`; nested files override root instructions for their subtree.

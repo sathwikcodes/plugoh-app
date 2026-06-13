@@ -372,7 +372,7 @@ describe('Plugoh API', () => {
     expect((await json(res)).data.campaignId).toBeTruthy();
     expect(store.tables.get('notifications')?.[0].type).toBe('new_booking');
     const campaign = store.tables.get('campaigns')?.[0];
-    expect(campaign?.ai_title).toBe('Aura Weekend Reel');
+    expect(campaign?.ai_title).toBe('Aura Reel');
     expect(campaign?.due_date).toBe('2026-07-01');
     expect(campaign?.brief).toContain('Due date: 2026-07-01');
     expect(campaign?.brief).not.toContain('choose_date');
@@ -779,7 +779,7 @@ describe('Plugoh API', () => {
       .get('payment_orders')
       ?.find((row) => row.campaign_id === campaignIdFromResponse);
     expect(paymentOrder?.status).toBe('authorized');
-    expect(campaign?.ai_title).toBe('Aura Weekend Reel');
+    expect(campaign?.ai_title).toBe('Aura Reel');
     expect(campaign?.card_image_url).toContain(`campaigns/${campaignIdFromResponse}/card.png`);
   });
 

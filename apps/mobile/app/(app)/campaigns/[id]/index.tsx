@@ -264,10 +264,10 @@ function ActionPill({
   disabled?: boolean;
   accessibilityLabel: string;
 }) {
-  const tintOverlayColor =
-    tint === 'accept' ? 'rgba(35, 174, 97, 0.34)' : 'rgba(230, 70, 70, 0.34)';
-  const borderColor = tint === 'accept' ? 'rgba(94, 255, 168, 0.34)' : 'rgba(255, 126, 126, 0.34)';
+  const tintOverlayColor = tint === 'accept' ? 'rgba(35, 174, 97, 0.2)' : 'rgba(230, 70, 70, 0.2)';
+  const borderColor = tint === 'accept' ? 'rgba(94, 255, 168, 0.28)' : 'rgba(255, 126, 126, 0.28)';
   const textColor = tint === 'accept' ? '#B8FFD3' : '#FFD0D0';
+  const glassTintColor = tint === 'accept' ? 'rgba(14, 44, 30, 0.22)' : 'rgba(48, 18, 18, 0.22)';
   const shellStyle = [
     styles.actionGlass,
     {
@@ -300,14 +300,20 @@ function ActionPill({
 
   if (isLiquidGlassAvailable()) {
     return (
-      <GlassView isInteractive glassEffectStyle="regular" colorScheme="dark" style={shellStyle}>
+      <GlassView
+        isInteractive
+        glassEffectStyle="regular"
+        colorScheme="dark"
+        tintColor={glassTintColor}
+        style={shellStyle}
+      >
         {content}
       </GlassView>
     );
   }
 
   return (
-    <BlurView tint="systemUltraThinMaterialDark" intensity={82} style={shellStyle}>
+    <BlurView tint="dark" intensity={36} style={shellStyle}>
       {content}
     </BlurView>
   );
@@ -342,19 +348,6 @@ function QuickActionTile({
         active ? styles.quickActionPressableActive : null,
       ]}
     >
-      <View pointerEvents="none" style={styles.quickActionGlassTint} />
-      <LinearGradient
-        pointerEvents="none"
-        colors={[
-          active ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.18)',
-          'rgba(255,255,255,0.04)',
-          'rgba(255,255,255,0)',
-        ]}
-        locations={[0, 0.48, 1]}
-        start={{ x: 0.12, y: 0 }}
-        end={{ x: 0.88, y: 1 }}
-        style={styles.quickActionSheen}
-      />
       <View pointerEvents="none" style={styles.quickActionInnerStroke} />
       <Ionicons name={icon} size={20} color={disabled ? 'rgba(255,255,255,0.34)' : '#FFFFFF'} />
       <Text
@@ -372,6 +365,7 @@ function QuickActionTile({
         isInteractive
         glassEffectStyle="clear"
         colorScheme="dark"
+        tintColor={active ? 'rgba(22, 24, 32, 0.24)' : 'rgba(10, 12, 18, 0.16)'}
         style={[styles.quickActionGlass, active ? styles.quickActionGlassActive : null]}
       >
         {content}
@@ -381,8 +375,8 @@ function QuickActionTile({
 
   return (
     <BlurView
-      tint="systemUltraThinMaterialDark"
-      intensity={active ? 88 : 78}
+      tint="dark"
+      intensity={active ? 34 : 28}
       style={[styles.quickActionGlass, active ? styles.quickActionGlassActive : null]}
     >
       {content}
@@ -424,15 +418,6 @@ function ProfileGlassTab({
         disabled ? styles.profileTabDisabled : null,
       ]}
     >
-      <View pointerEvents="none" style={styles.profileTabTint} />
-      <LinearGradient
-        pointerEvents="none"
-        colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.055)', 'rgba(255,255,255,0)']}
-        locations={[0, 0.46, 1]}
-        start={{ x: 0.08, y: 0 }}
-        end={{ x: 0.92, y: 1 }}
-        style={styles.profileTabSheen}
-      />
       <View pointerEvents="none" style={styles.profileTabInnerStroke} />
       <View style={styles.brandAvatar}>
         {loading ? (
@@ -471,6 +456,7 @@ function ProfileGlassTab({
         isInteractive
         glassEffectStyle="clear"
         colorScheme="dark"
+        tintColor="rgba(10, 12, 18, 0.18)"
         style={styles.profileTabGlass}
       >
         {content}
@@ -479,7 +465,7 @@ function ProfileGlassTab({
   }
 
   return (
-    <BlurView tint="systemUltraThinMaterialDark" intensity={82} style={styles.profileTabGlass}>
+    <BlurView tint="dark" intensity={32} style={styles.profileTabGlass}>
       {content}
     </BlurView>
   );
@@ -1018,19 +1004,19 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 2,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(8,9,14,0.22)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 1,
   },
   quickActionGlassActive: {
-    borderColor: 'rgba(255,255,255,0.46)',
-    backgroundColor: 'rgba(255,255,255,0.11)',
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
+    borderColor: 'rgba(255,255,255,0.24)',
+    backgroundColor: 'rgba(18,20,28,0.28)',
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
   },
   quickActionPressable: {
     minHeight: 58,
@@ -1042,21 +1028,13 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   quickActionPressableActive: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  quickActionGlassTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.035)',
-  },
-  quickActionSheen: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.92,
+    backgroundColor: 'rgba(255,255,255,0.018)',
   },
   quickActionInnerStroke: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 19,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.38)',
+    borderColor: 'rgba(255,255,255,0.16)',
   },
   quickActionText: {
     ...theme.typography.labelSmall,
@@ -1079,6 +1057,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderRadius: 22,
     borderWidth: 1,
+    backgroundColor: 'rgba(8,9,14,0.18)',
   },
   actionPressable: {
     minHeight: 46,
@@ -1176,13 +1155,13 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.24)',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    elevation: 2,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(8,9,14,0.24)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    elevation: 1,
   },
   profileTabPressable: {
     minHeight: 68,
@@ -1197,19 +1176,11 @@ const styles = StyleSheet.create({
   profileTabDisabled: {
     opacity: 0.62,
   },
-  profileTabTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.035)',
-  },
-  profileTabSheen: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.96,
-  },
   profileTabInnerStroke: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 23,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.36)',
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   brandLinkSection: {
     paddingVertical: theme.spacing.xs,

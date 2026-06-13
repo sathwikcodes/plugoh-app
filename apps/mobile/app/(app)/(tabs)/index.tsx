@@ -1,6 +1,7 @@
 import contentDeliveryImage from '@/assets/images/content_delivery.png';
 import crystalImage from '@/assets/images/crystal.png';
 import pendingEarningsImage from '@/assets/images/pending_earnings.png';
+import rocketImage from '@/assets/images/rocket.png';
 import { TierAssetBadge } from '@/components/influencer/tier-asset-badge';
 import { TierBadgeCarousel } from '@/components/influencer/tier-badge-carousel';
 import { AppHeader, getAppHeaderScreenTopPadding } from '@/components/ui/app-header';
@@ -530,11 +531,19 @@ function DailyInsightsSection({
 
   return (
     <View style={insightStyles.section}>
-      <View style={insightStyles.header}>
-        <Text style={insightStyles.title}>Daily Insights</Text>
-        <Text style={insightStyles.subtitle}>{"Today's update on your focus"}</Text>
-      </View>
       <View style={insightStyles.insightStack}>
+        <View style={insightStyles.header}>
+          <View style={insightStyles.headingCopy}>
+            <Text style={insightStyles.title}>Daily Insights</Text>
+            <Text style={insightStyles.subtitle}>{"Today's update on your focus"}</Text>
+          </View>
+          <Image
+            source={rocketImage}
+            style={insightStyles.rocketImage}
+            contentFit="contain"
+            accessible={false}
+          />
+        </View>
         <View style={insightStyles.focusPair}>
           <DeliveryFocusCard deliveryCampaigns={deliveryCampaigns} loading={loading} />
           <PendingEarningsFocusCard
@@ -602,7 +611,7 @@ const heroStyles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     marginHorizontal: -theme.spacing.xxl,
-    minHeight: 410,
+    minHeight: 385,
     paddingTop: theme.spacing.sm,
     paddingHorizontal: theme.spacing.xxl,
   },
@@ -610,6 +619,7 @@ const heroStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.12)',
     minHeight: 82,
     paddingVertical: theme.spacing.sm,
@@ -646,9 +656,18 @@ const heroStyles = StyleSheet.create({
 const insightStyles = StyleSheet.create({
   section: {
     gap: theme.spacing.lg,
-    marginTop: -theme.spacing.xs,
+    marginTop: -theme.spacing.md,
   },
   header: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.xs,
+  },
+  headingCopy: {
+    flex: 1,
+    minWidth: 0,
     gap: theme.spacing.xs,
   },
   title: {
@@ -658,6 +677,12 @@ const insightStyles = StyleSheet.create({
   subtitle: {
     ...theme.typography.caption,
     color: 'rgba(255,255,255,0.58)',
+  },
+  rocketImage: {
+    width: 48,
+    height: 48,
+    marginLeft: theme.spacing.lg,
+    marginRight: theme.spacing.xs,
   },
   insightStack: {
     gap: theme.spacing.md,
