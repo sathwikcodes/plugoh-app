@@ -1,8 +1,9 @@
 import { ConversationRow } from '@/components/inbox/conversation-row';
 import { InboxFilterSheet } from '@/components/inbox/inbox-filter-sheet';
-import { AppHeader, getAppHeaderShellTopPadding } from '@/components/ui/app-header';
+import { AppHeader, getAppHeaderTopPadding } from '@/components/ui/app-header';
 import { GlassSearchField } from '@/components/ui/glass-search-field';
 import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { TabScreenCanvas } from '@/components/ui/tab-screen-canvas';
 import { ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
 import {
@@ -135,101 +136,103 @@ export default function InboxScreen() {
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
-      <View
-        style={[
-          styles.topHeader,
-          {
-            paddingTop: getAppHeaderShellTopPadding(insets.top),
-            paddingHorizontal: theme.spacing.xxl,
-          },
-        ]}
-      >
-        <AppHeader
-          title="Messages"
-          profile={{
-            imageUri: profileImageUri,
-            onPress: () => {
-              router.push('/(app)/profile');
+    <TabScreenCanvas>
+      <View style={styles.root}>
+        <View
+          style={[
+            styles.topHeader,
+            {
+              paddingTop: getAppHeaderTopPadding(insets.top),
+              paddingHorizontal: theme.spacing.xxl,
             },
+          ]}
+        >
+          <AppHeader
+            title="Messages"
+            profile={{
+              imageUri: profileImageUri,
+              onPress: () => {
+                router.push('/(app)/profile');
+              },
+            }}
+          />
+        </View>
+
+        <View style={styles.searchBlock}>
+          <View style={styles.searchRow}>
+            <View style={styles.searchFieldWrap}>
+              <GlassSearchField
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search conversations"
+              />
+            </View>
+            <View style={styles.filterButtonWrap}>
+              <NativeIconButton
+                symbol="line.3.horizontal.decrease.circle"
+                fallbackIcon="filter"
+                fallbackIconFamily="foundation"
+                preferFallbackIcon
+                imageSource={labImage}
+                imageSize={30}
+                variant="glass"
+                haptic="selection"
+                size={46}
+                symbolSize={21}
+                fallbackSize={22}
+                accessibilityLabel="Open filters"
+                glassRendering="blur"
+                onPress={() => {
+                  setFiltersVisible(true);
+                }}
+              />
+              {appliedFilterCount > 0 ? (
+                <View style={styles.activeBadge}>
+                  <Text style={styles.activeBadgeText}>{appliedFilterCount}</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </View>
+
+        {shouldShowInitialLoader(bootstrap) || shouldShowInitialLoader(inbox) ? (
+          <View style={styles.skeletonList}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SkeletonRow key={i} />
+            ))}
+          </View>
+        ) : filtered.length === 0 ? (
+          <EmptyInboxState title="No messages yet" />
+        ) : (
+          <View style={styles.list}>
+            <FlashList
+              data={filtered}
+              renderItem={renderItem}
+              keyExtractor={keyExtractor}
+              ItemSeparatorComponent={Separator}
+              contentContainerStyle={listContentStyle}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            />
+          </View>
+        )}
+
+        <InboxFilterSheet
+          visible={filtersVisible}
+          presentation="premium"
+          filters={filters}
+          sort={sort}
+          onCancel={() => {
+            setFiltersVisible(false);
+          }}
+          onApply={({ filters: nextFilters, sort: nextSort }) => {
+            setFilters(nextFilters);
+            setSort(nextSort);
+            setFiltersVisible(false);
           }}
         />
       </View>
-
-      <View style={styles.searchBlock}>
-        <View style={styles.searchRow}>
-          <View style={styles.searchFieldWrap}>
-            <GlassSearchField
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search conversations"
-            />
-          </View>
-          <View style={styles.filterButtonWrap}>
-            <NativeIconButton
-              symbol="line.3.horizontal.decrease.circle"
-              fallbackIcon="filter"
-              fallbackIconFamily="foundation"
-              preferFallbackIcon
-              imageSource={labImage}
-              imageSize={30}
-              variant="glass"
-              haptic="selection"
-              size={46}
-              symbolSize={21}
-              fallbackSize={22}
-              accessibilityLabel="Open filters"
-              glassRendering="blur"
-              onPress={() => {
-                setFiltersVisible(true);
-              }}
-            />
-            {appliedFilterCount > 0 ? (
-              <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>{appliedFilterCount}</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </View>
-
-      {shouldShowInitialLoader(bootstrap) || shouldShowInitialLoader(inbox) ? (
-        <View style={styles.skeletonList}>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <SkeletonRow key={i} />
-          ))}
-        </View>
-      ) : filtered.length === 0 ? (
-        <EmptyInboxState title="No messages yet" />
-      ) : (
-        <View style={styles.list}>
-          <FlashList
-            data={filtered}
-            renderItem={renderItem}
-            keyExtractor={keyExtractor}
-            ItemSeparatorComponent={Separator}
-            contentContainerStyle={listContentStyle}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          />
-        </View>
-      )}
-
-      <InboxFilterSheet
-        visible={filtersVisible}
-        presentation="premium"
-        filters={filters}
-        sort={sort}
-        onCancel={() => {
-          setFiltersVisible(false);
-        }}
-        onApply={({ filters: nextFilters, sort: nextSort }) => {
-          setFilters(nextFilters);
-          setSort(nextSort);
-          setFiltersVisible(false);
-        }}
-      />
-    </View>
+    </TabScreenCanvas>
   );
 }
 

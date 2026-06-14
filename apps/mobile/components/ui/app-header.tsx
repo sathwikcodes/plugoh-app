@@ -22,11 +22,7 @@ export const APP_HEADER_SCREEN_TOP_PADDING = 0;
 export const APP_HEADER_SHELL_TOP_GAP = 20;
 export const APP_HEADER_PROFILE_GLASS_RENDERING = 'blur';
 
-export function getAppHeaderScreenTopPadding(insetTop: number) {
-  return Math.max(insetTop + APP_HEADER_SCREEN_TOP_PADDING - theme.spacing.hero, theme.spacing.sm);
-}
-
-export function getAppHeaderShellTopPadding(insetTop: number) {
+export function getAppHeaderTopPadding(insetTop: number) {
   return insetTop + APP_HEADER_SCREEN_TOP_PADDING + APP_HEADER_SHELL_TOP_GAP;
 }
 

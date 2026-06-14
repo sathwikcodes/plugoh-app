@@ -10,14 +10,13 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppHeader, getAppHeaderShellTopPadding } from './app-header';
+import { getTabScreenBottomPadding } from '@/components/navigation/native-tab-config';
+import { AppHeader, getAppHeaderTopPadding } from './app-header';
 import { FilterOption, FilterSheet, FilterSheetSection } from './filter-sheet';
 import { GlassSearchField } from './glass-search-field';
 import { NativeIconButton } from './native-icon-button';
 import { Screen } from './primitives';
 
-const NATIVE_TAB_DOCK_HEIGHT = 72;
-const TAB_DOCK_GAP = theme.spacing.lg;
 const PAGE_HORIZONTAL_INSET = theme.spacing.xxl;
 const MAX_CARD_WIDTH = 390;
 const CARD_VIEWPORT_RATIO = 0.84;
@@ -252,9 +251,8 @@ export function DeckBrowseScreen<
       contentContainerStyle={{
         flexGrow: 1,
         paddingHorizontal: PAGE_HORIZONTAL_INSET,
-        paddingTop: getAppHeaderShellTopPadding(insets.top),
-        paddingBottom:
-          Math.max(insets.bottom, theme.spacing.sm) + NATIVE_TAB_DOCK_HEIGHT + TAB_DOCK_GAP,
+        paddingTop: getAppHeaderTopPadding(insets.top),
+        paddingBottom: getTabScreenBottomPadding(insets.bottom),
         gap: isPremiumCampaigns ? theme.spacing.md : theme.spacing.md,
       }}
     >

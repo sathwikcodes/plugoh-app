@@ -4,7 +4,7 @@ import { MonthlyActivityCard } from '@/components/earnings/monthly-activity-card
 import { RecentTransactionsSection } from '@/components/earnings/recent-transactions-section';
 import { TotalEarnedCard } from '@/components/earnings/total-earned-card';
 import { EarningsWithdrawColumn } from '@/components/earnings/withdraw-card';
-import { AppHeader, getAppHeaderScreenTopPadding } from '@/components/ui/app-header';
+import { AppHeader, getAppHeaderTopPadding } from '@/components/ui/app-header';
 import { ErrorState, Screen } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
 import { useBootstrap, useEarnings, useInfluencerProfile } from '@/hooks/use-marketplace';
@@ -36,7 +36,7 @@ export default function EarningsScreen() {
     <Screen
       contentInsetAdjustmentBehavior="never"
       contentContainerStyle={{
-        paddingTop: getAppHeaderScreenTopPadding(insets.top),
+        paddingTop: getAppHeaderTopPadding(insets.top),
       }}
     >
       <AppHeader

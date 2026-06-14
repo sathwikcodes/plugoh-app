@@ -307,7 +307,7 @@ export default function CampaignBrandProfileScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#050509',
+    backgroundColor: theme.colors.backgroundClear,
   },
   hero: {
     overflow: 'hidden',

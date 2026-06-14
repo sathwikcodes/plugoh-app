@@ -4,7 +4,8 @@ import pendingEarningsImage from '@/assets/images/pending_earnings.png';
 import rocketImage from '@/assets/images/rocket.png';
 import { TierAssetBadge } from '@/components/influencer/tier-asset-badge';
 import { TierBadgeCarousel } from '@/components/influencer/tier-badge-carousel';
-import { AppHeader, getAppHeaderScreenTopPadding } from '@/components/ui/app-header';
+import { getTabScreenBottomPadding } from '@/components/navigation/native-tab-config';
+import { AppHeader, getAppHeaderTopPadding } from '@/components/ui/app-header';
 import { Screen } from '@/components/ui/primitives';
 import { ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
@@ -152,21 +153,14 @@ function LiquidInsightSurface({
   children: ReactNode;
   contentStyle: StyleProp<ViewStyle>;
 }) {
-  const content = (
-    <View style={[insightStyles.glassContent, contentStyle]}>
-      <View pointerEvents="none" style={insightStyles.glassTopHighlight} />
-      <View pointerEvents="none" style={insightStyles.glassBottomShade} />
-      {children}
-    </View>
-  );
+  const content = <View style={[insightStyles.glassContent, contentStyle]}>{children}</View>;
 
   if (isLiquidGlassAvailable()) {
     return (
       <GlassView
         isInteractive
-        glassEffectStyle="clear"
+        glassEffectStyle="regular"
         colorScheme="dark"
-        tintColor="rgba(255,255,255,0.04)"
         style={insightStyles.glassShell}
       >
         {content}
@@ -175,7 +169,7 @@ function LiquidInsightSurface({
   }
 
   return (
-    <BlurView tint="dark" intensity={58} style={insightStyles.glassShell}>
+    <BlurView tint="systemUltraThinMaterialDark" intensity={80} style={insightStyles.glassShell}>
       {content}
     </BlurView>
   );
@@ -578,7 +572,8 @@ export default function HomeScreen() {
     <Screen
       contentInsetAdjustmentBehavior="never"
       contentContainerStyle={{
-        paddingTop: getAppHeaderScreenTopPadding(insets.top),
+        paddingTop: getAppHeaderTopPadding(insets.top),
+        paddingBottom: getTabScreenBottomPadding(insets.bottom),
       }}
     >
       <AppHeader
@@ -696,29 +691,12 @@ const insightStyles = StyleSheet.create({
     borderRadius: 32,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'rgba(255,255,255,0.18)',
     overflow: 'hidden',
     backgroundColor: 'transparent',
   },
   glassContent: {
     flex: 1,
-    position: 'relative',
-  },
-  glassTopHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 18,
-    right: 18,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.32)',
-  },
-  glassBottomShade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '42%',
-    backgroundColor: 'rgba(3,9,14,0.1)',
   },
   focusNode: {
     flex: 1,

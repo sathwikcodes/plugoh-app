@@ -12,7 +12,7 @@ export default function AppIndexScreen() {
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: theme.colors.background,
+          backgroundColor: theme.colors.backgroundClear,
         }}
       >
         <ActivityIndicator color={theme.colors.accentStrong} />

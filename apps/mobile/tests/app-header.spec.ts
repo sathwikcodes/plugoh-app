@@ -51,8 +51,7 @@ import {
   APP_HEADER_PROFILE_GLASS_RENDERING,
   APP_HEADER_SCREEN_TOP_PADDING,
   APP_HEADER_SHELL_TOP_GAP,
-  getAppHeaderScreenTopPadding,
-  getAppHeaderShellTopPadding,
+  getAppHeaderTopPadding,
 } from '@/components/ui/app-header';
 
 describe('app header tokens', () => {
@@ -71,11 +70,10 @@ describe('app header tokens', () => {
     expect(APP_HEADER_SCREEN_TOP_PADDING).toBe(0);
   });
 
-  it('keeps custom shell headers below the native top obstruction', () => {
+  it('keeps every tab header on one safe-area offset below the native top obstruction', () => {
     expect(APP_HEADER_SHELL_TOP_GAP).toBe(20);
-    expect(getAppHeaderShellTopPadding(0)).toBe(APP_HEADER_SHELL_TOP_GAP);
-    expect(getAppHeaderShellTopPadding(59)).toBe(59 + APP_HEADER_SHELL_TOP_GAP);
-    expect(getAppHeaderShellTopPadding(59)).toBeGreaterThan(getAppHeaderScreenTopPadding(59));
+    expect(getAppHeaderTopPadding(0)).toBe(APP_HEADER_SHELL_TOP_GAP);
+    expect(getAppHeaderTopPadding(59)).toBe(59 + APP_HEADER_SHELL_TOP_GAP);
   });
 
   it('keeps profile buttons on the shared Expo blur rendering', () => {

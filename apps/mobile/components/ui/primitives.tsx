@@ -15,6 +15,7 @@ import {
   type ViewProps,
   type ViewStyle,
 } from 'react-native';
+import { TabScreenCanvas, useTabScreenCanvas } from '@/components/ui/tab-screen-canvas';
 import { theme, statusTone } from '@/constants/theme';
 
 function mergePressableStyle(
@@ -34,7 +35,8 @@ export function Screen({
   contentInsetAdjustmentBehavior = 'automatic',
   ...props
 }: ScrollViewProps) {
-  return (
+  const tabCanvas = useTabScreenCanvas();
+  const scrollView = (
     <ScrollView
       {...props}
       style={[styles.screen, props.style]}
@@ -45,6 +47,12 @@ export function Screen({
       {children}
     </ScrollView>
   );
+
+  if (tabCanvas) {
+    return <TabScreenCanvas>{scrollView}</TabScreenCanvas>;
+  }
+
+  return scrollView;
 }
 
 export function ScreenShell({
@@ -234,7 +242,7 @@ export function EmptyState({ title, subtitle }: { title: string; subtitle: strin
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.backgroundClear,
   },
   screenContent: {
     padding: theme.spacing.xxl,

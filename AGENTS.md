@@ -110,3 +110,19 @@ gstack provides shared skills (QA, review, ship, browse, planning) used across t
 - Prefer paths and concise explanations over duplicating large docs.
 - Ask before adding dependencies, changing native project config, editing deployment scripts, or making broad rewrites.
 - When checks cannot be run, state exactly which checks were skipped and why.
+
+## Learned User Preferences
+
+- Prefer energizing, fun, soothing mobile backgrounds; avoid dull or muddy palette choices.
+- Align in-app hero/screen backgrounds with the premium earnings card mesh (pink, gold, orange) — glossy and breathable, not flat black.
+- Keep hero metrics and primary UI content clearly visible above the background wash; lighten or calm the center when needed.
+- Limit premium mesh screen background to authenticated in-app screens; keep auth/login on its separate orbital gradient (`#050509`).
+- Provide design HTML previews when exploring mobile background palette options.
+
+## Learned Workspace Facts
+
+- In-app screen roots use `theme.colors.backgroundClear` so `AppBackground` / `AppScreenRoot` mesh shows through.
+- Premium mesh canvas hex tokens live in `apps/mobile/constants/premium-mesh-canvas-hex.js` (`PREMIUM_MESH_CANVAS_HEX`).
+- `apps/mobile/app.config.ts` must import config-time tokens from plain `.js` files only (no TypeScript, no `@/` aliases).
+- Switch the global canvas style via `ACTIVE_BACKGROUND_PALETTE_ID` in `background-palette.ts` (default: `premium-mesh`).
+- Screen ambient mesh uses `PREMIUM_BACKGROUND_MESH_*` in `premium-mesh-gradient.ts`; earnings card mesh uses `PREMIUM_EARNINGS_MESH_*` separately.

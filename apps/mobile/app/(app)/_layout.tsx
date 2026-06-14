@@ -1,3 +1,4 @@
+import { AppScreenRoot } from '@/components/ui/app-screen-root';
 import { BootstrapErrorScreen } from '@/components/ui/bootstrap-error';
 import { theme } from '@/constants/theme';
 import { useGate } from '@/hooks/use-gate';
@@ -10,16 +11,18 @@ export default function AppLayout() {
   const segmentPath = segments as unknown as string[];
   if (gate.status === 'loading') {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: theme.colors.background,
-        }}
-      >
-        <ActivityIndicator color={theme.colors.accentStrong} />
-      </View>
+      <AppScreenRoot>
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.backgroundClear,
+          }}
+        >
+          <ActivityIndicator color={theme.colors.accentStrong} />
+        </View>
+      </AppScreenRoot>
     );
   }
   if (gate.status === 'error') {

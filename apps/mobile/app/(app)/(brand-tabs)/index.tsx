@@ -1,5 +1,5 @@
 import { GlassCard } from '@/components/ui/glass-card';
-import { AppHeader, getAppHeaderScreenTopPadding } from '@/components/ui/app-header';
+import { AppHeader, getAppHeaderTopPadding } from '@/components/ui/app-header';
 import { ErrorState, PrimaryButton, Screen, StatusChip } from '@/components/ui/primitives';
 import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
@@ -269,7 +269,7 @@ export default function BrandHomeScreen() {
       contentInsetAdjustmentBehavior="never"
       contentContainerStyle={[
         styles.screenContent,
-        { paddingTop: getAppHeaderScreenTopPadding(insets.top) },
+        { paddingTop: getAppHeaderTopPadding(insets.top) },
       ]}
     >
       <AppHeader

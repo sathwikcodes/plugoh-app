@@ -1,18 +1,31 @@
 import type { NativeTabsProps } from 'expo-router/unstable-native-tabs';
-import { DynamicColorIOS, Platform, type ColorValue } from 'react-native';
+import type { ColorValue } from 'react-native';
+import { PREMIUM_MESH_CANVAS_HEX } from '@/constants/premium-mesh-canvas-hex.js';
+import { theme } from '@/constants/theme';
 
-function tabColor(dark: ColorValue, light: ColorValue) {
-  return Platform.OS === 'ios' ? DynamicColorIOS({ dark, light }) : dark;
+/** App is dark-only; avoid light DynamicColorIOS fallbacks that wash tab chrome. */
+export const NATIVE_TAB_SELECTED: ColorValue = '#FFFFFF';
+export const NATIVE_TAB_DEFAULT: ColorValue = 'rgba(255, 255, 255, 0.58)';
+
+/** Height of the floating native tab dock that overlays scroll content. */
+export const NATIVE_TAB_DOCK_HEIGHT = 72;
+/** Breathing room between the last scroll item and the tab dock. */
+export const TAB_DOCK_GAP = theme.spacing.lg;
+
+/**
+ * Bottom padding a tab screen's scroll content needs so its last item clears the
+ * floating native tab dock and the home-indicator safe area. Single source of truth.
+ */
+export function getTabScreenBottomPadding(insetBottom: number) {
+  return Math.max(insetBottom, theme.spacing.sm) + NATIVE_TAB_DOCK_HEIGHT + TAB_DOCK_GAP;
 }
-
-export const NATIVE_TAB_SELECTED = tabColor('#FFFFFF', '#FFFFFF');
-export const NATIVE_TAB_DEFAULT = tabColor('rgba(255, 255, 255, 0.58)', 'rgba(15, 23, 42, 0.58)');
 
 const TAB_LABEL_STYLE = {
   fontSize: 10,
 };
 
 export const plugohNativeTabOptions = {
+  backgroundColor: PREMIUM_MESH_CANVAS_HEX.deep,
   blurEffect: 'systemChromeMaterialDark',
   disableTransparentOnScrollEdge: true,
   minimizeBehavior: 'never',
@@ -31,6 +44,7 @@ export const plugohNativeTabOptions = {
   },
 } satisfies Pick<
   NativeTabsProps,
+  | 'backgroundColor'
   | 'blurEffect'
   | 'disableTransparentOnScrollEdge'
   | 'iconColor'

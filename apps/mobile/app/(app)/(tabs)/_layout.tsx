@@ -1,5 +1,6 @@
 import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { plugohNativeTabOptions } from '@/components/navigation/native-tab-config';
+import { TabScreenCanvasProvider } from '@/components/ui/tab-screen-canvas';
 import { theme } from '@/constants/theme';
 import { useBootstrap } from '@/hooks/use-marketplace';
 import { Redirect, useRouter, useSegments } from 'expo-router';
@@ -27,55 +28,57 @@ export default function TabsLayout() {
       leaf === 'earnings');
 
   return (
-    <View style={styles.root}>
-      <NativeTabs {...plugohNativeTabOptions}>
-        <NativeTabs.Trigger name="index">
-          <Icon sf={{ default: 'house', selected: 'house.fill' }} />
-          <Label>Home</Label>
-        </NativeTabs.Trigger>
+    <TabScreenCanvasProvider>
+      <View style={styles.root}>
+        <NativeTabs {...plugohNativeTabOptions}>
+          <NativeTabs.Trigger name="index">
+            <Icon sf={{ default: 'house', selected: 'house.fill' }} />
+            <Label>Home</Label>
+          </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="campaigns">
-          <Icon sf={{ default: 'briefcase', selected: 'briefcase.fill' }} />
-          <Label>Work</Label>
-        </NativeTabs.Trigger>
+          <NativeTabs.Trigger name="campaigns">
+            <Icon sf={{ default: 'briefcase', selected: 'briefcase.fill' }} />
+            <Label>Work</Label>
+          </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="inbox">
-          <Icon
-            sf={{
-              default: 'bubble.left.and.bubble.right',
-              selected: 'bubble.left.and.bubble.right.fill',
+          <NativeTabs.Trigger name="inbox">
+            <Icon
+              sf={{
+                default: 'bubble.left.and.bubble.right',
+                selected: 'bubble.left.and.bubble.right.fill',
+              }}
+            />
+            <Label>Inbox</Label>
+          </NativeTabs.Trigger>
+
+          <NativeTabs.Trigger name="earnings">
+            <Icon sf={{ default: 'wallet.pass', selected: 'wallet.pass.fill' }} />
+            <Label>Earn</Label>
+          </NativeTabs.Trigger>
+        </NativeTabs>
+
+        {!hideFloatingProfile ? (
+          <NativeIconButton
+            symbol="person.circle"
+            fallbackIcon="person-circle-outline"
+            variant="glass"
+            haptic="light"
+            size={44}
+            symbolSize={20}
+            onPress={() => {
+              router.push('/(app)/profile');
             }}
+            style={{ position: 'absolute', right: 16, top: insets.top + 14, zIndex: 50 }}
           />
-          <Label>Inbox</Label>
-        </NativeTabs.Trigger>
-
-        <NativeTabs.Trigger name="earnings">
-          <Icon sf={{ default: 'wallet.pass', selected: 'wallet.pass.fill' }} />
-          <Label>Earn</Label>
-        </NativeTabs.Trigger>
-      </NativeTabs>
-
-      {!hideFloatingProfile ? (
-        <NativeIconButton
-          symbol="person.circle"
-          fallbackIcon="person-circle-outline"
-          variant="glass"
-          haptic="light"
-          size={44}
-          symbolSize={20}
-          onPress={() => {
-            router.push('/(app)/profile');
-          }}
-          style={{ position: 'absolute', right: 16, top: insets.top + 14, zIndex: 50 }}
-        />
-      ) : null}
-    </View>
+        ) : null}
+      </View>
+    </TabScreenCanvasProvider>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.backgroundDeep,
   },
 });

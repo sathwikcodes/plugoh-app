@@ -266,7 +266,7 @@ export default function PayoutScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.backgroundClear,
   },
   scroll: {
     flex: 1,

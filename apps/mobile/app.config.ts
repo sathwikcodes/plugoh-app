@@ -1,4 +1,5 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
+import { PREMIUM_MESH_CANVAS_HEX } from './constants/premium-mesh-canvas-hex.js';
 
 const EAS_PROJECT_ID = 'f88efee0-4c94-48e4-916a-af5277b409f6';
 
@@ -15,7 +16,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         image: './assets/images/splash-icon.png',
         imageWidth: 200,
         resizeMode: 'contain',
-        backgroundColor: '#000000',
+        backgroundColor: PREMIUM_MESH_CANVAS_HEX.deep,
       },
     ],
     'expo-font',

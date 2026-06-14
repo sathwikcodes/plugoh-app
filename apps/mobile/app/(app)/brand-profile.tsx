@@ -224,7 +224,7 @@ export default function BrandProfileScreen() {
 
   return (
     <ScrollView
-      style={[styles.root, { backgroundColor: theme.colors.background }]}
+      style={[styles.root, { backgroundColor: theme.colors.backgroundClear }]}
       contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
       showsVerticalScrollIndicator={false}
     >

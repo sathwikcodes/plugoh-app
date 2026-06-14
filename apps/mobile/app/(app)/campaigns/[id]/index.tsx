@@ -936,7 +936,7 @@ export default function CampaignDetailScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#050509',
+    backgroundColor: theme.colors.backgroundClear,
   },
   hero: {
     marginHorizontal: theme.spacing.xl,

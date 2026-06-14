@@ -1,4 +1,5 @@
 import type { TextStyle } from 'react-native';
+import { getActiveBackgroundPalette } from './background-palette';
 import {
   fontBody,
   fontBodyBold,
@@ -10,10 +11,15 @@ import {
 } from './app-fonts';
 
 const tabularNums: NonNullable<TextStyle['fontVariant']> = ['tabular-nums'];
+const backgroundPalette = getActiveBackgroundPalette();
 
 export const theme = {
   colors: {
-    background: '#050509',
+    /** Solid canvas base — system UI, splash, opaque fallbacks */
+    background: backgroundPalette.base,
+    backgroundDeep: backgroundPalette.deep,
+    /** Use on screen roots so the hero gradient shows through */
+    backgroundClear: 'transparent',
     surface: '#111111',
     surfaceWarm: '#131110',
     surfaceBlush: '#120F12',

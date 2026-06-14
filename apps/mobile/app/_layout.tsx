@@ -1,3 +1,4 @@
+import { AppScreenRoot } from '@/components/ui/app-screen-root';
 import { appFontAssets } from '@/constants/app-font-assets';
 import { installGlobalTextFontDefaults } from '@/constants/app-fonts';
 import { theme } from '@/constants/theme';
@@ -82,16 +83,18 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.backgroundDeep }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider value={navigationTheme}>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: theme.colors.background },
-              }}
-            />
+            <AppScreenRoot>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: theme.colors.backgroundClear },
+                }}
+              />
+            </AppScreenRoot>
             <StatusBar style="light" />
           </ThemeProvider>
         </QueryClientProvider>
