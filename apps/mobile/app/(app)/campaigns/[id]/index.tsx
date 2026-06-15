@@ -14,12 +14,16 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  type StyleProp,
   Text,
   View,
+  type ViewStyle,
   useWindowDimensions,
 } from 'react-native';
+import type { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
+import { TabScreenCanvas } from '@/components/ui/tab-screen-canvas';
 import { theme } from '@/constants/theme';
 import { useBootstrap, useCampaign, useMarketplaceMutations } from '@/hooks/use-marketplace';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
@@ -251,6 +255,28 @@ function actionIconForStatus(status?: string): keyof typeof Ionicons.glyphMap {
   }
 }
 
+function CampaignLiquidSurface({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style: StyleProp<ViewStyle>;
+}) {
+  if (isLiquidGlassAvailable()) {
+    return (
+      <GlassView isInteractive glassEffectStyle="regular" colorScheme="dark" style={style}>
+        {children}
+      </GlassView>
+    );
+  }
+
+  return (
+    <BlurView tint="systemUltraThinMaterialDark" intensity={80} style={style}>
+      {children}
+    </BlurView>
+  );
+}
+
 function ActionPill({
   label,
   onPress,
@@ -267,7 +293,6 @@ function ActionPill({
   const tintOverlayColor = tint === 'accept' ? 'rgba(35, 174, 97, 0.2)' : 'rgba(230, 70, 70, 0.2)';
   const borderColor = tint === 'accept' ? 'rgba(94, 255, 168, 0.28)' : 'rgba(255, 126, 126, 0.28)';
   const textColor = tint === 'accept' ? '#B8FFD3' : '#FFD0D0';
-  const glassTintColor = tint === 'accept' ? 'rgba(14, 44, 30, 0.22)' : 'rgba(48, 18, 18, 0.22)';
   const shellStyle = [
     styles.actionGlass,
     {
@@ -298,25 +323,7 @@ function ActionPill({
     </Pressable>
   );
 
-  if (isLiquidGlassAvailable()) {
-    return (
-      <GlassView
-        isInteractive
-        glassEffectStyle="regular"
-        colorScheme="dark"
-        tintColor={glassTintColor}
-        style={shellStyle}
-      >
-        {content}
-      </GlassView>
-    );
-  }
-
-  return (
-    <BlurView tint="dark" intensity={36} style={shellStyle}>
-      {content}
-    </BlurView>
-  );
+  return <CampaignLiquidSurface style={shellStyle}>{content}</CampaignLiquidSurface>;
 }
 
 function QuickActionTile({
@@ -359,28 +366,12 @@ function QuickActionTile({
     </Pressable>
   );
 
-  if (isLiquidGlassAvailable()) {
-    return (
-      <GlassView
-        isInteractive
-        glassEffectStyle="clear"
-        colorScheme="dark"
-        tintColor={active ? 'rgba(22, 24, 32, 0.24)' : 'rgba(10, 12, 18, 0.16)'}
-        style={[styles.quickActionGlass, active ? styles.quickActionGlassActive : null]}
-      >
-        {content}
-      </GlassView>
-    );
-  }
-
   return (
-    <BlurView
-      tint="dark"
-      intensity={active ? 34 : 28}
+    <CampaignLiquidSurface
       style={[styles.quickActionGlass, active ? styles.quickActionGlassActive : null]}
     >
       {content}
-    </BlurView>
+    </CampaignLiquidSurface>
   );
 }
 
@@ -450,25 +441,7 @@ function ProfileGlassTab({
     </Pressable>
   );
 
-  if (isLiquidGlassAvailable()) {
-    return (
-      <GlassView
-        isInteractive
-        glassEffectStyle="clear"
-        colorScheme="dark"
-        tintColor="rgba(10, 12, 18, 0.18)"
-        style={styles.profileTabGlass}
-      >
-        {content}
-      </GlassView>
-    );
-  }
-
-  return (
-    <BlurView tint="dark" intensity={32} style={styles.profileTabGlass}>
-      {content}
-    </BlurView>
-  );
+  return <CampaignLiquidSurface style={styles.profileTabGlass}>{content}</CampaignLiquidSurface>;
 }
 
 function CampaignFactLine({
@@ -659,8 +632,9 @@ export default function CampaignDetailScreen() {
   };
 
   return (
-    <View style={styles.screen}>
+    <TabScreenCanvas>
       <ScrollView
+        style={styles.screen}
         contentContainerStyle={{
           paddingTop: insets.top + theme.spacing.md,
           paddingBottom: insets.bottom + theme.spacing.section,
@@ -929,7 +903,7 @@ export default function CampaignDetailScreen() {
           <LocationMapCard item={item} loading={campaignLoading} />
         </View>
       </ScrollView>
-    </View>
+    </TabScreenCanvas>
   );
 }
 
@@ -1004,18 +978,17 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(8,9,14,0.22)',
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'transparent',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
+    shadowOpacity: 0.18,
     shadowRadius: 16,
     elevation: 1,
   },
   quickActionGlassActive: {
     borderColor: 'rgba(255,255,255,0.24)',
-    backgroundColor: 'rgba(18,20,28,0.28)',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.24,
     shadowRadius: 18,
   },
   quickActionPressable: {
@@ -1028,7 +1001,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   quickActionPressableActive: {
-    backgroundColor: 'rgba(255,255,255,0.018)',
+    backgroundColor: 'rgba(255,255,255,0.045)',
   },
   quickActionInnerStroke: {
     ...StyleSheet.absoluteFillObject,
@@ -1057,7 +1030,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderRadius: 22,
     borderWidth: 1,
-    backgroundColor: 'rgba(8,9,14,0.18)',
+    backgroundColor: 'transparent',
   },
   actionPressable: {
     minHeight: 46,
@@ -1155,11 +1128,11 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(8,9,14,0.24)',
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'transparent',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.24,
+    shadowOpacity: 0.18,
     shadowRadius: 18,
     elevation: 1,
   },

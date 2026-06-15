@@ -299,6 +299,7 @@ export interface EarningsSummary {
     amount_paise: number;
     status: CampaignStatus;
     date?: string;
+    brand_profile_image_url?: string;
   }[];
   tier: 'nano' | 'micro' | 'mid' | 'macro';
   tier_progress: number;

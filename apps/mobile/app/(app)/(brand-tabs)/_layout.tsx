@@ -19,19 +19,19 @@ export default function BrandTabsLayout() {
         <NativeTabs {...plugohNativeTabOptions}>
           <NativeTabs.Trigger name="index">
             <Icon sf={{ default: 'house', selected: 'house.fill' }} />
-            <Label>Home</Label>
+            <Label hidden>Home</Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="discover">
             <Icon
               sf={{ default: 'magnifyingglass.circle', selected: 'magnifyingglass.circle.fill' }}
             />
-            <Label>Find</Label>
+            <Label hidden>Find</Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="campaigns">
             <Icon sf={{ default: 'briefcase', selected: 'briefcase.fill' }} />
-            <Label>Work</Label>
+            <Label hidden>Work</Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="inbox">
@@ -41,7 +41,7 @@ export default function BrandTabsLayout() {
                 selected: 'bubble.left.and.bubble.right.fill',
               }}
             />
-            <Label>Inbox</Label>
+            <Label hidden>Inbox</Label>
           </NativeTabs.Trigger>
         </NativeTabs>
       </View>

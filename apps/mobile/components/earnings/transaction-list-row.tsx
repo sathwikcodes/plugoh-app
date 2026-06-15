@@ -21,7 +21,7 @@ export const TransactionListRow = memo(function TransactionListRow({
 }) {
   return (
     <View style={styles.row}>
-      <CampaignAvatar title={transaction.title} />
+      <CampaignAvatar imageUrl={transaction.brand_profile_image_url} title={transaction.title} />
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={1}>
           {truncate(transaction.title, 28)}

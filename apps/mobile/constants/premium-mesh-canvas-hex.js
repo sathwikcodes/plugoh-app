@@ -15,11 +15,15 @@
 
 /** @type {PremiumMeshCanvasHex} */
 const PREMIUM_MESH_CANVAS_HEX = {
-  base: '#1E1622',
-  deep: '#120D17',
-  gradient: ['#2E2336', '#241A2B', '#1B1422', '#120D17'],
+  // Warm "lit" canvas — the mesh blends ONTO this, so it must NOT be near-black,
+  // or saturated hues collapse to mud. A warm espresso base lets champagne/gold/
+  // orange keep their luminance when composited.
+  base: '#2A1E18',
+  // Deep tone only used for the gradient floor / opaque fallback (system chrome).
+  deep: '#0F0B08',
+  gradient: ['#2E2119', '#231811', '#18100B', '#0F0B08'],
   calmCenter: '#FFF6F0',
-  heroLift: '#FFF6F0',
+  heroLift: '#FFF1E6',
   gloss: '#FFF2E8',
   glossWarm: '#FFCF6B',
 };

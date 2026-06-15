@@ -1,12 +1,9 @@
 import { theme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +13,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LiquidModalBackdrop, LiquidSheetSurface } from './liquid-sheet-surface';
 
 type FilterSheetProps = {
   visible: boolean;
@@ -125,12 +123,7 @@ export function FilterSheet({
             style={StyleSheet.absoluteFill}
             onPress={onCancel}
           >
-            <BlurView
-              intensity={Platform.OS === 'android' ? 18 : 28}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.scrim} />
+            <LiquidModalBackdrop />
           </Pressable>
         </Animated.View>
 
@@ -281,30 +274,13 @@ export function FilterRange({
 }
 
 function SheetSurface({ children }: { children: ReactNode }) {
-  if (isLiquidGlassAvailable()) {
-    return (
-      <GlassView glassEffectStyle="regular" colorScheme="dark" style={styles.surface}>
-        {children}
-      </GlassView>
-    );
-  }
-
-  return (
-    <BlurView tint="systemUltraThinMaterialDark" intensity={90} style={styles.surface}>
-      <View style={styles.surfaceTint} />
-      {children}
-    </BlurView>
-  );
+  return <LiquidSheetSurface style={styles.surface}>{children}</LiquidSheetSurface>;
 }
 
 const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
-  },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.58)',
   },
   sheetFrame: {
     marginHorizontal: 0,
@@ -317,11 +293,6 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(11,11,16,0.86)',
-  },
-  surfaceTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(5,5,9,0.68)',
   },
   handle: {
     width: 44,

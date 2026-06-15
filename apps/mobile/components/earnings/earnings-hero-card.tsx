@@ -58,6 +58,7 @@ export function EarningsHeroCard({
 
 const styles = StyleSheet.create({
   wrapper: {
+    alignItems: 'center',
     shadowColor: '#0D0D0D',
     shadowOffset: { width: 0, height: 22 },
     shadowOpacity: 0.42,
@@ -73,7 +74,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xxl,
     paddingVertical: theme.spacing.xl,
     gap: theme.spacing.lg,
-    transform: [{ perspective: 1400 }, { rotateX: '-3deg' }, { rotateZ: '-0.6deg' }],
   },
   topRow: {
     flexDirection: 'row',

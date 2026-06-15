@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated as RNAnimated,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,6 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LiquidModalBackdrop, LiquidSheetSurface } from '@/components/ui/liquid-sheet-surface';
 import type {
   CampaignFilterDraft,
   CampaignSort,
@@ -305,12 +305,7 @@ export function PremiumCampaignFilterSheet({
             style={StyleSheet.absoluteFill}
             onPress={onCancel}
           >
-            <BlurView
-              intensity={Platform.OS === 'android' ? 16 : 26}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.scrim} />
+            <LiquidModalBackdrop />
           </Pressable>
         </RNAnimated.View>
 
@@ -323,8 +318,7 @@ export function PremiumCampaignFilterSheet({
             },
           ]}
         >
-          <BlurView tint="systemUltraThinMaterialDark" intensity={92} style={styles.surface}>
-            <View style={styles.surfaceTint} />
+          <LiquidSheetSurface style={styles.surface}>
             <View style={styles.handle} />
 
             <View style={styles.headerRow}>
@@ -443,7 +437,7 @@ export function PremiumCampaignFilterSheet({
                 <Text style={styles.showText}>{showLabel}</Text>
               </Pressable>
             </View>
-          </BlurView>
+          </LiquidSheetSurface>
         </RNAnimated.View>
       </View>
     </Modal>
@@ -576,12 +570,7 @@ export function PremiumCreatorFilterSheet({
             style={StyleSheet.absoluteFill}
             onPress={onCancel}
           >
-            <BlurView
-              intensity={Platform.OS === 'android' ? 16 : 26}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.scrim} />
+            <LiquidModalBackdrop />
           </Pressable>
         </RNAnimated.View>
 
@@ -594,8 +583,7 @@ export function PremiumCreatorFilterSheet({
             },
           ]}
         >
-          <BlurView tint="systemUltraThinMaterialDark" intensity={92} style={styles.surface}>
-            <View style={styles.surfaceTint} />
+          <LiquidSheetSurface style={styles.surface}>
             <View style={styles.handle} />
 
             <View style={styles.headerRow}>
@@ -722,7 +710,7 @@ export function PremiumCreatorFilterSheet({
                 <Text style={styles.showText}>{showLabel}</Text>
               </Pressable>
             </View>
-          </BlurView>
+          </LiquidSheetSurface>
         </RNAnimated.View>
       </View>
     </Modal>
@@ -751,12 +739,7 @@ function MainFilterPage({
   onMaxChange: (value: string) => void;
 }) {
   return (
-    <ScrollView
-      style={styles.content}
-      contentContainerStyle={[styles.contentInner, styles.mainContentInner]}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View style={[styles.content, styles.contentInner]}>
       <View style={styles.groupCard}>
         <FilterNavigationRow label="Sort" value={sortLabel} onPress={onOpenSort} />
         <View style={styles.divider} />
@@ -792,7 +775,7 @@ function MainFilterPage({
         </View>
         {applyError ? <Text style={styles.errorText}>{applyError}</Text> : null}
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -1134,10 +1117,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.64)',
-  },
   sheetFrame: {
     marginHorizontal: 0,
   },
@@ -1149,11 +1128,6 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderTopWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(9,9,14,0.9)',
-  },
-  surfaceTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(7,7,12,0.78)',
   },
   handle: {
     width: 46,

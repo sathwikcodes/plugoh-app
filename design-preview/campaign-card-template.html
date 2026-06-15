@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Plugoh Campaign Card Template Preview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #fff8f2;
+        --muted: rgba(255, 248, 242, 0.68);
+        --line: rgba(255, 255, 255, 0.18);
+        --pink: #ff4fa3;
+        --rose: #ff8aac;
+        --gold: #ffc86f;
+        --orange: #ff7a35;
+        --green: #4bdc93;
+        --mint: #b8ffda;
+        --night: #09070d;
+        --plum: #29101f;
+        --radius: 34px;
+        font-family:
+          General Sans,
+          Satoshi,
+          Avenir Next,
+          ui-sans-serif,
+          system-ui,
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 16% 6%, rgba(255, 79, 163, 0.28), transparent 28%),
+          radial-gradient(circle at 86% 0%, rgba(255, 200, 111, 0.2), transparent 26%),
+          linear-gradient(145deg, #06050a 0%, #120810 48%, #070509 100%);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(1200px, 100%);
+        margin: 0 auto;
+        padding: 44px 20px 52px;
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(240px, 360px);
+        gap: 28px;
+        align-items: end;
+        margin-bottom: 28px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        max-width: 800px;
+        font-family:
+          Instrument Serif,
+          Georgia,
+          serif;
+        font-size: clamp(40px, 7vw, 82px);
+        font-weight: 400;
+        line-height: 0.94;
+        letter-spacing: 0;
+      }
+
+      .intro p {
+        max-width: 680px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.55;
+      }
+
+      .principle {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 18px;
+        background: rgba(255, 255, 255, 0.07);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+      }
+
+      .principle strong {
+        display: block;
+        margin-bottom: 8px;
+        color: #fff;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .principle span {
+        color: rgba(255, 248, 242, 0.7);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(260px, 1fr));
+        gap: 20px;
+        align-items: start;
+      }
+
+      .variant {
+        display: grid;
+        gap: 14px;
+      }
+
+      .caption {
+        color: rgba(255, 248, 242, 0.62);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .caption b {
+        display: block;
+        color: #fff;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      .campaign-card {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 9 / 14;
+        min-height: 520px;
+        overflow: hidden;
+        border-radius: var(--radius);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: #111;
+        box-shadow:
+          0 28px 70px rgba(0, 0, 0, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+
+      .campaign-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 14%),
+          linear-gradient(180deg, transparent 35%, rgba(5, 5, 9, 0.2) 52%, rgba(5, 5, 9, 0.98) 100%);
+      }
+
+      .campaign-card.recommended {
+        background:
+          radial-gradient(circle at 30% 12%, rgba(255, 255, 255, 0.44), transparent 15%),
+          radial-gradient(circle at 74% 18%, rgba(255, 200, 111, 0.55), transparent 18%),
+          linear-gradient(145deg, #10392b 0%, #1bb56e 42%, #f6c85f 70%, #fd7a39 100%);
+      }
+
+      .campaign-card.local-proof {
+        background:
+          linear-gradient(160deg, rgba(12, 10, 18, 0.22), rgba(12, 10, 18, 0.72)),
+          radial-gradient(circle at 50% 24%, #ffb47f 0%, transparent 24%),
+          linear-gradient(145deg, #4e132d 0%, #ed4f93 45%, #ffc46b 100%);
+      }
+
+      .campaign-card.signal {
+        background:
+          radial-gradient(circle at 50% 10%, rgba(184, 255, 218, 0.62), transparent 18%),
+          linear-gradient(155deg, #09130d 0%, #17613f 42%, #e4b65e 78%, #ff6c3d 100%);
+      }
+
+      .noise {
+        position: absolute;
+        inset: 0;
+        opacity: 0.08;
+        mix-blend-mode: overlay;
+        background-image:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.8) 1px, transparent 1px),
+          linear-gradient(0deg, rgba(255, 255, 255, 0.7) 1px, transparent 1px);
+        background-size: 42px 42px;
+      }
+
+      .topbar {
+        position: absolute;
+        z-index: 4;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 13px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 999px;
+        background: rgba(9, 8, 14, 0.38);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.24),
+          0 10px 20px rgba(0, 0, 0, 0.18);
+        color: #fff6d7;
+        font-size: 12px;
+        font-weight: 650;
+        backdrop-filter: blur(18px);
+      }
+
+      .mini-chip {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(255, 222, 181, 0.86)),
+          #fff;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+      }
+
+      .hero-stage {
+        position: absolute;
+        z-index: 2;
+        top: 82px;
+        left: 9%;
+        right: 9%;
+        height: 48%;
+        border-radius: 38px;
+        transform: perspective(900px) rotateX(4deg);
+      }
+
+      .stage-floor {
+        position: absolute;
+        left: 8%;
+        right: 8%;
+        bottom: 12%;
+        height: 34%;
+        border-radius: 50%;
+        background: radial-gradient(ellipse, rgba(7, 18, 13, 0.28), transparent 72%);
+        filter: blur(2px);
+      }
+
+      .collab-arc {
+        position: absolute;
+        top: 24%;
+        left: 16%;
+        right: 16%;
+        height: 26%;
+        border: 14px solid rgba(255, 255, 255, 0.38);
+        border-bottom: 0;
+        border-radius: 180px 180px 0 0;
+        filter: drop-shadow(0 18px 22px rgba(29, 70, 41, 0.2));
+      }
+
+      .creator-token {
+        position: absolute;
+        width: 34%;
+        aspect-ratio: 1;
+        border-radius: 36% 42% 38% 45%;
+        box-shadow:
+          0 24px 30px rgba(19, 51, 35, 0.24),
+          inset -8px -12px 20px rgba(0, 0, 0, 0.18),
+          inset 10px 10px 20px rgba(255, 255, 255, 0.42);
+      }
+
+      .creator-token.left {
+        left: 10%;
+        top: 34%;
+        background: linear-gradient(145deg, #fff7cf, #ffa46f 48%, #f04f8c 100%);
+        transform: rotate(-9deg);
+      }
+
+      .creator-token.right {
+        right: 10%;
+        top: 28%;
+        background: linear-gradient(145deg, #e3ffe9, #68df9f 48%, #0d7c54 100%);
+        transform: rotate(8deg);
+      }
+
+      .creator-token::before,
+      .creator-token::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        background: rgba(17, 16, 23, 0.74);
+      }
+
+      .creator-token::before {
+        width: 14%;
+        height: 14%;
+        top: 38%;
+        left: 32%;
+        box-shadow: 46px 0 0 rgba(17, 16, 23, 0.74);
+      }
+
+      .creator-token::after {
+        width: 34%;
+        height: 7%;
+        left: 33%;
+        top: 62%;
+        background: rgba(17, 16, 23, 0.38);
+      }
+
+      .handoff {
+        position: absolute;
+        z-index: 3;
+        left: 37%;
+        top: 51%;
+        width: 26%;
+        height: 12%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #fff8dd, #ffc45f, #ff7a35);
+        box-shadow:
+          0 18px 24px rgba(69, 40, 8, 0.24),
+          inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        transform: rotate(-4deg);
+      }
+
+      .product-tile {
+        position: absolute;
+        border-radius: 21px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.22);
+        backdrop-filter: blur(12px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+
+      .product-tile.one {
+        width: 28%;
+        height: 18%;
+        left: 3%;
+        top: 8%;
+      }
+
+      .product-tile.two {
+        width: 24%;
+        height: 16%;
+        right: 2%;
+        top: 5%;
+      }
+
+      .product-tile.three {
+        width: 34%;
+        height: 15%;
+        right: 14%;
+        bottom: 14%;
+      }
+
+      .photo-window {
+        position: absolute;
+        inset: 14% 12% 28%;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 36px;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.18), transparent),
+          linear-gradient(145deg, #351823, #ff8b61 48%, #ffe3a3);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+      }
+
+      .photo-window::before {
+        content: "";
+        position: absolute;
+        left: 14%;
+        right: 14%;
+        top: 20%;
+        height: 36%;
+        border-radius: 28px;
+        background: linear-gradient(145deg, #ffe9b2, #ff7a92);
+        box-shadow: 0 20px 40px rgba(65, 20, 31, 0.22);
+      }
+
+      .signal-mark {
+        position: absolute;
+        z-index: 3;
+        top: 16%;
+        left: 21%;
+        right: 21%;
+        aspect-ratio: 1;
+        border-radius: 34%;
+        background:
+          radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.82), transparent 15%),
+          linear-gradient(145deg, #f8ffcf, #63f09b 44%, #0d7c54);
+        box-shadow:
+          0 34px 50px rgba(6, 54, 33, 0.36),
+          inset -12px -14px 28px rgba(0, 0, 0, 0.18),
+          inset 10px 10px 22px rgba(255, 255, 255, 0.42);
+        transform: rotate(45deg);
+      }
+
+      .signal-mark::after {
+        content: "";
+        position: absolute;
+        inset: 30% 20% 45%;
+        border-radius: 999px;
+        background: #0a1510;
+        box-shadow: 0 28px 0 -6px #0a1510;
+      }
+
+      .content {
+        position: absolute;
+        z-index: 4;
+        left: 26px;
+        right: 26px;
+        bottom: 34px;
+        display: grid;
+        justify-items: center;
+        text-align: center;
+        gap: 10px;
+      }
+
+      .avatar {
+        width: 56px;
+        height: 56px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.76);
+        background: linear-gradient(145deg, #fff, #ffe0b5);
+        color: #130c10;
+        font-weight: 900;
+        box-shadow: 0 18px 28px rgba(0, 0, 0, 0.22);
+      }
+
+      .title {
+        margin: 0;
+        font-family:
+          Instrument Serif,
+          Georgia,
+          serif;
+        font-size: clamp(32px, 7vw, 44px);
+        font-weight: 400;
+        line-height: 0.98;
+        letter-spacing: 0;
+        text-shadow: 0 4px 22px rgba(0, 0, 0, 0.38);
+      }
+
+      .meta {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 15px;
+        line-height: 1.35;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.36);
+      }
+
+      .timer {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        width: 100%;
+        margin-top: 8px;
+      }
+
+      .timer span {
+        min-height: 42px;
+        display: grid;
+        place-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(38, 42, 47, 0.94), rgba(4, 5, 9, 0.96));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+        color: #fff;
+        font-family:
+          JetBrains Mono,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .notes {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .note {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 248, 242, 0.72);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .note b {
+        display: block;
+        color: #fff;
+        margin-bottom: 5px;
+      }
+
+      @media (max-width: 900px) {
+        .intro,
+        .gallery,
+        .notes {
+          grid-template-columns: 1fr;
+        }
+
+        main {
+          padding-top: 30px;
+        }
+
+        .campaign-card {
+          max-width: 390px;
+          margin: 0 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="intro">
+        <div>
+          <h1>Campaign art should be a system, not a dice roll.</h1>
+          <p>
+            This preview keeps the card frame, typography, overlay, status pill, and hero art grammar
+            fixed. Campaign data changes the palette, small props, title, and user imagery. The result
+            still feels custom, but the generator never controls the whole premium surface.
+          </p>
+        </div>
+        <div class="principle">
+          <strong>Recommended direction</strong>
+          <span>
+            Use a template-rendered "collab capsule": glossy stage, two creator/brand tokens, a handoff
+            ribbon, and tiny campaign props. No full-scene AI background needed.
+          </span>
+        </div>
+      </section>
+
+      <section class="gallery" aria-label="Campaign card visual directions">
+        <article class="variant">
+          <div class="campaign-card recommended">
+            <div class="noise"></div>
+            <div class="topbar">
+              <div class="pill">Requested</div>
+              <div class="mini-chip"></div>
+            </div>
+            <div class="hero-stage">
+              <div class="stage-floor"></div>
+              <div class="product-tile one"></div>
+              <div class="product-tile two"></div>
+              <div class="product-tile three"></div>
+              <div class="collab-arc"></div>
+              <div class="creator-token left"></div>
+              <div class="creator-token right"></div>
+              <div class="handoff"></div>
+            </div>
+            <div class="content">
+              <div class="avatar">A</div>
+              <h2 class="title">Cafe Reel</h2>
+              <p class="meta">Booked Reel for Rs 18,000</p>
+              <div class="timer">
+                <span>02</span>
+                <span>18</span>
+                <span>42</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">
+            <b>1. Collab Capsule</b>
+            Best default. It communicates creator plus brand plus paid handoff without random scenes,
+            fake logos, weird people, or unreadable lower halves.
+          </p>
+        </article>
+
+        <article class="variant">
+          <div class="campaign-card local-proof">
+            <div class="noise"></div>
+            <div class="topbar">
+              <div class="pill">In escrow</div>
+              <div class="mini-chip"></div>
+            </div>
+            <div class="photo-window"></div>
+            <div class="content">
+              <div class="avatar">M</div>
+              <h2 class="title">Glow Story</h2>
+              <p class="meta">Mira + Story + Rs 9,500</p>
+            </div>
+          </div>
+          <p class="caption">
+            <b>2. Local Proof</b>
+            Use when the brand has a real profile/photo asset. The template frames real identity
+            while keeping the overlay and lower card predictable.
+          </p>
+        </article>
+
+        <article class="variant">
+          <div class="campaign-card signal">
+            <div class="noise"></div>
+            <div class="topbar">
+              <div class="pill">Delivery due</div>
+              <div class="mini-chip"></div>
+            </div>
+            <div class="signal-mark"></div>
+            <div class="hero-stage">
+              <div class="stage-floor"></div>
+              <div class="product-tile one"></div>
+              <div class="product-tile two"></div>
+            </div>
+            <div class="content">
+              <div class="avatar">P</div>
+              <h2 class="title">Launch Post</h2>
+              <p class="meta">Submit draft by Friday</p>
+            </div>
+          </div>
+          <p class="caption">
+            <b>3. Task Signal</b>
+            Use after acceptance. The card art shifts from invitation energy to delivery clarity,
+            so the deck becomes more useful than decorative.
+          </p>
+        </article>
+      </section>
+
+      <section class="notes" aria-label="Implementation notes">
+        <div class="note">
+          <b>Fixed layer</b>
+          Gradient mesh, glass pill, bottom fog, title zone, timer, and avatar stay deterministic.
+        </div>
+        <div class="note">
+          <b>Variable layer</b>
+          Palette, title, status, user image, package token, and 2-3 tiny prop shapes change per campaign.
+        </div>
+        <div class="note">
+          <b>AI boundary</b>
+          LLM may classify the campaign into template tokens. It should not generate the full card image.
+        </div>
+        <div class="note">
+          <b>Premium rule</b>
+          If a campaign lacks enough data, fall back to the default capsule instead of inventing a fake scene.
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

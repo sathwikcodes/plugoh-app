@@ -2,6 +2,7 @@ import { FilterNavigationRow } from '@/components/inbox/filter-sheet/filter-navi
 import { FilterOptionPage } from '@/components/inbox/filter-sheet/filter-option-page';
 import { LiquidHeaderIconButton } from '@/components/inbox/filter-sheet/liquid-header-icon-button';
 import { filterSheetStyles as styles } from '@/components/inbox/filter-sheet/styles';
+import { LiquidModalBackdrop, LiquidSheetSurface } from '@/components/ui/liquid-sheet-surface';
 import { theme } from '@/constants/theme';
 import { useFilterSheetAnimation } from '@/hooks/use-filter-sheet-animation';
 import type { InboxFilter, InboxFilterDraft, InboxSort } from '@/lib/filters/inbox';
@@ -11,11 +12,9 @@ import {
   selectedSortLabel,
   selectedStatusLabel,
 } from '@/lib/inbox/filter-options';
-import { BlurView } from 'expo-blur';
 import {
   Animated as RNAnimated,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -79,20 +78,14 @@ export function PremiumFilterSheet({
             style={StyleSheet.absoluteFill}
             onPress={onCancel}
           >
-            <BlurView
-              intensity={Platform.OS === 'android' ? 16 : 26}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.scrim} />
+            <LiquidModalBackdrop />
           </Pressable>
         </RNAnimated.View>
 
         <RNAnimated.View
           style={[styles.sheetFrame, { height: sheetHeight, transform: [{ translateY }] }]}
         >
-          <BlurView tint="systemUltraThinMaterialDark" intensity={92} style={styles.surface}>
-            <View style={styles.surfaceTint} />
+          <LiquidSheetSurface style={styles.surface}>
             <View style={styles.handle} />
 
             <View style={styles.headerRow}>
@@ -195,7 +188,7 @@ export function PremiumFilterSheet({
                 <Text style={styles.showText}>{showLabel}</Text>
               </Pressable>
             </View>
-          </BlurView>
+          </LiquidSheetSurface>
         </RNAnimated.View>
       </View>
     </Modal>

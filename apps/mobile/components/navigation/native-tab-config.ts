@@ -20,10 +20,6 @@ export function getTabScreenBottomPadding(insetBottom: number) {
   return Math.max(insetBottom, theme.spacing.sm) + NATIVE_TAB_DOCK_HEIGHT + TAB_DOCK_GAP;
 }
 
-const TAB_LABEL_STYLE = {
-  fontSize: 10,
-};
-
 export const plugohNativeTabOptions = {
   backgroundColor: PREMIUM_MESH_CANVAS_HEX.deep,
   blurEffect: 'systemChromeMaterialDark',
@@ -33,24 +29,15 @@ export const plugohNativeTabOptions = {
     default: NATIVE_TAB_DEFAULT,
     selected: NATIVE_TAB_SELECTED,
   },
-  labelStyle: {
-    default: { ...TAB_LABEL_STYLE, color: NATIVE_TAB_DEFAULT },
-    selected: { ...TAB_LABEL_STYLE, color: NATIVE_TAB_SELECTED },
-  },
-  labelVisibilityMode: 'labeled',
+  labelVisibilityMode: 'unlabeled',
   shadowColor: 'rgba(255, 255, 255, 0.12)',
-  titlePositionAdjustment: {
-    vertical: 0,
-  },
 } satisfies Pick<
   NativeTabsProps,
   | 'backgroundColor'
   | 'blurEffect'
   | 'disableTransparentOnScrollEdge'
   | 'iconColor'
-  | 'labelStyle'
   | 'labelVisibilityMode'
   | 'minimizeBehavior'
   | 'shadowColor'
-  | 'titlePositionAdjustment'
 >;

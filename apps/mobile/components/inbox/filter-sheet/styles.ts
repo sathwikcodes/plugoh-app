@@ -11,10 +11,6 @@ export const filterSheetStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.64)',
-  },
   sheetFrame: {
     marginHorizontal: 0,
   },
@@ -26,11 +22,6 @@ export const filterSheetStyles = StyleSheet.create({
     borderCurve: 'continuous',
     borderTopWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(9,9,14,0.9)',
-  },
-  surfaceTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(7,7,12,0.78)',
   },
   handle: {
     width: 46,

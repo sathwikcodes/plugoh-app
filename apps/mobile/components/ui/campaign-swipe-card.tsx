@@ -1,18 +1,19 @@
+import completedCardHeroImage from '@/assets/images/completed_card.png';
+import deliveryCardHeroImage from '@/assets/images/delivery_card.png';
+import requestedCardHeroImage from '@/assets/images/requested_card.png';
 import { CAMPAIGN_CARD_CORNER_RADIUS } from '@/constants/campaign-card-frame';
 import { theme } from '@/constants/theme';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { CampaignListItem } from '@plugoh/contracts';
-import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MeshGradientView } from 'expo-mesh-gradient';
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import {
   AccessibilityInfo,
   Animated,
   Easing,
-  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
@@ -39,63 +40,120 @@ const DAY_MS = 24 * HOUR_MS;
 const COUNTDOWN_SEGMENTS = ['hours', 'minutes', 'seconds'] as const;
 
 type CampaignStatus = CampaignListItem['status'];
+type CampaignCardGradientFamily = 'requested' | 'accepted' | 'action';
+type CampaignCardHeroFamily = 'requested' | 'delivery' | 'completed' | null;
+
+type CampaignCardGradientTone = {
+  baseColor: string;
+  meshColors: readonly string[];
+  topSheen: readonly [string, string, string];
+  edgeShadowColor: string;
+};
+
+const CAMPAIGN_CARD_MESH_POINTS = [
+  [0.0, 0.0],
+  [0.5, 0.0],
+  [1.0, 0.0],
+  [0.0, 0.5],
+  [0.62, 0.4],
+  [1.0, 0.5],
+  [0.0, 1.0],
+  [0.5, 1.0],
+  [1.0, 1.0],
+] as const;
+
+const CAMPAIGN_CARD_GRADIENT_TONES = {
+  requested: {
+    baseColor: '#FFB46B',
+    meshColors: [
+      '#FF6BC8',
+      '#FF8DDF',
+      '#FFE06A',
+      '#FF5FBB',
+      '#FFA45A',
+      '#FFD238',
+      '#E64FA8',
+      '#FF8F2E',
+      '#FFB13D',
+    ],
+    topSheen: ['rgba(255,255,255,0.34)', 'rgba(255,216,77,0.12)', 'rgba(255,255,255,0)'],
+    edgeShadowColor: 'rgba(92, 20, 46, 0.42)',
+  },
+  accepted: {
+    baseColor: '#FFB46B',
+    meshColors: [
+      '#5CF7B0',
+      '#A3FFD0',
+      '#FFE06A',
+      '#45E992',
+      '#FFAD5C',
+      '#FFD238',
+      '#26B96D',
+      '#FF8F2E',
+      '#FFB13D',
+    ],
+    topSheen: ['rgba(249,255,209,0.32)', 'rgba(255,216,77,0.12)', 'rgba(255,255,255,0)'],
+    edgeShadowColor: 'rgba(16, 76, 38, 0.42)',
+  },
+  action: {
+    baseColor: '#FFAA67',
+    meshColors: [
+      '#FF7FA2',
+      '#FF9AB5',
+      '#FFE06A',
+      '#F76778',
+      '#FFA45A',
+      '#FFC238',
+      '#B94A54',
+      '#F27636',
+      '#FF9430',
+    ],
+    topSheen: ['rgba(255,240,194,0.34)', 'rgba(255,210,77,0.12)', 'rgba(255,255,255,0)'],
+    edgeShadowColor: 'rgba(88, 30, 20, 0.44)',
+  },
+} satisfies Record<CampaignCardGradientFamily, CampaignCardGradientTone>;
 
 type StatusPillTone = {
-  tintColor: string;
-  overlayColor: string;
+  surfaceColor: string;
   borderColor: string;
   innerBorderColor: string;
-  highlightColor: string;
-  lowlightColor: string;
+  iconBackgroundColor: string;
+  iconColor: string;
   textColor: string;
-  shadowColor: string;
-  shadowOpacity: number;
 };
 
 const STATUS_PILL_TONES = {
   success: {
-    tintColor: 'rgba(40, 174, 108, 0.34)',
-    overlayColor: 'rgba(29, 190, 113, 0.2)',
-    borderColor: 'rgba(130, 255, 191, 0.42)',
-    innerBorderColor: 'rgba(210, 255, 231, 0.24)',
-    highlightColor: 'rgba(223, 255, 237, 0.32)',
-    lowlightColor: 'rgba(8, 67, 39, 0.28)',
-    textColor: '#D9FFE7',
-    shadowColor: '#19C76F',
-    shadowOpacity: 0.32,
+    surfaceColor: 'rgba(38, 61, 41, 0.72)',
+    borderColor: 'rgba(230, 255, 216, 0.2)',
+    innerBorderColor: 'rgba(255, 255, 255, 0.06)',
+    iconBackgroundColor: '#70D960',
+    iconColor: '#1D5A25',
+    textColor: '#FFFFFF',
   },
   warning: {
-    tintColor: 'rgba(245, 185, 49, 0.34)',
-    overlayColor: 'rgba(255, 193, 54, 0.22)',
-    borderColor: 'rgba(255, 225, 129, 0.48)',
-    innerBorderColor: 'rgba(255, 247, 204, 0.26)',
-    highlightColor: 'rgba(255, 246, 211, 0.34)',
-    lowlightColor: 'rgba(118, 76, 6, 0.3)',
-    textColor: '#FFF3C0',
-    shadowColor: '#F4B321',
-    shadowOpacity: 0.34,
+    surfaceColor: 'rgba(72, 57, 31, 0.72)',
+    borderColor: 'rgba(255, 235, 172, 0.22)',
+    innerBorderColor: 'rgba(255, 255, 255, 0.06)',
+    iconBackgroundColor: '#F2C94D',
+    iconColor: '#6D4910',
+    textColor: '#FFFFFF',
   },
   danger: {
-    tintColor: 'rgba(230, 68, 73, 0.34)',
-    overlayColor: 'rgba(238, 66, 72, 0.22)',
-    borderColor: 'rgba(255, 148, 148, 0.46)',
-    innerBorderColor: 'rgba(255, 222, 222, 0.24)',
-    highlightColor: 'rgba(255, 225, 225, 0.3)',
-    lowlightColor: 'rgba(99, 13, 19, 0.3)',
-    textColor: '#FFD7D7',
-    shadowColor: '#EA3F45',
-    shadowOpacity: 0.34,
+    surfaceColor: 'rgba(69, 34, 34, 0.72)',
+    borderColor: 'rgba(255, 196, 196, 0.2)',
+    innerBorderColor: 'rgba(255, 255, 255, 0.06)',
+    iconBackgroundColor: '#F06D6D',
+    iconColor: '#611C1C',
+    textColor: '#FFFFFF',
   },
   neutral: {
-    tintColor: 'rgba(72, 92, 135, 0.24)',
-    overlayColor: 'rgba(255, 255, 255, 0.055)',
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-    innerBorderColor: 'rgba(255, 255, 255, 0.18)',
-    highlightColor: 'rgba(255, 255, 255, 0.26)',
-    lowlightColor: 'rgba(0, 0, 0, 0.24)',
-    textColor: 'rgba(255,255,255,0.94)',
-    shadowColor: '#000000',
-    shadowOpacity: 0.26,
+    surfaceColor: 'rgba(43, 48, 54, 0.72)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    innerBorderColor: 'rgba(255, 255, 255, 0.06)',
+    iconBackgroundColor: 'rgba(255,255,255,0.82)',
+    iconColor: '#334155',
+    textColor: '#FFFFFF',
   },
 } satisfies Record<string, StatusPillTone>;
 
@@ -138,10 +196,6 @@ function influencerProfileImageUrl(campaign: CampaignListItem) {
     campaign.influencer_profile?.profile_photo_url,
     campaign.influencer_profile?.avatar_url,
   );
-}
-
-function cardImageUrl(campaign: CampaignListItem) {
-  return firstImageUrl(campaign.card_image_url, businessProfileImageUrl(campaign));
 }
 
 function influencerBookedLine(campaign: CampaignListItem) {
@@ -261,6 +315,49 @@ function statusPillTone(status: CampaignStatus | undefined, hasActiveTimer: bool
   }
 }
 
+function campaignCardGradientFamily(
+  status: CampaignStatus | undefined,
+  role: CampaignDeckRole,
+): CampaignCardGradientFamily {
+  switch (status) {
+    case 'requested':
+    case 'payment_pending':
+    case 'pre_authorized':
+      return 'requested';
+    case 'changes_requested':
+    case 'declined':
+    case 'disputed':
+    case 'expired':
+    case 'cancelled':
+    case 'refunded':
+      return 'action';
+    case 'in_escrow':
+      return role === 'influencer' ? 'action' : 'accepted';
+    case 'capture_pending':
+    case 'delivery_submitted':
+    case 'completed':
+      return 'accepted';
+    default:
+      return 'requested';
+  }
+}
+
+function campaignCardHeroFamily(status: CampaignStatus | undefined): CampaignCardHeroFamily {
+  switch (status) {
+    case 'requested':
+    case 'payment_pending':
+    case 'pre_authorized':
+      return 'requested';
+    case 'capture_pending':
+    case 'in_escrow':
+      return 'delivery';
+    case 'completed':
+      return 'completed';
+    default:
+      return null;
+  }
+}
+
 function StatusGlassPill({
   icon,
   label,
@@ -280,13 +377,13 @@ function StatusGlassPill({
   iconSize: number;
   fontSize: number;
 }) {
+  const iconBubbleSize = Math.max(18, Math.round(iconSize + 2));
+  const iconGlyphSize = Math.max(10, Math.round(iconBubbleSize * 0.56));
   const shellStyle = [
     styles.statusPillShell,
     {
       minHeight,
       borderRadius: theme.radius.pill,
-      shadowColor: tone.shadowColor,
-      shadowOpacity: tone.shadowOpacity,
     },
   ];
   const frameStyle = [
@@ -295,6 +392,7 @@ function StatusGlassPill({
       minHeight,
       borderRadius: theme.radius.pill,
       borderColor: tone.borderColor,
+      backgroundColor: tone.surfaceColor,
     },
   ];
   const content = (
@@ -308,45 +406,38 @@ function StatusGlassPill({
         },
       ]}
     >
-      <View
-        pointerEvents="none"
-        style={[styles.statusPillTint, { backgroundColor: tone.overlayColor }]}
-      />
       <LinearGradient
         pointerEvents="none"
-        colors={[tone.highlightColor, 'rgba(255,255,255,0.02)', tone.lowlightColor]}
-        locations={[0, 0.48, 1]}
-        style={styles.statusPillSheen}
+        colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.08)']}
+        locations={[0, 0.46, 1]}
+        style={styles.statusPillMatteWash}
       />
       <View
         pointerEvents="none"
         style={[styles.statusPillInnerStroke, { borderColor: tone.innerBorderColor }]}
       />
-      <Ionicons name={icon} size={iconSize} color={tone.textColor} />
+      <View
+        style={[
+          styles.statusPillIconBadge,
+          {
+            width: iconBubbleSize,
+            height: iconBubbleSize,
+            borderRadius: iconBubbleSize / 2,
+            backgroundColor: tone.iconBackgroundColor,
+          },
+        ]}
+      >
+        <Ionicons name={icon} size={iconGlyphSize} color={tone.iconColor} />
+      </View>
       <Text style={[styles.statusPillText, { color: tone.textColor, fontSize }]} numberOfLines={1}>
         {label}
       </Text>
     </View>
   );
 
-  if (isLiquidGlassAvailable()) {
-    return (
-      <View style={shellStyle}>
-        <GlassView
-          glassEffectStyle="regular"
-          colorScheme="dark"
-          tintColor={tone.tintColor}
-          style={frameStyle}
-        >
-          {content}
-        </GlassView>
-      </View>
-    );
-  }
-
   return (
     <View style={shellStyle}>
-      <BlurView tint="dark" intensity={58} style={frameStyle}>
+      <BlurView tint="dark" intensity={24} style={frameStyle}>
         {content}
       </BlurView>
     </View>
@@ -576,6 +667,100 @@ function RequestCountdownTimer({
   );
 }
 
+function CampaignStatusMeshBackground({
+  tone,
+  borderRadius,
+}: {
+  tone: CampaignCardGradientTone;
+  borderRadius: number;
+}) {
+  return (
+    <View pointerEvents="none" style={[styles.meshBackground, { backgroundColor: tone.baseColor }]}>
+      <MeshGradientView
+        style={StyleSheet.absoluteFillObject}
+        columns={3}
+        rows={3}
+        points={CAMPAIGN_CARD_MESH_POINTS.map(([x, y]) => [x, y])}
+        colors={[...tone.meshColors]}
+        smoothsColors
+      />
+      <LinearGradient
+        colors={[...tone.topSheen]}
+        locations={[0, 0.36, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.meshTopSheen}
+      />
+      <LinearGradient
+        colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)', tone.edgeShadowColor]}
+        locations={[0, 0.64, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.meshReliefWash}
+      />
+      <View style={[styles.meshBevel, { borderRadius }]} />
+      <View style={styles.meshTopCurveLight} />
+      <View style={styles.meshBottomLeftCurveLight} />
+      <View style={styles.meshBottomRightCurveLight} />
+    </View>
+  );
+}
+
+function RequestedHeroSignalChip({
+  avatarUrl,
+  fallbackInitial,
+  icon,
+  eyebrow,
+  label,
+  compact,
+  style,
+}: {
+  avatarUrl?: string;
+  fallbackInitial?: string;
+  icon?: ComponentProps<typeof Ionicons>['name'];
+  eyebrow: string;
+  label: string;
+  compact?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View style={[styles.heroSignalChip, compact ? styles.heroSignalChipCompact : null, style]}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(255,255,255,0.34)', 'rgba(255,255,255,0.08)', 'rgba(37,20,17,0.18)']}
+        locations={[0, 0.52, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.heroSignalInnerStroke} />
+      {avatarUrl || fallbackInitial ? (
+        <View style={styles.heroSignalAvatar}>
+          {avatarUrl ? (
+            <Image
+              source={{ uri: avatarUrl }}
+              style={styles.heroSignalAvatarImage}
+              contentFit="cover"
+            />
+          ) : (
+            <Text style={styles.heroSignalAvatarInitial}>{fallbackInitial}</Text>
+          )}
+        </View>
+      ) : icon ? (
+        <View style={styles.heroSignalIconBadge}>
+          <Ionicons name={icon} size={12} color="#7B4815" />
+        </View>
+      ) : null}
+      <View style={styles.heroSignalTextBlock}>
+        <Text style={styles.heroSignalEyebrow} numberOfLines={1}>
+          {eyebrow}
+        </Text>
+        <Text style={styles.heroSignalLabel} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export function CampaignSwipeCard({
   role,
   campaign,
@@ -591,10 +776,11 @@ export function CampaignSwipeCard({
   const displayIdentity = role === 'business' ? creatorName(campaign) : brandName;
   const ownerImageUrl =
     role === 'business' ? influencerProfileImageUrl(campaign) : businessProfileImageUrl(campaign);
-  const imageUrl = cardImageUrl(campaign);
+  const brandImageUrl = businessProfileImageUrl(campaign);
   const title = campaign.ai_title?.trim() || campaign.title.trim() || brandName;
   const detailLine =
     role === 'business' ? brandBookedLine(campaign) : influencerBookedLine(campaign);
+  const packageLabel = formatPackageType(campaign.package_type) || 'Collab brief';
   const expiryLabel = useMemo(
     () => formatExpiryLabel(campaign.expires_at, now),
     [campaign.expires_at, now],
@@ -614,6 +800,21 @@ export function CampaignSwipeCard({
   const hasDockedTimer = remainingAcceptanceSeconds != null;
   const timerRowHeight = px(72);
   const bottomContentPadding = hasDockedTimer ? timerRowHeight + px(48) : px(36);
+  const gradientFamily = campaignCardGradientFamily(campaign.status, role);
+  const gradientTone = CAMPAIGN_CARD_GRADIENT_TONES[gradientFamily];
+  const heroFamily = campaignCardHeroFamily(campaign.status);
+  const heroImage =
+    heroFamily === 'requested'
+      ? requestedCardHeroImage
+      : heroFamily === 'delivery'
+        ? deliveryCardHeroImage
+        : heroFamily === 'completed'
+          ? completedCardHeroImage
+          : null;
+  const showRequestedSignals = heroFamily === 'requested';
+  const heroHeight = hasDockedTimer ? Math.round(cardHeight * 0.43) : Math.round(cardHeight * 0.58);
+  const heroWidth = Math.min(Math.round(cardWidth * 0.86), Math.round(heroHeight * 0.94));
+  const heroTop = hasDockedTimer ? px(70) : px(78);
 
   useEffect(() => {
     if (!campaign.expires_at) return undefined;
@@ -634,54 +835,85 @@ export function CampaignSwipeCard({
             width: cardWidth,
             height: cardHeight,
             borderRadius: CAMPAIGN_CARD_CORNER_RADIUS,
+            backgroundColor: gradientTone.baseColor,
           },
         ]}
       >
-        {imageUrl ? (
-          <ImageBackground
-            source={{ uri: imageUrl }}
-            style={StyleSheet.absoluteFill}
-            imageStyle={styles.backgroundImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.fallbackBackground} />
-        )}
+        <CampaignStatusMeshBackground
+          tone={gradientTone}
+          borderRadius={CAMPAIGN_CARD_CORNER_RADIUS}
+        />
 
         <LinearGradient
           pointerEvents="none"
           colors={[
             'rgba(0,0,0,0)',
-            'rgba(10,12,16,0)',
-            'rgba(10,12,16,0.15)',
-            'rgba(10,12,16,0.45)',
-            'rgba(10,12,16,0.78)',
-            'rgba(10,12,16,0.97)',
+            'rgba(18,8,5,0)',
+            'rgba(20,8,5,0.1)',
+            'rgba(20,8,5,0.34)',
+            'rgba(20,8,5,0.72)',
           ]}
-          locations={[0, 0.25, 0.42, 0.58, 0.72, 1]}
+          locations={[0, 0.48, 0.66, 0.84, 1]}
           style={styles.backgroundGradient}
         />
-
-        <MaskedView
-          pointerEvents="none"
-          style={styles.bottomFogMask}
-          maskElement={
-            <LinearGradient
-              colors={[
-                'rgba(0,0,0,0)',
-                'rgba(0,0,0,0.12)',
-                'rgba(0,0,0,0.42)',
-                'rgba(0,0,0,0.78)',
-                'rgba(0,0,0,1)',
+        {heroImage ? (
+          <View
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[
+              styles.heroImageSlot,
+              {
+                top: heroTop,
+                height: heroHeight,
+              },
+            ]}
+          >
+            {showRequestedSignals ? (
+              <>
+                <RequestedHeroSignalChip
+                  avatarUrl={brandImageUrl}
+                  fallbackInitial={initial(brandName)}
+                  eyebrow="Invite from"
+                  label={brandName}
+                  style={[
+                    styles.heroSignalPrimary,
+                    {
+                      right: px(22),
+                      top: px(40),
+                      maxWidth: Math.round(cardWidth * 0.44),
+                    },
+                  ]}
+                />
+                <RequestedHeroSignalChip
+                  icon="megaphone"
+                  eyebrow="Campaign"
+                  label={packageLabel}
+                  compact
+                  style={[
+                    styles.heroSignalSecondary,
+                    {
+                      left: px(34),
+                      bottom: px(48),
+                      maxWidth: Math.round(cardWidth * 0.38),
+                    },
+                  ]}
+                />
+              </>
+            ) : null}
+            <Image
+              source={heroImage}
+              style={[
+                styles.heroImage,
+                {
+                  width: heroWidth,
+                  height: heroHeight,
+                },
               ]}
-              locations={[0, 0.24, 0.52, 0.76, 1]}
-              style={StyleSheet.absoluteFill}
+              contentFit="contain"
             />
-          }
-        >
-          <BlurView tint="dark" intensity={14} style={StyleSheet.absoluteFill} />
-        </MaskedView>
-
+          </View>
+        ) : null}
         <Pressable
           onPress={onViewPress}
           accessibilityRole="button"
@@ -787,35 +1019,190 @@ export function CampaignSwipeCard({
 const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   shell: {
     overflow: 'hidden',
     borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: '#050509',
+    backgroundColor: '#3A1D18',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.55,
-    shadowRadius: 22,
-    elevation: 16,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -1px 0 rgba(0,0,0,0.1)',
   },
-  fallbackBackground: {
+  meshBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#202322',
+    overflow: 'hidden',
   },
-  backgroundImage: {
-    borderRadius: CAMPAIGN_CARD_CORNER_RADIUS,
+  meshTopSheen: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.26,
+  },
+  meshReliefWash: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.24,
+  },
+  meshBevel: {
+    ...StyleSheet.absoluteFillObject,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    borderTopColor: 'rgba(255,255,255,0.32)',
+    borderLeftColor: 'rgba(255,255,255,0.18)',
+    borderRightColor: 'rgba(0,0,0,0.18)',
+    borderBottomColor: 'rgba(0,0,0,0.28)',
+    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.22), inset 0 -3px 5px rgba(96,50,12,0.32)',
+  },
+  meshTopCurveLight: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    top: 0,
+    height: 34,
+    borderTopWidth: 2,
+    borderTopLeftRadius: CAMPAIGN_CARD_CORNER_RADIUS,
+    borderTopRightRadius: CAMPAIGN_CARD_CORNER_RADIUS,
+    borderTopColor: 'rgba(255,255,255,0.52)',
+    opacity: 0.86,
+  },
+  meshBottomLeftCurveLight: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    width: 76,
+    height: 76,
+    borderLeftWidth: 1,
+    borderBottomWidth: 1,
+    borderBottomLeftRadius: CAMPAIGN_CARD_CORNER_RADIUS,
+    borderLeftColor: 'rgba(255,238,200,0.32)',
+    borderBottomColor: 'rgba(255,220,166,0.3)',
+    opacity: 0.86,
+  },
+  meshBottomRightCurveLight: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 76,
+    height: 76,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderBottomRightRadius: CAMPAIGN_CARD_CORNER_RADIUS,
+    borderRightColor: 'rgba(255,205,174,0.28)',
+    borderBottomColor: 'rgba(255,220,166,0.26)',
+    opacity: 0.84,
   },
   backgroundGradient: {
     ...StyleSheet.absoluteFillObject,
   },
-  bottomFogMask: {
+  heroImageSlot: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
-    height: '60%',
+    zIndex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroImage: {
+    zIndex: 2,
+    opacity: 0.98,
+  },
+  heroSignalChip: {
+    position: 'absolute',
+    zIndex: 3,
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+    backgroundColor: 'rgba(102, 58, 42, 0.22)',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    shadowColor: '#6B2F24',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.14,
+    shadowRadius: 9,
+    elevation: 0,
+  },
+  heroSignalChipCompact: {
+    minHeight: 34,
+    borderRadius: 17,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  heroSignalPrimary: {
+    transform: [{ rotate: '-3deg' }],
+  },
+  heroSignalSecondary: {
+    transform: [{ rotate: '3deg' }],
+  },
+  heroSignalInnerStroke: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  heroSignalAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.58)',
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    flexShrink: 0,
+  },
+  heroSignalAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heroSignalAvatarInitial: {
+    ...theme.typography.label,
+    color: '#432019',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  heroSignalIconBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,217,91,0.88)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.42)',
+    flexShrink: 0,
+  },
+  heroSignalTextBlock: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  heroSignalEyebrow: {
+    ...theme.typography.label,
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  heroSignalLabel: {
+    ...theme.typography.label,
+    color: '#FFFFFF',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.22)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   cardHitArea: {
     position: 'absolute',
@@ -853,22 +1240,21 @@ const styles = StyleSheet.create({
   },
   statusPillShell: {
     flexShrink: 0,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 14,
-    elevation: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.16,
+    shadowRadius: 5,
+    elevation: 0,
   },
   statusPillFrame: {
     overflow: 'hidden',
     borderCurve: 'continuous',
     borderWidth: 1,
-    backgroundColor: 'rgba(8,9,14,0.2)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.08)',
   },
-  statusPillTint: {
+  statusPillMatteWash: {
     ...StyleSheet.absoluteFillObject,
-  },
-  statusPillSheen: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.82,
+    opacity: 0.64,
   },
   statusPillInnerStroke: {
     ...StyleSheet.absoluteFillObject,
@@ -882,14 +1268,20 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
+  statusPillIconBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.14)',
+  },
   statusPillText: {
     ...theme.typography.label,
-    color: 'rgba(255,255,255,0.94)',
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: '800',
     fontVariant: ['tabular-nums'],
-    textShadowColor: 'rgba(0,0,0,0.28)',
+    textShadowColor: 'rgba(0,0,0,0.18)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 2,
   },
   content: {
     position: 'absolute',

@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Campaign Card Status Gradients</title>
+    <style>
+      :root {
+        --app-deep: #0f0b08;
+        --app-base: #2a1e18;
+        --app-rose: #f4a6b0;
+        --app-peach: #f7c58c;
+        --app-gold: #ffcf6b;
+        --app-coral: #e89a86;
+        --ink: #fff8ef;
+        --muted: rgba(255, 248, 239, 0.72);
+        --line: rgba(255, 248, 239, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background:
+          radial-gradient(circle at 18% 8%, rgba(244, 166, 176, 0.62), transparent 28%),
+          radial-gradient(circle at 72% 5%, rgba(255, 207, 107, 0.46), transparent 31%),
+          radial-gradient(circle at 45% 48%, rgba(247, 197, 140, 0.38), transparent 34%),
+          radial-gradient(circle at 86% 74%, rgba(255, 138, 61, 0.34), transparent 30%),
+          linear-gradient(160deg, var(--app-base), #231811 38%, #18100b 72%, var(--app-deep));
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 38px 0 56px;
+      }
+
+      header {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        color: rgba(255, 207, 107, 0.84);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 780px;
+        font-size: clamp(34px, 5vw, 62px);
+        line-height: 0.94;
+        letter-spacing: 0;
+      }
+
+      .lede {
+        max-width: 760px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.55;
+      }
+
+      .option {
+        display: grid;
+        gap: 16px;
+        margin-top: 26px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+      }
+
+      .option-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .option-heading h2 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: 0;
+      }
+
+      .option-heading p {
+        margin: 0;
+        color: rgba(255, 248, 239, 0.64);
+        font-size: 13px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .status-card {
+        position: relative;
+        min-height: 460px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 28px;
+        box-shadow:
+          0 30px 80px rgba(0, 0, 0, 0.34),
+          inset 0 1px 0 rgba(255, 255, 255, 0.24);
+        isolation: isolate;
+      }
+
+      .status-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -3;
+        background: var(--mesh);
+      }
+
+      .status-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 18%),
+          linear-gradient(0deg, rgba(8, 5, 4, 0.82), transparent 45%),
+          radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.18), transparent 28%);
+        pointer-events: none;
+      }
+
+      .card-inner {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-height: 460px;
+        padding: 18px;
+      }
+
+      .top-row,
+      .bottom-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 10px;
+      }
+
+      .avatar {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.16)),
+          var(--avatar);
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+          0 10px 30px rgba(0, 0, 0, 0.22);
+      }
+
+      .brand-text {
+        min-width: 0;
+      }
+
+      .brand-name,
+      .money {
+        margin: 0;
+        overflow: hidden;
+        font-size: 13px;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .sub {
+        margin: 2px 0 0;
+        color: rgba(255, 248, 239, 0.66);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .pill {
+        flex: 0 0 auto;
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 999px;
+        color: rgba(255, 248, 239, 0.9);
+        font-size: 11px;
+        font-weight: 900;
+        background: rgba(15, 11, 8, 0.28);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      }
+
+      .hero {
+        position: relative;
+        display: grid;
+        place-items: center;
+        min-height: 274px;
+      }
+
+      .hero-stack {
+        position: relative;
+        width: 210px;
+        height: 210px;
+        transform: rotateX(56deg) rotateZ(-18deg);
+        transform-style: preserve-3d;
+      }
+
+      .tile {
+        position: absolute;
+        border-radius: 30px;
+        background: var(--tile);
+        box-shadow:
+          inset 0 2px 0 rgba(255, 255, 255, 0.52),
+          inset 0 -18px 34px rgba(0, 0, 0, 0.16),
+          0 28px 54px rgba(0, 0, 0, 0.26);
+      }
+
+      .tile.large {
+        inset: 26px;
+        transform: translateZ(34px);
+      }
+
+      .tile.mid {
+        inset: 54px 32px 34px 64px;
+        transform: translateZ(62px) rotateZ(18deg);
+        opacity: 0.92;
+      }
+
+      .tile.small {
+        inset: 30px 96px 96px 26px;
+        transform: translateZ(86px) rotateZ(-12deg);
+        opacity: 0.88;
+      }
+
+      .spark {
+        position: absolute;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: var(--spark);
+        box-shadow:
+          inset 0 2px 0 rgba(255, 255, 255, 0.72),
+          0 18px 36px rgba(0, 0, 0, 0.24);
+      }
+
+      .spark.one {
+        top: 42px;
+        right: 24px;
+      }
+
+      .spark.two {
+        bottom: 46px;
+        left: 18px;
+        width: 28px;
+        height: 28px;
+        opacity: 0.72;
+      }
+
+      .copy {
+        display: grid;
+        gap: 7px;
+      }
+
+      .copy h3 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.02;
+        letter-spacing: 0;
+      }
+
+      .copy p {
+        margin: 0;
+        color: rgba(255, 248, 239, 0.72);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .swatches {
+        display: flex;
+        gap: 6px;
+      }
+
+      .swatch {
+        width: 26px;
+        height: 26px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 8px;
+        background: var(--color);
+      }
+
+      .recommended .option-heading h2::after {
+        content: "Recommended";
+        margin-left: 10px;
+        padding: 4px 8px;
+        border: 1px solid rgba(255, 207, 107, 0.34);
+        border-radius: 999px;
+        color: #ffdc8a;
+        font-size: 10px;
+        font-weight: 900;
+        vertical-align: middle;
+        background: rgba(255, 207, 107, 0.1);
+      }
+
+      .requested-a {
+        --mesh:
+          radial-gradient(circle at 20% 10%, #ff8ab7 0, transparent 30%),
+          radial-gradient(circle at 74% 9%, #ffd38b 0, transparent 31%),
+          radial-gradient(circle at 83% 38%, #ff9b4a 0, transparent 34%),
+          radial-gradient(circle at 28% 44%, #f05e91 0, transparent 32%),
+          radial-gradient(circle at 50% 56%, rgba(255, 232, 184, 0.9), transparent 28%),
+          radial-gradient(circle at 72% 75%, #a9461b 0, transparent 30%),
+          linear-gradient(150deg, #3a1d18, #24100b 58%, #120a07);
+        --avatar: linear-gradient(135deg, #ffe8b8, #ff8ab7);
+        --tile: linear-gradient(145deg, #fff0c8, #ff8ab7 50%, #ff7a35);
+        --spark: linear-gradient(145deg, #fff5d7, #ffb23f);
+      }
+
+      .accepted-a {
+        --mesh:
+          radial-gradient(circle at 18% 10%, #b8ffd8 0, transparent 30%),
+          radial-gradient(circle at 70% 8%, #ffe29a 0, transparent 30%),
+          radial-gradient(circle at 84% 38%, #ffb347 0, transparent 33%),
+          radial-gradient(circle at 26% 44%, #42d88a 0, transparent 34%),
+          radial-gradient(circle at 55% 56%, rgba(200, 246, 166, 0.86), transparent 29%),
+          radial-gradient(circle at 76% 76%, #15803d 0, transparent 31%),
+          linear-gradient(150deg, #10251a, #12351f 48%, #07100b);
+        --avatar: linear-gradient(135deg, #d9ffd9, #ffc86f);
+        --tile: linear-gradient(145deg, #e6ffd5, #4bdc93 48%, #ffc86f);
+        --spark: linear-gradient(145deg, #fff4bd, #23c56b);
+      }
+
+      .action-a {
+        --mesh:
+          radial-gradient(circle at 18% 11%, #ffd19a 0, transparent 30%),
+          radial-gradient(circle at 72% 9%, #ffb25f 0, transparent 30%),
+          radial-gradient(circle at 84% 40%, #f07a5a 0, transparent 33%),
+          radial-gradient(circle at 26% 45%, #e36a72 0, transparent 34%),
+          radial-gradient(circle at 54% 58%, rgba(221, 181, 142, 0.84), transparent 29%),
+          radial-gradient(circle at 76% 76%, #823033 0, transparent 31%),
+          linear-gradient(150deg, #2a1410, #5b1f22 48%, #0d0706);
+        --avatar: linear-gradient(135deg, #ffd19a, #e36a72);
+        --tile: linear-gradient(145deg, #ffe0b2, #f07a5a 48%, #b73745);
+        --spark: linear-gradient(145deg, #fff0c7, #c54b50);
+      }
+
+      .requested-b {
+        --mesh:
+          radial-gradient(circle at 18% 8%, #ffb4cf 0, transparent 30%),
+          radial-gradient(circle at 72% 9%, #ffe4a8 0, transparent 32%),
+          radial-gradient(circle at 86% 42%, #ff7a59 0, transparent 31%),
+          radial-gradient(circle at 28% 48%, #ff6f9f 0, transparent 30%),
+          linear-gradient(150deg, #402019, #28100b 58%, #100706);
+        --avatar: linear-gradient(135deg, #ffe4a8, #ff6f9f);
+        --tile: linear-gradient(145deg, #fff2c9, #ff9abb 48%, #ff7a59);
+        --spark: linear-gradient(145deg, #fff5da, #ffb257);
+      }
+
+      .accepted-b {
+        --mesh:
+          radial-gradient(circle at 18% 10%, #d4ff9f 0, transparent 31%),
+          radial-gradient(circle at 70% 8%, #ffe4a3 0, transparent 31%),
+          radial-gradient(circle at 84% 40%, #ff9c3a 0, transparent 33%),
+          radial-gradient(circle at 30% 48%, #7ce38a 0, transparent 31%),
+          linear-gradient(150deg, #17351f, #1d4425 50%, #08100b);
+        --avatar: linear-gradient(135deg, #ecffc7, #ffca69);
+        --tile: linear-gradient(145deg, #eaffb8, #7ce38a 48%, #ffbd63);
+        --spark: linear-gradient(145deg, #fff6c8, #72d45f);
+      }
+
+      .action-b {
+        --mesh:
+          radial-gradient(circle at 18% 10%, #ffc58f 0, transparent 31%),
+          radial-gradient(circle at 72% 9%, #ff9d55 0, transparent 31%),
+          radial-gradient(circle at 84% 42%, #d84b55 0, transparent 33%),
+          radial-gradient(circle at 28% 47%, #ff7a66 0, transparent 31%),
+          linear-gradient(150deg, #32140f, #672527 50%, #100606);
+        --avatar: linear-gradient(135deg, #ffc58f, #d84b55);
+        --tile: linear-gradient(145deg, #ffe0ae, #ff7a66 48%, #a8343d);
+        --spark: linear-gradient(145deg, #ffeac2, #d84b55);
+      }
+
+      .requested-c {
+        --mesh:
+          radial-gradient(circle at 18% 9%, #e95c91 0, transparent 30%),
+          radial-gradient(circle at 72% 8%, #d9a249 0, transparent 31%),
+          radial-gradient(circle at 86% 42%, #d65a2c 0, transparent 32%),
+          radial-gradient(circle at 28% 48%, #8f3246 0, transparent 31%),
+          linear-gradient(150deg, #24100f, #190b08 58%, #0b0504);
+        --avatar: linear-gradient(135deg, #d9a249, #e95c91);
+        --tile: linear-gradient(145deg, #ffd98c, #e95c91 48%, #d65a2c);
+        --spark: linear-gradient(145deg, #fff0c0, #d9a249);
+      }
+
+      .accepted-c {
+        --mesh:
+          radial-gradient(circle at 18% 10%, #7cf2bd 0, transparent 30%),
+          radial-gradient(circle at 72% 9%, #d8b558 0, transparent 30%),
+          radial-gradient(circle at 84% 42%, #b36d22 0, transparent 33%),
+          radial-gradient(circle at 28% 47%, #0e8b51 0, transparent 31%),
+          linear-gradient(150deg, #071a13, #0d2d1d 52%, #050b08);
+        --avatar: linear-gradient(135deg, #bfffcf, #d8b558);
+        --tile: linear-gradient(145deg, #cfffd9, #37c77e 48%, #d8b558);
+        --spark: linear-gradient(145deg, #fff2b8, #0e8b51);
+      }
+
+      .action-c {
+        --mesh:
+          radial-gradient(circle at 18% 10%, #d99162 0, transparent 31%),
+          radial-gradient(circle at 72% 9%, #bf5a45 0, transparent 31%),
+          radial-gradient(circle at 84% 42%, #843038 0, transparent 33%),
+          radial-gradient(circle at 28% 47%, #ab4152 0, transparent 31%),
+          linear-gradient(150deg, #1c0b09, #3e1518 50%, #080403);
+        --avatar: linear-gradient(135deg, #d99162, #ab4152);
+        --tile: linear-gradient(145deg, #e8b27d, #bf5a45 48%, #843038);
+        --spark: linear-gradient(145deg, #f7d6a7, #ab4152);
+      }
+
+      @media (max-width: 920px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .status-card,
+        .card-inner {
+          min-height: 430px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Plugoh campaign card color direction</div>
+        <h1>Status gradients that sit on the champagne app mesh.</h1>
+        <p class="lede">
+          Three status families: requested, accepted/submitted/completed, and needs
+          action/declined. The recommended set keeps the first state warm, the second state
+          unmistakably secured, and the third state urgent without turning the card into a
+          generic danger alert.
+        </p>
+      </header>
+
+      <section class="option recommended">
+        <div class="option-heading">
+          <h2>Option A: Champagne Signal</h2>
+          <p>Best balance of premium, Gen Z warmth, and status clarity.</p>
+        </div>
+        <div class="grid">
+          <article class="status-card requested-a">
+            <div class="card-inner">
+              <div class="top-row">
+                <div class="brand">
+                  <div class="avatar"></div>
+                  <div class="brand-text">
+                    <p class="brand-name">GlowLab</p>
+                    <p class="sub">Campaign request</p>
+                  </div>
+                </div>
+                <div class="pill">REQUESTED</div>
+              </div>
+              <div class="hero">
+                <div class="hero-stack">
+                  <span class="tile large"></span>
+                  <span class="tile mid"></span>
+                  <span class="tile small"></span>
+                  <span class="spark one"></span>
+                  <span class="spark two"></span>
+                </div>
+              </div>
+              <div class="bottom-row">
+                <div class="copy">
+                  <h3>New brand invite</h3>
+                  <p>Rose, champagne, and tangerine. Friendly, social, not final yet.</p>
+                </div>
+                <div class="swatches">
+                  <span class="swatch" style="--color: #ff8ab7"></span>
+                  <span class="swatch" style="--color: #ffd38b"></span>
+                  <span class="swatch" style="--color: #ff9b4a"></span>
+                  <span class="swatch" style="--color: #3a1d18"></span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="status-card accepted-a">
+            <div class="card-inner">
+              <div class="top-row">
+                <div class="brand">
+                  <div class="avatar"></div>
+                  <div class="brand-text">
+                    <p class="brand-name">Mosaic Foods</p>
+                    <p class="sub">Escrow secured</p>
+                  </div>
+                </div>
+                <div class="pill">ACCEPTED</div>
+              </div>
+              <div class="hero">
+                <div class="hero-stack">
+                  <span class="tile large"></span>
+                  <span class="tile mid"></span>
+                  <span class="tile small"></span>
+                  <span class="spark one"></span>
+                  <span class="spark two"></span>
+                </div>
+              </div>
+              <div class="bottom-row">
+                <div class="copy">
+                  <h3>Collab is live</h3>
+                  <p>Emerald, honey, and gold. Trust, payout, growth, and momentum.</p>
+                </div>
+                <div class="swatches">
+                  <span class="swatch" style="--color: #b8ffd8"></span>
+                  <span class="swatch" style="--color: #42d88a"></span>
+                  <span class="swatch" style="--color: #ffe29a"></span>
+                  <span class="swatch" style="--color: #10251a"></span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="status-card action-a">
+            <div class="card-inner">
+              <div class="top-row">
+                <div class="brand">
+                  <div class="avatar"></div>
+                  <div class="brand-text">
+                    <p class="brand-name">Studio Rue</p>
+                    <p class="sub">Needs attention</p>
+                  </div>
+                </div>
+                <div class="pill">ACTION</div>
+              </div>
+              <div class="hero">
+                <div class="hero-stack">
+                  <span class="tile large"></span>
+                  <span class="tile mid"></span>
+                  <span class="tile small"></span>
+                  <span class="spark one"></span>
+                  <span class="spark two"></span>
+                </div>
+              </div>
+              <div class="bottom-row">
+                <div class="copy">
+                  <h3>Reply required</h3>
+                  <p>Amber, coral, and rosewood. Urgent, human, still premium.</p>
+                </div>
+                <div class="swatches">
+                  <span class="swatch" style="--color: #ffd19a"></span>
+                  <span class="swatch" style="--color: #f07a5a"></span>
+                  <span class="swatch" style="--color: #b73745"></span>
+                  <span class="swatch" style="--color: #2a1410"></span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="option">
+        <div class="option-heading">
+          <h2>Option B: Sunnier Commerce</h2>
+          <p>More approachable and bright; slightly less premium than Option A.</p>
+        </div>
+        <div class="grid">
+          <article class="status-card requested-b"><div class="card-inner"><div class="top-row"><div class="brand"><div class="avatar"></div><div class="brand-text"><p class="brand-name">GlowLab</p><p class="sub">Campaign request</p></div></div><div class="pill">REQUESTED</div></div><div class="hero"><div class="hero-stack"><span class="tile large"></span><span class="tile mid"></span><span class="tile small"></span><span class="spark one"></span><span class="spark two"></span></div></div><div class="bottom-row"><div class="copy"><h3>Soft invite energy</h3><p>Light peach-pink with citrus depth.</p></div><div class="swatches"><span class="swatch" style="--color: #ffb4cf"></span><span class="swatch" style="--color: #ffe4a8"></span><span class="swatch" style="--color: #ff7a59"></span></div></div></div></article>
+          <article class="status-card accepted-b"><div class="card-inner"><div class="top-row"><div class="brand"><div class="avatar"></div><div class="brand-text"><p class="brand-name">Mosaic Foods</p><p class="sub">Escrow secured</p></div></div><div class="pill">ACCEPTED</div></div><div class="hero"><div class="hero-stack"><span class="tile large"></span><span class="tile mid"></span><span class="tile small"></span><span class="spark one"></span><span class="spark two"></span></div></div><div class="bottom-row"><div class="copy"><h3>Fresh paid collab</h3><p>Matcha, honey, and orange-gold.</p></div><div class="swatches"><span class="swatch" style="--color: #d4ff9f"></span><span class="swatch" style="--color: #7ce38a"></span><span class="swatch" style="--color: #ff9c3a"></span></div></div></div></article>
+          <article class="status-card action-b"><div class="card-inner"><div class="top-row"><div class="brand"><div class="avatar"></div><div class="brand-text"><p class="brand-name">Studio Rue</p><p class="sub">Needs attention</p></div></div><div class="pill">ACTION</div></div><div class="hero"><div class="hero-stack"><span class="tile large"></span><span class="tile mid"></span><span class="tile small"></span><span class="spark one"></span><span class="spark two"></span></div></div><div class="bottom-row"><div class="copy"><h3>Warm correction</h3><p>Toast, coral, and softened red.</p></div><div class="swatches"><span class="swatch" style="--color: #ffc58f"></span><span class="swatch" style="--color: #ff7a66"></span><span class="swatch" style="--color: #d84b55"></span></div></div></div></article>
+        </div>
+      </section>
+
+      <section class="option">
+        <div class="option-heading">
+          <h2>Option C: Deep Luxury</h2>
+          <p>Moodier, heavier, more editorial; strongest contrast but less playful.</p>
+        </div>
+        <div class="grid">
+          <article class="status-card requested-c"><div class="card-inner"><div class="top-row"><div class="brand"><div class="avatar"></div><div class="brand-text"><p class="brand-name">GlowLab</p><p class="sub">Campaign request</p></div></div><div class="pill">REQUESTED</div></div><div class="hero"><div class="hero-stack"><span class="tile large"></span><span class="tile mid"></span><span class="tile small"></span><span class="spark one"></span><span class="spark two"></span></div></div><div class="bottom-row"><div class="copy"><h3>Private invite</h3><p>Rose espresso with antique gold.</p></div><div class="swatches"><span class="swatch" style="--color: #e95c91"></span><span class="swatch" style="--color: #d9a249"></span><span class="swatch" style="--color: #24100f"></span></div></div></div></article>
+          <article class="status-card accepted-c"><div class="card-inner"><div class="top-row"><div class="brand"><div class="avatar"></div><div class="brand-text"><p class="brand-name">Mosaic Foods</p><p class="sub">Escrow secured</p></div></div><div class="pill">ACCEPTED</div></div><div class="hero"><div class="hero-stack"><span class="tile large"></span><span class="tile mid"></span><span class="tile small"></span><span class="spark one"></span><span class="spark two"></span></div></div><div class="bottom-row"><div class="copy"><h3>Secured brief</h3><p>Deep jade with muted gold.</p></div><div class="swatches"><span class="swatch" style="--color: #7cf2bd"></span><span class="swatch" style="--color: #0e8b51"></span><span class="swatch" style="--color: #d8b558"></span></div></div></div></article>
+          <article class="status-card action-c"><div class="card-inner"><div class="top-row"><div class="brand"><div class="avatar"></div><div class="brand-text"><p class="brand-name">Studio Rue</p><p class="sub">Needs attention</p></div></div><div class="pill">ACTION</div></div><div class="hero"><div class="hero-stack"><span class="tile large"></span><span class="tile mid"></span><span class="tile small"></span><span class="spark one"></span><span class="spark two"></span></div></div><div class="bottom-row"><div class="copy"><h3>Muted alert</h3><p>Smoked garnet, clay, and bronze.</p></div><div class="swatches"><span class="swatch" style="--color: #d99162"></span><span class="swatch" style="--color: #bf5a45"></span><span class="swatch" style="--color: #843038"></span></div></div></div></article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

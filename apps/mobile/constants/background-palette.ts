@@ -68,6 +68,12 @@ export type BackgroundPalette = {
   };
   /** Optional 3×3 mesh — when set, replaces the three static blooms. */
   mesh?: BackgroundMesh;
+  /**
+   * When true, the screen renders the warm-glass SVG radial canvas
+   * (`PremiumGlassCanvas`) instead of the gradient/mesh/bloom/overlay stack.
+   * True radial gradients, paints on any iOS version (mesh needs iOS 18+).
+   */
+  useRadialCanvas?: boolean;
   /** Soft radial clear zone — keeps the hero area open like Luma's airy centre. */
   calmCenter?: { color: string; opacity: number; size: number; top: number; left: number };
   /** Soft top lift — keeps hero metrics readable over the mesh. */
@@ -83,7 +89,8 @@ export const BACKGROUND_PALETTES: Record<BackgroundPaletteId, BackgroundPalette>
     id: 'premium-mesh',
     label: 'Premium Mesh',
     description:
-      'Breathable pink/gold ambient mesh — Luma-style restraint: colour at the edges, calm open hero centre.',
+      'Warm champagne-gold glass mesh — pink/gold/orange scattered like glossy glass, calm open hero centre. Harmonised with the 3D earnings card.',
+    useRadialCanvas: true,
     base: PREMIUM_MESH_CANVAS_HEX.base,
     deep: PREMIUM_MESH_CANVAS_HEX.deep,
     gradient: PREMIUM_MESH_CANVAS_HEX.gradient,
@@ -98,20 +105,20 @@ export const BACKGROUND_PALETTES: Record<BackgroundPaletteId, BackgroundPalette>
     mesh: {
       points: PREMIUM_EARNINGS_MESH_POINTS,
       colors: PREMIUM_BACKGROUND_MESH_COLORS,
-      opacity: 0.06,
+      opacity: 0.09,
       opacities: PREMIUM_BACKGROUND_MESH_OPACITIES,
       bloomSize: 440,
     },
     calmCenter: {
       color: PREMIUM_MESH_CANVAS_HEX.calmCenter,
-      opacity: 0.07,
+      opacity: 0.08,
       size: 520,
       top: -80,
       left: -60,
     },
-    heroLift: { color: PREMIUM_MESH_CANVAS_HEX.heroLift, opacity: 0.06, height: 0.58 },
-    gloss: { color: PREMIUM_MESH_CANVAS_HEX.gloss, opacity: 0.09 },
-    glossWarm: { color: PREMIUM_MESH_CANVAS_HEX.glossWarm, opacity: 0.05 },
+    heroLift: { color: PREMIUM_MESH_CANVAS_HEX.heroLift, opacity: 0.07, height: 0.58 },
+    gloss: { color: PREMIUM_MESH_CANVAS_HEX.gloss, opacity: 0.11 },
+    glossWarm: { color: PREMIUM_MESH_CANVAS_HEX.glossWarm, opacity: 0.07 },
   },
   'aurora-pop': {
     id: 'aurora-pop',

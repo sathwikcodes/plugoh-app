@@ -1903,6 +1903,17 @@ export class EarningsService {
 
   async summary(user: AuthUser) {
     const campaigns = await this.store.list<Row>('campaigns', { eq: { influencer_id: user.id } });
+    const businessIds = [
+      ...new Set(campaigns.map((campaign) => campaign.business_id).filter(Boolean)),
+    ];
+    const [businessProfiles, businessAccounts] = await Promise.all([
+      businessIds.length
+        ? this.store.list<Row>('business_profiles', { in: { user_id: businessIds } })
+        : [],
+      businessIds.length ? this.store.list<Row>('profiles', { in: { id: businessIds } }) : [],
+    ]);
+    const businessByUserId = new Map(businessProfiles.map((profile) => [profile.user_id, profile]));
+    const accountByUserId = new Map(businessAccounts.map((account) => [account.id, account]));
     const relevant = campaigns.filter((campaign) =>
       ['in_escrow', 'delivery_submitted', 'completed'].includes(campaign.status),
     );
@@ -1936,13 +1947,24 @@ export class EarningsService {
       month_over_month_change:
         lastMonth === 0 ? (thisMonth > 0 ? 1 : 0) : (thisMonth - lastMonth) / lastMonth,
       monthly_breakdown: [...byMonth.entries()].map(([month, amount]) => ({ month, amount })),
-      transactions: completed.map((campaign) => ({
-        campaignId: campaign.id,
-        title: campaign.title,
-        amount_paise: campaign.price_offered_paise,
-        status: campaign.status,
-        date: campaign.completed_at,
-      })),
+      transactions: completed.map((campaign) => {
+        const businessProfile = withBusinessProfileImage(
+          businessByUserId.get(campaign.business_id),
+          accountByUserId.get(campaign.business_id),
+        );
+        const businessAccount = accountByUserId.get(campaign.business_id);
+        const accountAvatar =
+          typeof businessAccount?.avatar_url === 'string' ? businessAccount.avatar_url.trim() : '';
+
+        return {
+          campaignId: campaign.id,
+          title: campaign.title,
+          amount_paise: campaign.price_offered_paise,
+          status: campaign.status,
+          date: campaign.completed_at,
+          brand_profile_image_url: businessProfile?.profile_photo_url || accountAvatar || undefined,
+        };
+      }),
       tier:
         total >= 50_000_000
           ? 'macro'

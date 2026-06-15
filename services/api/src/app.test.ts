@@ -564,6 +564,54 @@ describe('Plugoh API', () => {
     expect(body.data[0].unreadCount).toBe(1);
   });
 
+  it('hydrates earnings transaction brand images from the campaign owner', async () => {
+    const completedAt = '2026-06-01T12:00:00.000Z';
+    const { app } = makeApp({
+      profiles: [
+        {
+          id: businessId,
+          email: 'brand@test.dev',
+          full_name: 'Brand Owner',
+          avatar_url: 'https://cdn.test/brand-avatar.jpg',
+        },
+        { id: influencerId, email: 'creator@test.dev', full_name: 'Creator' },
+      ],
+      business_profiles: [
+        {
+          id: 'bp-1',
+          user_id: businessId,
+          brand_name: 'Plugoh Cafe',
+          brand_category: 'restaurant_cafe',
+          brand_location: 'Hyderabad',
+          instagram_profile_picture_url: 'https://cdn.test/brand-instagram.jpg',
+        },
+      ],
+      campaigns: [
+        {
+          id: campaignId,
+          business_id: businessId,
+          influencer_id: influencerId,
+          title: 'Booking',
+          status: 'completed',
+          price_offered_paise: 10000,
+          package_type: 'instagram_reel',
+          completed_at: completedAt,
+          created_at: completedAt,
+        },
+      ],
+    });
+
+    const res = await app.request('/influencer/earnings', {
+      headers: { authorization: 'Bearer influencer' },
+    });
+    const body = await json(res);
+
+    expect(res.status).toBe(200);
+    expect(body.data.transactions[0].brand_profile_image_url).toBe(
+      'https://cdn.test/brand-instagram.jpg',
+    );
+  });
+
   it('validates campaign booking requirements', async () => {
     const { app } = makeApp();
     const res = await app.request('/campaigns', {

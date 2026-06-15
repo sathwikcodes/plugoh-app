@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Plugoh — Warm Glass Background Preview</title>
+    <style>
+      :root {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui,
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        min-height: 100vh;
+        background: #0a0a0c;
+        color: #f5f0ea;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 28px;
+        padding: 48px 24px 80px;
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .subtitle {
+        font-size: 14px;
+        color: rgba(245, 240, 234, 0.6);
+        max-width: 640px;
+        text-align: center;
+        line-height: 1.5;
+      }
+      .stage {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 48px;
+        justify-content: center;
+        margin-top: 12px;
+      }
+      .variant {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      .variant-label {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: rgba(245, 240, 234, 0.7);
+      }
+      .variant-desc {
+        font-size: 12px;
+        color: rgba(245, 240, 234, 0.45);
+        max-width: 300px;
+        text-align: center;
+      }
+
+      /* ---- Phone frame ---- */
+      .phone {
+        position: relative;
+        width: 320px;
+        height: 680px;
+        border-radius: 46px;
+        padding: 12px;
+        background: #000;
+        box-shadow: 0 40px 90px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 255, 255, 0.05);
+        overflow: hidden;
+      }
+      .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 34px;
+        overflow: hidden;
+      }
+
+      /* =========================================================
+         WARM GLASS BACKGROUND LAYERS
+         Approximation of the RN MeshGradientView + overlay stack
+         using CSS radial gradients (which CSS does smoothly).
+         ========================================================= */
+
+      /* Base deep warm gradient (replaces purple-brown) */
+      .layer-base {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* The colored mesh blooms */
+      .layer-mesh {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* Glass overlays: calm center, hero lift, top gloss sheen, warm bottom */
+      .layer-overlays {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      /* ----- Variant A: Champagne-Gold lead ----- */
+      .v-gold .layer-base {
+        background: linear-gradient(
+          180deg,
+          #241813 0%,
+          #1c130e 28%,
+          #150e0a 62%,
+          #0f0b08 100%
+        );
+      }
+      .v-gold .layer-mesh {
+        background:
+          radial-gradient(120% 90% at 12% 0%, rgba(244, 166, 176, 0.34) 0%, rgba(244, 166, 176, 0) 55%),
+          radial-gradient(110% 80% at 88% 4%, rgba(255, 207, 107, 0.40) 0%, rgba(255, 207, 107, 0) 55%),
+          radial-gradient(120% 90% at 95% 52%, rgba(255, 179, 71, 0.40) 0%, rgba(255, 179, 71, 0) 55%),
+          radial-gradient(120% 95% at 6% 60%, rgba(232, 154, 134, 0.30) 0%, rgba(232, 154, 134, 0) 55%),
+          radial-gradient(130% 100% at 50% 104%, rgba(255, 138, 61, 0.42) 0%, rgba(255, 138, 61, 0) 58%),
+          radial-gradient(140% 110% at 92% 100%, rgba(255, 159, 90, 0.40) 0%, rgba(255, 159, 90, 0) 55%);
+      }
+
+      /* ----- Variant B: Rose-Orange lead ----- */
+      .v-rose .layer-base {
+        background: linear-gradient(
+          180deg,
+          #261611 0%,
+          #1e120d 28%,
+          #160d09 62%,
+          #100a07 100%
+        );
+      }
+      .v-rose .layer-mesh {
+        background:
+          radial-gradient(120% 90% at 10% 0%, rgba(247, 154, 168, 0.40) 0%, rgba(247, 154, 168, 0) 55%),
+          radial-gradient(110% 80% at 90% 2%, rgba(255, 184, 138, 0.36) 0%, rgba(255, 184, 138, 0) 55%),
+          radial-gradient(120% 90% at 96% 48%, rgba(255, 150, 92, 0.42) 0%, rgba(255, 150, 92, 0) 55%),
+          radial-gradient(120% 95% at 4% 56%, rgba(233, 138, 106, 0.34) 0%, rgba(233, 138, 106, 0) 55%),
+          radial-gradient(130% 100% at 48% 104%, rgba(255, 122, 80, 0.44) 0%, rgba(255, 122, 80, 0) 58%),
+          radial-gradient(140% 110% at 94% 100%, rgba(255, 138, 61, 0.40) 0%, rgba(255, 138, 61, 0) 55%);
+      }
+
+      /* Shared glass overlays */
+      .layer-overlays {
+        background:
+          /* top-left specular sheen (single light source -> glass) */
+          radial-gradient(80% 50% at 22% 6%, rgba(255, 246, 240, 0.16) 0%, rgba(255, 246, 240, 0) 60%),
+          /* hero lift, keeps top text readable */
+          linear-gradient(180deg, rgba(255, 241, 230, 0.07) 0%, rgba(255, 241, 230, 0) 58%),
+          /* calm center clear-zone (opens space behind hero) */
+          radial-gradient(60% 42% at 42% 30%, rgba(255, 246, 240, 0.09) 0%, rgba(255, 246, 240, 0) 70%),
+          /* warm bottom gloss */
+          radial-gradient(120% 50% at 50% 100%, rgba(255, 207, 107, 0.08) 0%, rgba(255, 207, 107, 0) 60%),
+          /* top gloss band (lacquer) */
+          linear-gradient(180deg, rgba(255, 242, 232, 0.10) 0%, rgba(255, 242, 232, 0) 48%);
+      }
+
+      /* subtle frosted noise to read as glass, not flat */
+      .screen::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.04;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+
+      /* =========================================================
+         MOCK CONTENT (hero metric + earnings card) to test legibility
+         ========================================================= */
+      .content {
+        position: absolute;
+        inset: 0;
+        padding: 64px 22px 28px;
+        display: flex;
+        flex-direction: column;
+        z-index: 2;
+      }
+      .status {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.85);
+        margin-bottom: 26px;
+      }
+      .greeting {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .hero-metric {
+        font-size: 40px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin-top: 4px;
+        color: #fff;
+        text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+      }
+      .hero-sub {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.55);
+        margin-top: 4px;
+      }
+
+      /* 3D earnings card — mirrors PREMIUM_EARNINGS_MESH saturated mesh */
+      .card {
+        margin-top: 30px;
+        aspect-ratio: 85.6 / 53.98;
+        border-radius: 22px;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        transform: perspective(1400px) rotateX(-3deg) rotateZ(-0.6deg);
+        box-shadow: 0 26px 40px rgba(38, 18, 48, 0.42), 0 10px 18px rgba(70, 36, 8, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      }
+      .card-mesh {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(90% 90% at 0% 0%, #9b1fff 0%, rgba(155, 31, 255, 0) 60%),
+          radial-gradient(90% 90% at 50% 0%, #e04bff 0%, rgba(224, 75, 255, 0) 55%),
+          radial-gradient(90% 90% at 100% 0%, #ffd24d 0%, rgba(255, 210, 77, 0) 55%),
+          radial-gradient(110% 110% at 62% 42%, #ff8f3c 0%, rgba(255, 143, 60, 0) 60%),
+          radial-gradient(90% 90% at 100% 50%, #ffb300 0%, rgba(255, 179, 0, 0) 55%),
+          radial-gradient(90% 90% at 0% 100%, #d81ff0 0%, rgba(216, 31, 240, 0) 55%),
+          radial-gradient(90% 90% at 50% 100%, #ff8a00 0%, rgba(255, 138, 0, 0) 55%),
+          radial-gradient(90% 90% at 100% 100%, #ff7a00 0%, rgba(255, 122, 0, 0) 55%),
+          #ff8f3c;
+      }
+      .card-content {
+        position: absolute;
+        inset: 0;
+        padding: 16px 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        z-index: 2;
+      }
+      .card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .card-brand {
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        color: rgba(255, 255, 255, 0.95);
+      }
+      .card-amount {
+        font-size: 26px;
+        font-weight: 800;
+        color: #fff;
+        letter-spacing: -0.02em;
+      }
+      .card-name {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.85);
+      }
+
+      /* glass info tiles to test the frosted UI over the bg */
+      .tiles {
+        margin-top: auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .tile {
+        border-radius: 18px;
+        padding: 14px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+      .tile-label {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.55);
+      }
+      .tile-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+        margin-top: 2px;
+      }
+      .footnote {
+        margin-top: 28px;
+        font-size: 12px;
+        color: rgba(245, 240, 234, 0.4);
+        max-width: 720px;
+        text-align: center;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Plugoh — Warm Glass Background</h1>
+    <p class="subtitle">
+      Fully warm (no purple), soft-but-visible. Champagne pink, rose, gold, and orange scattered
+      like frosted/glossy glass — harmonized with the saturated 3D earnings card. Two leads to
+      compare. (CSS radial-gradient approximation of the RN MeshGradient + overlay stack.)
+    </p>
+
+    <div class="stage">
+      <!-- Variant A -->
+      <div class="variant">
+        <span class="variant-label">A · Champagne-Gold lead</span>
+        <div class="phone">
+          <div class="screen v-gold">
+            <div class="layer-base"></div>
+            <div class="layer-mesh"></div>
+            <div class="layer-overlays"></div>
+            <div class="content">
+              <div class="status"><span>9:41</span><span>􀙇 􀛨 􀋦</span></div>
+              <div class="greeting">Good evening, Sathwik</div>
+              <div class="hero-metric">₹1,24,500</div>
+              <div class="hero-sub">Available to withdraw</div>
+              <div class="card">
+                <div class="card-mesh"></div>
+                <div class="card-content">
+                  <div class="card-top">
+                    <span class="card-brand">plugoh</span>
+                    <span>􀎽</span>
+                  </div>
+                  <div>
+                    <div class="card-amount">₹2,86,300</div>
+                    <div class="card-name">Total earned</div>
+                  </div>
+                </div>
+              </div>
+              <div class="tiles">
+                <div class="tile">
+                  <div class="tile-label">This month</div>
+                  <div class="tile-value">₹48,200</div>
+                </div>
+                <div class="tile">
+                  <div class="tile-label">Active deals</div>
+                  <div class="tile-value">6</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="variant-desc">Gold/amber dominant, pink as a soft top-left accent. Reads warm, luxe, "money."</span>
+      </div>
+
+      <!-- Variant B -->
+      <div class="variant">
+        <span class="variant-label">B · Rose-Orange lead</span>
+        <div class="phone">
+          <div class="screen v-rose">
+            <div class="layer-base"></div>
+            <div class="layer-mesh"></div>
+            <div class="layer-overlays"></div>
+            <div class="content">
+              <div class="status"><span>9:41</span><span>􀙇 􀛨 􀋦</span></div>
+              <div class="greeting">Good evening, Sathwik</div>
+              <div class="hero-metric">₹1,24,500</div>
+              <div class="hero-sub">Available to withdraw</div>
+              <div class="card">
+                <div class="card-mesh"></div>
+                <div class="card-content">
+                  <div class="card-top">
+                    <span class="card-brand">plugoh</span>
+                    <span>􀎽</span>
+                  </div>
+                  <div>
+                    <div class="card-amount">₹2,86,300</div>
+                    <div class="card-name">Total earned</div>
+                  </div>
+                </div>
+              </div>
+              <div class="tiles">
+                <div class="tile">
+                  <div class="tile-label">This month</div>
+                  <div class="tile-value">₹48,200</div>
+                </div>
+                <div class="tile">
+                  <div class="tile-label">Active deals</div>
+                  <div class="tile-value">6</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <span class="variant-desc">Rose/coral dominant, warmer & softer. Reads inviting, "social," sunset-leaning.</span>
+      </div>
+    </div>
+
+    <p class="footnote">
+      Note: on-device the colors come from <code>expo-mesh-gradient</code> with opaque vertex hex +
+      per-vertex opacity (no rgba), so the real blend is even smoother than these CSS gradients. The
+      glass tiles use the existing GlassView/blur. Pick a lead (A or B), or ask for a hybrid / less /
+      more intensity, and I'll lock the exact hex into the app constants.
+    </p>
+  </body>
+</html>

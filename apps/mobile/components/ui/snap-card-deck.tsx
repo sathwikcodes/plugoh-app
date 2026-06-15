@@ -1,6 +1,6 @@
 import { theme } from '@/constants/theme';
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { CampaignEmptyState } from './campaign-empty-state';
 import { ShimmerBlock, ShimmerCircle, ShimmerText } from './shimmer';
@@ -92,7 +92,7 @@ export function SnapCardDeck<TItem>({
 
   if (isLoading && items.length === 0) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={styles.loadingDeckRoot}>
         <DeckCardSkeleton cardWidth={cardWidth} cardHeight={cardHeight} />
       </View>
     );
@@ -101,12 +101,13 @@ export function SnapCardDeck<TItem>({
   if (items.length === 0) {
     return (
       <View
-        style={{
-          width: viewportWidth,
-          height: cardHeight,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+        style={[
+          styles.emptyDeckRoot,
+          {
+            width: viewportWidth,
+            height: cardHeight,
+          },
+        ]}
       >
         {renderEmptyState ? (
           renderEmptyState({ cardWidth, cardHeight })
@@ -118,7 +119,7 @@ export function SnapCardDeck<TItem>({
   }
 
   return (
-    <View style={{ width: viewportWidth, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={[styles.deckRoot, { width: viewportWidth }]}>
       <Animated.ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -132,22 +133,25 @@ export function SnapCardDeck<TItem>({
         directionalLockEnabled
         overScrollMode="never"
         onScroll={scrollHandler}
-        style={{ width: viewportWidth }}
-        contentContainerStyle={{
-          paddingHorizontal: sidePadding,
-          alignItems: 'center',
-          minHeight: cardHeight,
-        }}
+        style={[styles.scrollView, { width: viewportWidth }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingHorizontal: sidePadding,
+            minHeight: cardHeight,
+          },
+        ]}
       >
         {items.map((item) => (
           <Animated.View
             key={keyExtractor(item)}
-            style={{
-              width: interval,
-              height: cardHeight,
-              alignItems: 'flex-start',
-              justifyContent: 'center',
-            }}
+            style={[
+              styles.cardSlot,
+              {
+                width: interval,
+                height: cardHeight,
+              },
+            ]}
           >
             {renderCard({ item, cardWidth, cardHeight, interval })}
           </Animated.View>
@@ -156,3 +160,34 @@ export function SnapCardDeck<TItem>({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingDeckRoot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  emptyDeckRoot: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  deckRoot: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  scrollView: {
+    backgroundColor: 'transparent',
+  },
+  scrollContent: {
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  cardSlot: {
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+});

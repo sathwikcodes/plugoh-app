@@ -5,8 +5,7 @@ import rocketImage from '@/assets/images/rocket.png';
 import { TierAssetBadge } from '@/components/influencer/tier-asset-badge';
 import { TierBadgeCarousel } from '@/components/influencer/tier-badge-carousel';
 import { getTabScreenBottomPadding } from '@/components/navigation/native-tab-config';
-import { AppHeader, getAppHeaderTopPadding } from '@/components/ui/app-header';
-import { Screen } from '@/components/ui/primitives';
+import { HomeScreenWithStickyHeader, StickyHomeHeader } from '@/components/ui/sticky-home-header';
 import { ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
 import {
@@ -569,25 +568,28 @@ export default function HomeScreen() {
   const profileImageUri = influencerProfileImageUri(profile.data);
 
   return (
-    <Screen
+    <HomeScreenWithStickyHeader
+      insetTop={insets.top}
       contentInsetAdjustmentBehavior="never"
       contentContainerStyle={{
-        paddingTop: getAppHeaderTopPadding(insets.top),
         paddingBottom: getTabScreenBottomPadding(insets.bottom),
       }}
+      header={
+        <StickyHomeHeader
+          insetTop={insets.top}
+          title="Home"
+          showLogoTitle
+          showBackground={false}
+          logoAccessibilityLabel="Plugoh home"
+          profile={{
+            imageUri: profileImageUri,
+            onPress: () => {
+              router.push('/(app)/profile');
+            },
+          }}
+        />
+      }
     >
-      <AppHeader
-        title="Home"
-        showLogoTitle
-        logoAccessibilityLabel="Plugoh home"
-        profile={{
-          imageUri: profileImageUri,
-          onPress: () => {
-            router.push('/(app)/profile');
-          },
-        }}
-      />
-
       <HomeTierHero earnings={earnings.data} loading={heroLoading} />
 
       <DailyInsightsSection
@@ -595,7 +597,7 @@ export default function HomeScreen() {
         campaigns={campaigns.data?.items ?? []}
         loading={earningsLoading || campaignsLoading}
       />
-    </Screen>
+    </HomeScreenWithStickyHeader>
   );
 }
 

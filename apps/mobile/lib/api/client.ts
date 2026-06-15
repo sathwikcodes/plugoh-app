@@ -1,8 +1,12 @@
 import type { ApiResponse } from '@plugoh/contracts';
+import Constants from 'expo-constants';
 import { ApiError, userMessageForStatus } from '@/lib/api/error';
+import { extractDevMachineHost, resolveApiBaseUrl } from '@/lib/api/resolve-api-base-url';
 import { useAuthStore } from '@/store/auth';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const API_BASE_URL = resolveApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL, {
+  devMachineHost: extractDevMachineHost(Constants),
+});
 
 export async function api<T>(
   path: string,

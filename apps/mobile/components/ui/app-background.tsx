@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MeshGradientView } from 'expo-mesh-gradient';
 import { memo, useMemo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { PremiumGlassCanvas } from '@/components/ui/premium-glass-canvas';
 
 type AppBackgroundProps = {
   /** Override active palette (used by previews / Storybook). */
@@ -65,6 +66,18 @@ function SoftBloom({ bloom }: { bloom: BackgroundBloom }) {
   );
 }
 
+/**
+ * Single soft warm-white catch-light at the top-left — simulates one light source
+ * grazing a glossy glass surface. Feathered (two-circle SoftBloom), low opacity.
+ */
+const SPECULAR_HIGHLIGHT: BackgroundBloom = {
+  color: '#FFF6F0',
+  opacity: 0.14,
+  size: 360,
+  top: -120,
+  left: -90,
+};
+
 function getOpaqueMeshColors(mesh: BackgroundMesh, baseHex: string): string[] {
   return mesh.colors.map((color, index) =>
     blendHex(baseHex, color, mesh.opacities?.[index] ?? mesh.opacity),
@@ -95,6 +108,16 @@ function ScreenMeshGradient({
 export const AppBackground = memo(function AppBackground({ palette, style }: AppBackgroundProps) {
   const active = palette ?? getActiveBackgroundPalette();
 
+  // Warm-glass palettes render a true SVG radial canvas (paints on any iOS version)
+  // instead of the gradient/mesh/bloom/overlay stack below.
+  if (active.useRadialCanvas) {
+    return (
+      <View pointerEvents="none" style={[styles.root, style, { backgroundColor: active.deep }]}>
+        <PremiumGlassCanvas />
+      </View>
+    );
+  }
+
   const {
     blooms,
     calmCenter,
@@ -119,7 +142,10 @@ export const AppBackground = memo(function AppBackground({ palette, style }: App
       />
 
       {mesh ? (
-        <ScreenMeshGradient baseHex={active.base} mesh={mesh} />
+        <>
+          <ScreenMeshGradient baseHex={active.base} mesh={mesh} />
+          <SoftBloom bloom={SPECULAR_HIGHLIGHT} />
+        </>
       ) : (
         <>
           <SoftBloom bloom={blooms.pink} />

@@ -1,5 +1,13 @@
-import { NativeIconButton } from '@/components/ui/native-icon-button';
+import earnTab from '@/assets/images/earn-tab.png';
+import earnTabSelected from '@/assets/images/earn-tab-selected.png';
+import homeTab from '@/assets/images/home-tab.png';
+import homeTabSelected from '@/assets/images/home-tab-selected.png';
+import inboxTab from '@/assets/images/inbox-tab.png';
+import inboxTabSelected from '@/assets/images/inbox-tab-selected.png';
+import workTab from '@/assets/images/work-tab.png';
+import workTabSelected from '@/assets/images/work-tab-selected.png';
 import { plugohNativeTabOptions } from '@/components/navigation/native-tab-config';
+import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { TabScreenCanvasProvider } from '@/components/ui/tab-screen-canvas';
 import { theme } from '@/constants/theme';
 import { useBootstrap } from '@/hooks/use-marketplace';
@@ -32,28 +40,23 @@ export default function TabsLayout() {
       <View style={styles.root}>
         <NativeTabs {...plugohNativeTabOptions}>
           <NativeTabs.Trigger name="index">
-            <Icon sf={{ default: 'house', selected: 'house.fill' }} />
-            <Label>Home</Label>
+            <Icon src={{ default: homeTab, selected: homeTabSelected }} />
+            <Label hidden>Home</Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="campaigns">
-            <Icon sf={{ default: 'briefcase', selected: 'briefcase.fill' }} />
-            <Label>Work</Label>
+            <Icon src={{ default: workTab, selected: workTabSelected }} />
+            <Label hidden>Work</Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="inbox">
-            <Icon
-              sf={{
-                default: 'bubble.left.and.bubble.right',
-                selected: 'bubble.left.and.bubble.right.fill',
-              }}
-            />
-            <Label>Inbox</Label>
+            <Icon src={{ default: inboxTab, selected: inboxTabSelected }} />
+            <Label hidden>Inbox</Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="earnings">
-            <Icon sf={{ default: 'wallet.pass', selected: 'wallet.pass.fill' }} />
-            <Label>Earn</Label>
+            <Icon src={{ default: earnTab, selected: earnTabSelected }} />
+            <Label hidden>Earn</Label>
           </NativeTabs.Trigger>
         </NativeTabs>
 

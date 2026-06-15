@@ -33,9 +33,17 @@ const styles = StyleSheet.create({
   scrollHost: {
     flex: 1,
     backgroundColor: theme.colors.backgroundClear,
+    // Lift the (transparent) scroll content above the background layer with a
+    // positive zIndex instead of pushing the background to a NEGATIVE zIndex.
+    // Inside NativeTabs the tab screen has an opaque native backing; a negative
+    // zIndex child (the SVG canvas) sinks behind it and gets covered, leaving
+    // only the solid backgroundDeep color. Keeping both layers at >= 0 keeps the
+    // canvas visible while preserving scrollHost as the first declared child
+    // (required for RN Screens to discover the tab ScrollView).
+    zIndex: 1,
   },
   backgroundLayer: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: -1,
+    zIndex: 0,
   },
 });

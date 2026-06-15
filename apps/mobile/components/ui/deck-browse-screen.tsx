@@ -318,6 +318,7 @@ export function DeckBrowseScreen<
           marginHorizontal: -PAGE_HORIZONTAL_INSET,
           alignItems: 'center',
           justifyContent: 'center',
+          backgroundColor: 'transparent',
         }}
       >
         {renderDeck({

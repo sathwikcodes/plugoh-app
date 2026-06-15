@@ -39,24 +39,31 @@ export const PREMIUM_EARNINGS_MESH_COLORS = [
 export const PREMIUM_EARNINGS_SHELL_FALLBACK = '#E7B27A';
 
 /**
- * Ambient full-screen mesh — same layout as the card. Hues match premium pink/gold
- * but are muted and low-opacity (Luma-style: present, breathable, never loud).
+ * Ambient full-screen mesh — same layout as the card, fully WARM (no purple).
+ * Champagne-gold lead: rose accent top-left, gold leading top-right/mid-right,
+ * orange grounding the bottom. Champagne centre kept lowest so the hero stays open.
+ * Soft but clearly visible — harmonised with the saturated earnings card.
  */
 export const PREMIUM_BACKGROUND_MESH_COLORS = [
-  '#8E4A92',
-  '#C25C9A',
-  '#E6A85A',
-  '#7E468E',
-  '#C98A66',
-  '#EC9A54',
-  '#7A4686',
-  '#E89350',
-  '#EE8C48',
+  '#F4A6B0', // top-left — soft rose / champagne pink accent
+  '#F7C58C', // top-center — peach-gold
+  '#FFCF6B', // top-right — gold (lead)
+  '#E89A86', // mid-left — warm coral
+  '#F3C9A8', // centre — champagne (lowest opacity)
+  '#FFB347', // mid-right — warm orange-gold (lead)
+  '#E98A6A', // bottom-left — warm terracotta
+  '#FF8A3D', // bottom-center — deep orange
+  '#FF9F5A', // bottom-right — orange
 ] as const;
 
-/** Per-vertex strength — centre kept lowest so hero metrics stay open. */
+/**
+ * Per-vertex strength. Blended onto the WARM lit base (`#2A1E18`), so these need
+ * to be high enough that the hue reads — at low alpha a light champagne hue just
+ * collapses into the base. Edges/corners carry the colour; the centre is kept
+ * lowest so it stays calm and the hero metrics remain legible.
+ */
 export const PREMIUM_BACKGROUND_MESH_OPACITIES = [
-  0.17, 0.2, 0.22, 0.13, 0.07, 0.18, 0.17, 0.2, 0.22,
+  0.42, 0.46, 0.5, 0.34, 0.14, 0.46, 0.42, 0.46, 0.5,
 ] as const;
 
 /** Accent hues at full strength — earnings card, CTAs, spectrum previews only. */

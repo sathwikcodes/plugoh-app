@@ -1,6 +1,6 @@
 import { GlassCard } from '@/components/ui/glass-card';
-import { AppHeader, getAppHeaderTopPadding } from '@/components/ui/app-header';
-import { ErrorState, PrimaryButton, Screen, StatusChip } from '@/components/ui/primitives';
+import { HomeScreenWithStickyHeader, StickyHomeHeader } from '@/components/ui/sticky-home-header';
+import { ErrorState, PrimaryButton, StatusChip } from '@/components/ui/primitives';
 import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
 import {
@@ -265,25 +265,25 @@ export default function BrandHomeScreen() {
   const profileImageUri = businessProfileImageUri(profile.data);
 
   return (
-    <Screen
+    <HomeScreenWithStickyHeader
+      insetTop={insets.top}
       contentInsetAdjustmentBehavior="never"
-      contentContainerStyle={[
-        styles.screenContent,
-        { paddingTop: getAppHeaderTopPadding(insets.top) },
-      ]}
+      contentContainerStyle={styles.screenContent}
+      header={
+        <StickyHomeHeader
+          insetTop={insets.top}
+          title="Home"
+          showLogoTitle
+          logoAccessibilityLabel="Plugoh home"
+          profile={{
+            imageUri: profileImageUri,
+            onPress: () => {
+              router.push('/(app)/brand-profile');
+            },
+          }}
+        />
+      }
     >
-      <AppHeader
-        title="Home"
-        showLogoTitle
-        logoAccessibilityLabel="Plugoh home"
-        profile={{
-          imageUri: profileImageUri,
-          onPress: () => {
-            router.push('/(app)/brand-profile');
-          },
-        }}
-      />
-
       <Animated2.View entering={FadeInDown.duration(320)} style={styles.header}>
         <View style={styles.heroCopy}>
           <Text style={styles.greeting}>{getGreeting()},</Text>
@@ -405,7 +405,7 @@ export default function BrandHomeScreen() {
           router.push('/(app)/(brand-tabs)/discover');
         }}
       />
-    </Screen>
+    </HomeScreenWithStickyHeader>
   );
 }
 

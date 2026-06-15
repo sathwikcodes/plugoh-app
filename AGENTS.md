@@ -118,11 +118,23 @@ gstack provides shared skills (QA, review, ship, browse, planning) used across t
 - Keep hero metrics and primary UI content clearly visible above the background wash; lighten or calm the center when needed.
 - Limit premium mesh screen background to authenticated in-app screens; keep auth/login on its separate orbital gradient (`#050509`).
 - Provide design HTML previews when exploring mobile background palette options.
+- Sticky header should be invisible at rest; blur/glass reveals only as content scrolls behind it (scroll-reveal pattern, no visible panel or divider at the top).
+- Prefer `GlassView` from `expo-glass-effect` (iOS 26+) over `expo-blur` (`BlurView`) for header/overlay blur — user explicitly rejected `BlurView`.
+- Gradient-blur header aesthetic (a la Deel): strongest blur at the very top, dissolving downward — no visible separation line, no hard edge.
+- Tab bar icons: no labels, enlarged icon size; selected state uses solid SVG variant, unselected state uses outline SVG variant. The earn tab solid should show only the wallet/stack-of-cards bottom as white, not the entire icon white.
+- Tab bar icons should be outlined (normal) when inactive and solid (filled) when the tab is selected — user explicitly requested this and had it restored.
 
 ## Learned Workspace Facts
 
 - In-app screen roots use `theme.colors.backgroundClear` so `AppBackground` / `AppScreenRoot` mesh shows through.
-- Premium mesh canvas hex tokens live in `apps/mobile/constants/premium-mesh-canvas-hex.js` (`PREMIUM_MESH_CANVAS_HEX`).
+- Premium mesh tokens: canvas hex in `apps/mobile/constants/premium-mesh-canvas-hex.js` (`PREMIUM_MESH_CANVAS_HEX`); radial/blob parameters in `apps/mobile/constants/premium-glass-radials.ts`.
 - `apps/mobile/app.config.ts` must import config-time tokens from plain `.js` files only (no TypeScript, no `@/` aliases).
-- Switch the global canvas style via `ACTIVE_BACKGROUND_PALETTE_ID` in `background-palette.ts` (default: `premium-mesh`).
-- Screen ambient mesh uses `PREMIUM_BACKGROUND_MESH_*` in `premium-mesh-gradient.ts`; earnings card mesh uses `PREMIUM_EARNINGS_MESH_*` separately.
+- Switch the global canvas style via `ACTIVE_BACKGROUND_PALETTE_ID` in `background-palette.ts` (default: `premium-mesh`). Screen ambient mesh uses `PREMIUM_BACKGROUND_MESH_*`; earnings card mesh uses `PREMIUM_EARNINGS_MESH_*` separately.
+- `apps/mobile/components/ui/sticky-home-header.tsx` exports `HomeScreenWithStickyHeader` and `getStickyHomeHeaderContentPadding`; both influencer and brand home screens use it.
+- iOS `UIVisualEffectView` (`BlurView`) stops compositing when any ancestor has `opacity: 0` — keep blur always active; use an overlaid mask/gradient that fades to hide it at rest instead of animating blur opacity.
+- Sticky glass header: `GlassView` (`expo-glass-effect`, `glassEffectStyle="regular"`, `colorScheme="dark"`) for iOS 26+; `View` with `backgroundColor: 'rgba(10, 6, 18, 0.85)'` as the fallback. A `LinearGradient` with `absoluteFill` covers the **full header height** (opaque-to-transparent from top — no hard clip line, no bottom strip).
+- `TabScreenCanvas` wraps tab screens with the gradient canvas; the scroll host must be the **first child** (before `AppBackground`) so iOS native tabs can walk the subview chain and apply `contentInsetAdjustmentBehavior` correctly.
+- `MeshGradientView` must use opaque (non-rgba) vertex colors — rgba washes to white by compositing against iOS's native white backing layer.
+- `react-native-svg` registers `<Defs>` IDs globally — `PremiumGlassCanvas` must use per-instance unique ID prefixes on all SVG def IDs (`glass-base`, blob IDs, overlay IDs); duplicate hardcoded IDs across simultaneous tab canvases (NativeTabs keeps all screens alive) collapse gradients to flat base color.
+- `apps/mobile/lib/api/resolve-api-base-url.ts` resolves the API base URL to the local network IP (not `localhost`) when running on a physical device, enabling the mobile client to reach the dev API over the same Wi-Fi network.
+- NativeTabs only accepts PNG template images (not raw SVG components); the alpha channel defines icon shape and `iconColor` tints it. Generate PNGs from SVG with `resvg-js` at transparent background — macOS `qlmanage` produces solid opaque squares that render as solid blocks in the tab bar. Use outline PNGs for unselected state and filled/solid PNGs for the selected state via the default/selected icon pair API.
