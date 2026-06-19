@@ -48,6 +48,18 @@ beforeAll(async () => {
     exception
       when duplicate_object then null;
     end $$;
+    -- Supabase manages the auth schema in real environments; the throwaway test
+    -- container does not, so stub the objects migrations reference (e.g. the
+    -- auth.users FK in 0007). Seed the test users so FK-backed inserts succeed.
+    create schema if not exists auth;
+    create table if not exists auth.users (
+      id uuid primary key
+    );
+    insert into auth.users (id)
+    values
+      ('11111111-1111-4111-8111-111111111111'),
+      ('22222222-2222-4222-8222-222222222222')
+    on conflict (id) do nothing;
     create table if not exists public.campaigns (
       id uuid primary key,
       business_id uuid not null,
