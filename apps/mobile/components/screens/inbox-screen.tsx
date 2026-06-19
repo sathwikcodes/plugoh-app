@@ -1,0 +1,406 @@
+import { ConversationRow } from '@/components/inbox/conversation-row';
+import { InboxFilterSheet } from '@/components/inbox/inbox-filter-sheet';
+import { getTabScreenBottomPadding } from '@/components/navigation/native-tab-config';
+import { AppHeader, getAppHeaderTopPadding } from '@/components/ui/app-header';
+import { CampaignDeckEmptyState } from '@/components/ui/campaign-empty-state';
+import { GlassSearchField } from '@/components/ui/glass-search-field';
+import { NativeIconButton } from '@/components/ui/native-icon-button';
+import { TabScreenCanvas } from '@/components/ui/tab-screen-canvas';
+import { ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
+import { theme } from '@/constants/theme';
+import { useBootstrap, useInbox, useMarketplaceMutations } from '@/hooks/use-marketplace';
+import {
+  DEFAULT_INBOX_FILTERS,
+  DEFAULT_INBOX_SORT,
+  getVisibleInboxItems,
+  inboxActiveFilterCount,
+  type InboxFilterDraft,
+  type InboxSort,
+} from '@/lib/filters/inbox';
+import { getConversationParty } from '@/lib/inbox/conversation-display';
+import { shouldShowInitialLoader } from '@/lib/query/loading';
+import labImage from '@/assets/images/lab.png';
+import mailImage from '@/assets/images/mail.png';
+import type { InboxItem } from '@plugoh/contracts';
+import { FlashList } from '@shopify/flash-list';
+import { router, type Href } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+export type InboxRole = 'business' | 'influencer';
+
+/** Per-role differences for the shared inbox composition. Everything else is identical. */
+type InboxRoleConfig = {
+  profileRoute: Href;
+  emptyTitle: string;
+  emptyHorizontalPadding: number;
+  matchesSearch: (item: InboxItem, q: string) => boolean;
+};
+
+const ROLE_CONFIG: Record<InboxRole, InboxRoleConfig> = {
+  influencer: {
+    profileRoute: '/(app)/profile',
+    emptyTitle: 'No messages yet',
+    emptyHorizontalPadding: theme.spacing.xxl,
+    matchesSearch: (item, q) =>
+      item.campaign.title.toLowerCase().includes(q) ||
+      Boolean(item.campaign.business_profile?.brand_name?.toLowerCase().includes(q)),
+  },
+  business: {
+    profileRoute: '/(app)/brand-profile',
+    emptyTitle: 'No messages',
+    emptyHorizontalPadding: theme.spacing.lg,
+    matchesSearch: (item, q) => {
+      const creatorName =
+        item.campaign.influencer_profile?.display_name ??
+        item.campaign.influencer_profile?.ig_username ??
+        '';
+      return item.campaign.title.toLowerCase().includes(q) || creatorName.toLowerCase().includes(q);
+    },
+  },
+};
+
+const TAB_BAR_CLEARANCE = 12;
+const EMPTY_CARD_MAX_WIDTH = 390;
+const EMPTY_CARD_WIDTH_RATIO = 0.84;
+const EMPTY_CARD_FALLBACK_HEIGHT_RATIO = 0.58;
+const EMPTY_CARD_FRAME_CLEARANCE = theme.spacing.section;
+
+function SkeletonRow() {
+  return (
+    <View style={styles.skeletonRow}>
+      <ShimmerCircle size={56} />
+      <View style={styles.skeletonBody}>
+        <ShimmerText width="64%" height={16} />
+        <ShimmerText width="46%" height={12} />
+        <ShimmerText width="80%" height={11} />
+      </View>
+    </View>
+  );
+}
+
+function EmptyInboxState({
+  title,
+  bottomInset,
+  horizontalPadding,
+}: {
+  title: string;
+  bottomInset: number;
+  horizontalPadding: number;
+}) {
+  const window = useWindowDimensions();
+  const [slotHeight, setSlotHeight] = useState(0);
+  const topClearance = EMPTY_CARD_FRAME_CLEARANCE / 2;
+  const bottomClearance = getTabScreenBottomPadding(bottomInset);
+  const cardWidth = Math.max(
+    260,
+    Math.round(Math.min(window.width * EMPTY_CARD_WIDTH_RATIO, EMPTY_CARD_MAX_WIDTH)),
+  );
+  const availableHeight =
+    slotHeight > 0
+      ? Math.max(0, slotHeight - topClearance - bottomClearance - EMPTY_CARD_FRAME_CLEARANCE / 2)
+      : window.height * EMPTY_CARD_FALLBACK_HEIGHT_RATIO;
+  const cardHeight = Math.max(360, Math.round(availableHeight));
+
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    setSlotHeight(event.nativeEvent.layout.height);
+  }, []);
+
+  return (
+    <View
+      style={[
+        styles.emptyWrap,
+        {
+          paddingTop: topClearance,
+          paddingBottom: bottomClearance,
+          paddingHorizontal: horizontalPadding,
+        },
+      ]}
+      onLayout={handleLayout}
+    >
+      <CampaignDeckEmptyState
+        title={title}
+        subtitle="New messages will appear here when they arrive."
+        imageSource={mailImage}
+        cardWidth={cardWidth}
+        cardHeight={cardHeight}
+      />
+    </View>
+  );
+}
+
+type InboxScreenProps = {
+  role: InboxRole;
+  profileImageUri: string | null | undefined;
+};
+
+/**
+ * Shared inbox composition for both roles. The influencer and business tabs
+ * differ only in their profile hook (resolved by the route wrapper into
+ * `profileImageUri`) and the per-role values in `ROLE_CONFIG`.
+ */
+export function InboxScreen({ role, profileImageUri }: InboxScreenProps) {
+  const config = ROLE_CONFIG[role];
+  const insets = useSafeAreaInsets();
+  const bootstrap = useBootstrap();
+  const inbox = useInbox();
+  const mutations = useMarketplaceMutations();
+  const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<InboxFilterDraft>(DEFAULT_INBOX_FILTERS);
+  const [sort, setSort] = useState<InboxSort>(DEFAULT_INBOX_SORT);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const appliedFilterCount =
+    inboxActiveFilterCount(filters) + (sort !== DEFAULT_INBOX_SORT ? 1 : 0);
+
+  const filtered = useMemo(() => {
+    return getVisibleInboxItems({
+      items: inbox.data ?? [],
+      query,
+      filters,
+      sort,
+      matchesSearch: config.matchesSearch,
+    });
+  }, [config.matchesSearch, filters, inbox.data, query, sort]);
+
+  const handleLongPress = useCallback(
+    (item: InboxItem) => {
+      Alert.alert(item.campaign.title, undefined, [
+        {
+          text: 'Mark as read',
+          onPress: () => {
+            mutations.markMessagesRead.mutate(item.campaign.id);
+          },
+        },
+        {
+          text: 'View Campaign',
+          onPress: () => {
+            router.push(`/(app)/campaigns/${item.campaign.id}`);
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [mutations.markMessagesRead],
+  );
+
+  const handlePress = useCallback((item: InboxItem) => {
+    router.push(`/(app)/inbox/${item.campaign.id}`);
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: InboxItem; index: number }) => {
+      const party = getConversationParty(item.campaign, role);
+      return (
+        <ConversationRow
+          item={item}
+          index={index}
+          nameLabel={party.name}
+          avatarName={party.avatarName}
+          avatarImageUri={party.avatarUri}
+          onPress={handlePress}
+          onLongPress={handleLongPress}
+        />
+      );
+    },
+    [handlePress, handleLongPress, role],
+  );
+
+  const keyExtractor = useCallback((item: InboxItem) => item.campaign.id, []);
+  const Separator = useCallback(() => <View style={styles.separator} />, []);
+
+  const listContentStyle = useMemo(
+    () => ({ paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE }),
+    [insets.bottom],
+  );
+
+  return (
+    <TabScreenCanvas>
+      <View style={styles.root}>
+        <View
+          style={[
+            styles.topHeader,
+            {
+              paddingTop: getAppHeaderTopPadding(insets.top),
+              paddingHorizontal: theme.spacing.xxl,
+            },
+          ]}
+        >
+          <AppHeader
+            title="Messages"
+            profile={{
+              imageUri: profileImageUri,
+              onPress: () => {
+                router.push(config.profileRoute);
+              },
+            }}
+          />
+        </View>
+
+        <View style={styles.searchBlock}>
+          <View style={styles.searchRow}>
+            <View style={styles.searchFieldWrap}>
+              <GlassSearchField
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search conversations"
+              />
+            </View>
+            <View style={styles.filterButtonWrap}>
+              <NativeIconButton
+                symbol="line.3.horizontal.decrease.circle"
+                fallbackIcon="filter"
+                fallbackIconFamily="foundation"
+                preferFallbackIcon
+                imageSource={labImage}
+                imageSize={30}
+                variant="glass"
+                haptic="selection"
+                size={46}
+                symbolSize={21}
+                fallbackSize={22}
+                accessibilityLabel="Open filters"
+                glassRendering="blur"
+                onPress={() => {
+                  setFiltersVisible(true);
+                }}
+              />
+              {appliedFilterCount > 0 ? (
+                <View style={styles.activeBadge}>
+                  <Text style={styles.activeBadgeText}>{appliedFilterCount}</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </View>
+
+        {shouldShowInitialLoader(bootstrap) || shouldShowInitialLoader(inbox) ? (
+          <View style={styles.skeletonList}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SkeletonRow key={i} />
+            ))}
+          </View>
+        ) : filtered.length === 0 ? (
+          <EmptyInboxState
+            title={config.emptyTitle}
+            bottomInset={insets.bottom}
+            horizontalPadding={config.emptyHorizontalPadding}
+          />
+        ) : (
+          <View style={styles.list}>
+            <FlashList
+              data={filtered}
+              renderItem={renderItem}
+              keyExtractor={keyExtractor}
+              ItemSeparatorComponent={Separator}
+              contentContainerStyle={listContentStyle}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            />
+          </View>
+        )}
+
+        <InboxFilterSheet
+          visible={filtersVisible}
+          presentation="premium"
+          filters={filters}
+          sort={sort}
+          onCancel={() => {
+            setFiltersVisible(false);
+          }}
+          onApply={({ filters: nextFilters, sort: nextSort }) => {
+            setFilters(nextFilters);
+            setSort(nextSort);
+            setFiltersVisible(false);
+          }}
+        />
+      </View>
+    </TabScreenCanvas>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  topHeader: {
+    flexShrink: 0,
+  },
+  searchBlock: {
+    paddingHorizontal: theme.spacing.xxl,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  searchFieldWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  filterButtonWrap: {
+    position: 'relative',
+    width: 46,
+    height: 46,
+  },
+  activeBadge: {
+    position: 'absolute',
+    right: -4,
+    top: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    backgroundColor: '#FF453A',
+    shadowColor: '#FF453A',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.34,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  activeBadgeText: {
+    ...theme.typography.labelSmall,
+    color: theme.colors.foreground,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  list: {
+    flex: 1,
+  },
+  skeletonList: {
+    flex: 1,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    marginLeft: 90,
+    marginRight: 20,
+  },
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: theme.spacing.xxl,
+    paddingVertical: 13,
+    gap: 14,
+  },
+  skeletonBody: {
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+});

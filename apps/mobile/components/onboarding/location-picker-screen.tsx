@@ -2,7 +2,10 @@ import mapImage from '@/assets/images/map.png';
 import { GlassSearchField } from '@/components/ui/glass-search-field';
 import { theme } from '@/constants/theme';
 import { endpoints } from '@/lib/api/endpoints';
-import { setOnboardingLocationSelection } from '@/lib/onboarding/location-selection';
+import {
+  onboardingLocationChannel,
+  type LocationSelection,
+} from '@/lib/location/location-selection';
 import {
   resolvePlace,
   reverseLabel,
@@ -33,12 +36,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 type Coordinates = {
   latitude?: number;
   longitude?: number;
-};
-
-type LocationSelection = {
-  label: string;
-  latitude: number;
-  longitude: number;
 };
 
 type LocationPickerScreenProps = {
@@ -244,7 +241,7 @@ export function LocationPickerScreen({
     if (onConfirm) {
       onConfirm(selection);
     } else {
-      setOnboardingLocationSelection(selection);
+      onboardingLocationChannel.set(selection);
     }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();

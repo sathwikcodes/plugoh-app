@@ -1,5 +1,5 @@
-import { AnimatedPillButton } from '@/components/auth/AnimatedPillButton';
-import { OtpInputRow } from '@/components/auth/OtpInputRow';
+import { AnimatedPillButton } from '@/components/auth/animated-pill-button';
+import { OtpInputRow } from '@/components/auth/otp-input-row';
 import { authTypography } from '@/components/auth/typography';
 import { theme } from '@/constants/theme';
 import { sendEmailOtp } from '@/lib/auth/otp';

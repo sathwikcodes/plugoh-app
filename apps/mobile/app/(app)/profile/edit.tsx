@@ -9,11 +9,7 @@ import {
   useMarketplaceMutations,
 } from '@/hooks/use-marketplace';
 import { BRAND_CATEGORY_OPTIONS, type BrandCategory } from '@/lib/onboarding/premium-flow';
-import {
-  consumeProfileLocationSelection,
-  subscribeProfileLocationSelection,
-  type ProfileLocationSelection,
-} from '@/lib/profile/location-selection';
+import { profileLocationChannel, type LocationSelection } from '@/lib/location/location-selection';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { BlurView } from 'expo-blur';
 import { router, useFocusEffect } from 'expo-router';
@@ -235,7 +231,7 @@ export default function EditProfileScreen() {
   const profile = useInfluencerProfile();
   const businessProfile = useBusinessProfile();
   const mutations = useMarketplaceMutations();
-  const [businessLocation, setBusinessLocation] = useState<ProfileLocationSelection | null>(null);
+  const [businessLocation, setBusinessLocation] = useState<LocationSelection | null>(null);
   type FormValues = z.infer<typeof schema>;
   const {
     handleSubmit,
@@ -277,13 +273,13 @@ export default function EditProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const applySelection = (selection: ProfileLocationSelection) => {
+      const applySelection = (selection: LocationSelection) => {
         setBusinessLocation(selection);
         setValue('city', selection.label, { shouldValidate: true, shouldDirty: true });
       };
-      const consumed = consumeProfileLocationSelection();
+      const consumed = profileLocationChannel.consume();
       if (consumed) applySelection(consumed);
-      return subscribeProfileLocationSelection(applySelection);
+      return profileLocationChannel.subscribe(applySelection);
     }, [setValue]),
   );
 

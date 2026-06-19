@@ -8,9 +8,9 @@ import { theme } from '@/constants/theme';
 import { instagramConnect } from '@/lib/api/endpoints';
 import { clearBasicsDraft, getBasicsDraft, setBasicsDraft } from '@/lib/onboarding/basics-draft';
 import {
-  consumeOnboardingLocationSelection,
-  type OnboardingLocationSelection,
-} from '@/lib/onboarding/location-selection';
+  onboardingLocationChannel,
+  type LocationSelection,
+} from '@/lib/location/location-selection';
 import {
   BRAND_CATEGORY_OPTIONS,
   DEFAULT_PREMIUM_ONBOARDING_VALUES,
@@ -519,7 +519,7 @@ export function PremiumOnboardingScreen({ stage }: PremiumOnboardingScreenProps)
   const [values, setValues] = useState<PremiumOnboardingValues>(DEFAULT_PREMIUM_ONBOARDING_VALUES);
   const [busy, setBusy] = useState(false);
 
-  const applyLocationSelection = useCallback((selection: OnboardingLocationSelection) => {
+  const applyLocationSelection = useCallback((selection: LocationSelection) => {
     setValues((current) => ({
       ...current,
       location: selection.label,
@@ -556,7 +556,7 @@ export function PremiumOnboardingScreen({ stage }: PremiumOnboardingScreenProps)
 
   useFocusEffect(
     useCallback(() => {
-      const selection = consumeOnboardingLocationSelection();
+      const selection = onboardingLocationChannel.consume();
       if (selection) applyLocationSelection(selection);
     }, [applyLocationSelection]),
   );

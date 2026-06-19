@@ -1,5 +1,5 @@
-import { GetStartedModal } from '@/components/auth/GetStartedModal';
-import { OrbitalComposition } from '@/components/auth/OrbitalComposition';
+import { GetStartedModal } from '@/components/auth/get-started-modal';
+import { OrbitalComposition } from '@/components/auth/orbital-composition';
 import { authTypography } from '@/components/auth/typography';
 import { signInWithSupabaseGoogle, userMessageForGoogleAuth } from '@/lib/auth/google';
 import MaskedView from '@react-native-masked-view/masked-view';

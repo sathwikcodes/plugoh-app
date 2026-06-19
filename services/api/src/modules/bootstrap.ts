@@ -12,6 +12,7 @@ import type { EnvConfig } from '../config/env.js';
 import { loggerMiddleware } from '../core/logger.js';
 import { fail } from '../core/response.js';
 import { onError, notFoundHandler } from '../middleware/error-handler.js';
+import { requestLog } from '../middleware/request-log.js';
 import type { DataStore } from '../repositories/data-store.js';
 import { createServices, type ProviderBundle, type Services } from '../services/marketplace.js';
 import type { AppEnv } from '../types.js';
@@ -36,6 +37,7 @@ export function applyGlobalMiddleware(app: Hono<AppEnv>, config: EnvConfig) {
   app.use('*', etag());
   app.use('*', compress());
   app.use('*', loggerMiddleware);
+  app.use('*', requestLog);
   if (process.env.NODE_ENV !== 'production') app.use('*', timing());
   app.use('*', async (c, next) => {
     const maxSize = c.req.path === '/delivery/upload' ? 50 * 1024 * 1024 : 1 * 1024 * 1024;

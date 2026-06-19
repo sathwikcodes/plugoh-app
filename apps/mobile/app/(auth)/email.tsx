@@ -1,5 +1,5 @@
-import { AnimatedPillButton } from '@/components/auth/AnimatedPillButton';
-import { LumaTextField } from '@/components/auth/LumaTextField';
+import { AnimatedPillButton } from '@/components/auth/animated-pill-button';
+import { LumaTextField } from '@/components/auth/luma-text-field';
 import { authTypography } from '@/components/auth/typography';
 import { theme } from '@/constants/theme';
 import { sendEmailOtp } from '@/lib/auth/otp';

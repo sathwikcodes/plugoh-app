@@ -6,7 +6,7 @@ import {
 import { theme } from '@/constants/theme';
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { Dimensions, Text, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 
 const PLACEHOLDER_TONE = 'rgba(255,255,255,0.42)';
 
@@ -21,7 +21,8 @@ export function GlassPlaceholderCard({
   minHeight: minHeightProp,
   placeholder = 'Campaign cards will appear here',
 }: GlassPlaceholderCardProps) {
-  const minHeight = minHeightProp ?? getCampaignCardFrameHeight(Dimensions.get('window').height);
+  const { height: windowHeight } = useWindowDimensions();
+  const minHeight = minHeightProp ?? getCampaignCardFrameHeight(windowHeight);
 
   const inner = (
     <View

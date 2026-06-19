@@ -1,6 +1,6 @@
 import { LocationPickerScreen } from '@/components/onboarding/location-picker-screen';
 import { useBusinessProfile } from '@/hooks/use-marketplace';
-import { setProfileLocationSelection } from '@/lib/profile/location-selection';
+import { profileLocationChannel } from '@/lib/location/location-selection';
 
 export default function ProfileLocationPickerRoute() {
   const profile = useBusinessProfile();
@@ -20,7 +20,7 @@ export default function ProfileLocationPickerRoute() {
       searchPlaceholder="Search brand address"
       confirmLabel="Use this location"
       initialSelection={initialSelection}
-      onConfirm={setProfileLocationSelection}
+      onConfirm={profileLocationChannel.set}
     />
   );
 }

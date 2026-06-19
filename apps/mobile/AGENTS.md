@@ -32,6 +32,29 @@ Run from repo root unless noted.
 - Prefer the `@/` alias over long relative imports.
 - Remove old route files when intentionally restructuring navigation.
 
+### Route files stay THIN (hard rule)
+
+- A route file (`app/**/*.tsx`) is a wrapper, not a screen. Target **< ~50 LOC**; never exceed ~150 without explicit justification. It may: call role/data hooks, derive a small view-model, and render a screen component from `components/screens/`. It must not contain the screen's layout, styles, sub-components, or business logic.
+- Full screen layouts live in `components/screens/<screen>.tsx` (kebab-case). Example: `app/(app)/(tabs)/inbox.tsx` and `app/(app)/(brand-tabs)/inbox.tsx` are 8-line wrappers around `components/screens/inbox-screen.tsx`.
+
+### Dual-role screens (business vs influencer) — never duplicate
+
+- The two role tab groups — `app/(app)/(tabs)/` (influencer) and `app/(app)/(brand-tabs)/` (business) — must **not** hold near-duplicate screen files. Build one shared composition in `components/screens/` and pass role differences in via props/config.
+- Pattern: the shared screen takes a small role config (a `role: 'business' | 'influencer'` discriminant with a per-role lookup object, or explicit props for the few differences — profile image, target routes, search predicate, copy). Each route wrapper calls its role-specific hook (`useInfluencerProfile` vs `useBusinessProfile`) and passes the resolved values down. See `components/screens/inbox-screen.tsx` and `components/screens/home-screen.tsx`.
+- If you find yourself copy-pasting a screen between the two tab groups, stop and extract a `components/screens/` composition instead.
+
+### Component & hook organization
+
+- `components/screens/` — full screen compositions (role-parameterized). `components/ui/` — primitives (glass, headers, shimmer, tab canvas). `components/<domain>/` (e.g. `inbox/`, `earnings/`, `auth/`, `onboarding/`, `influencer/`) — domain-specific pieces.
+- Marketplace data hooks live in `hooks/marketplace/` split by domain (`use-profiles`, `use-campaigns`, `use-inbox`, `use-earnings`, `use-payments`, `use-notifications`, `use-discovery`, `use-mutations`), with private shared helpers in `hooks/marketplace/internal.ts` and a barrel `hooks/marketplace/index.ts`. `hooks/use-marketplace.ts` is a back-compat re-export shim — prefer importing from `@/hooks/marketplace` in new code, and do not grow `use-marketplace.ts` back into a god-hook.
+- Feature logic (filters, pub/sub channels, formatters, view-model derivation) lives in `lib/<feature>/` — e.g. `lib/location/location-selection.ts` (one generic channel factory; do not re-introduce per-feature copies), `lib/filters/`, `lib/brand/`, `lib/influencer/`. Keep one source of truth per concern; never duplicate a pub/sub or helper across `lib/` subfolders.
+
+### Naming conventions
+
+- Filenames are **kebab-case** for every `.ts`/`.tsx` file, including components (`comment-card.tsx`, not `CommentCard.tsx`). React components and hooks keep their idiomatic casing as *symbols* (`CommentCard`, `useInbox`) but the file is kebab-case.
+- Prefer **named exports** for components/hooks/utilities. Route files use `export default` (Expo Router requirement); give the default a descriptive name (`InfluencerInboxRoute`, not `default`).
+- One primary export concern per file; co-locate only its tightly-coupled local helpers/sub-components.
+
 ## Graphify Context Anchors
 
 - Before broad UI, bootstrap, auth/session, API, query-cache, or navigation changes, query/inspect Graphify nodes around `theme`, `useBootstrap()`, `createQueryClient()`, `queryKeys`, `coreInvalidationKeys`, route `_layout.tsx` files, and the target screen/component.

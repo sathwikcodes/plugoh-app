@@ -1,5 +1,5 @@
-import type { UserRole } from "@plugoh/contracts";
-import type { Logger } from "pino";
+import type { UserRole } from '@plugoh/contracts';
+import type { Logger } from 'pino';
 
 export type AuthUser = {
   id: string;
@@ -15,6 +15,7 @@ export type HonoVariables = {
   role?: UserRole;
   authToken?: string;
   log?: Logger;
+  requestStartMs?: number;
 };
 
 export type AppEnv = {

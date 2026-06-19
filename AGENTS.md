@@ -30,15 +30,31 @@ Do not document or call `npm run ai:dev` unless `package.json` is updated; it is
 
 ## Directory Structure And Architecture
 
-- `apps/mobile`: Expo Router React Native client. Keep client code thin; backend orchestration and integrations belong in services.
-- `services/api`: Hono marketplace API with route modules, middleware, repositories, service logic, tests, and job exports.
+- `apps/mobile`: Expo Router React Native client. Keep client code thin; backend orchestration and integrations belong in services. Routes in `app/` are thin wrappers; screen compositions live in `components/screens/`, data hooks in `hooks/marketplace/`, logic in `lib/<feature>/`. See `apps/mobile/AGENTS.md`.
+- `services/api`: Hono marketplace API. Each domain is a `src/modules/<domain>/` folder with `routes.ts` (thin) + `service.ts` (logic). `src/services/marketplace.ts` is a factory barrel only (`createServices`/`Services`/`ProviderBundle`); multi-use helpers live in `src/services/shared.ts`. See `services/api/AGENTS.md`.
 - `services/jobs`: worker/scheduler entrypoint that should call service/job logic instead of duplicating business rules.
-- `services/ai`: scaffold only; no current workspace package or source package detected.
+- AI text generation is a normal API module (`services/api/src/modules/ai/`), not a separate `services/ai` package — do not recreate a standalone AI service.
 - `packages/contracts`: shared API/domain contracts and Zod schemas.
 - `packages/db`: database integration/types scaffold.
 - `packages/config`: shared TypeScript configs.
 - `infra/azure`: deployment scripts, runbooks, and Bicep modules; see `infra/azure/README.md` and `infra/azure/RUNBOOK.md`.
 - `infra/db`: SQL migrations and seed data.
+
+## Architecture And Naming Conventions (REQUIRED)
+
+These rules are enforced by review; follow them exactly. Nested `AGENTS.md` files hold the detail — read them before editing their subtree.
+
+**No duplication / single source of truth.** Before writing a new helper, hook, component, type, or screen, search for an existing one and reuse or extend it. Never copy-paste a file between roles, folders, or services. Lighter is better — delete dead code, redundant scaffolds, and unused exports as you touch them.
+
+**API module pattern.** Domain logic lives in `services/api/src/modules/<domain>/service.ts`; `routes.ts` stays a thin Hono handler (validate → call one service method → shape response). `services/marketplace.ts` is a factory barrel only. Multi-use helpers go in `services/shared.ts`; single-use helpers stay local to their service. Construct services via `createServices()`; never read `process.env` or build providers inside a service.
+
+**Mobile thin-route pattern.** `app/**` route files are wrappers (target < ~50 LOC); full screens live in `components/screens/`. Business/influencer screens share one `components/screens/` composition parameterized by role — never two near-duplicate route files. Marketplace hooks live in `hooks/marketplace/` (domain-split + barrel), feature logic in `lib/<feature>/`. Keep mobile thin: payment state, escrow, campaign transitions, provider calls, and notification side effects belong in API/services/jobs.
+
+**Naming.** All filenames are kebab-case (`comment-card.tsx`, `use-inbox.ts`), including components — symbols keep idiomatic casing (`CommentCard`, `useInbox`). Prefer named exports; Expo Router route files use a descriptively-named `export default`. Prefer the `@/` alias over deep relatives.
+
+**Contracts.** Cross-boundary request/response/domain types live only in `packages/contracts`; never duplicate them in app or service code. If an API shape changes, update `packages/contracts` + API + mobile + tests in the same change. Money is in paise (see `formatPaiseAsINR`).
+
+**Observability & safety.** Every API request logs one structured line (`request-log.ts`); never log secrets, tokens, OTPs, cookies, headers, or payment bodies. Preserve idempotency, auth, validation, rate limiting, and error normalization on sensitive paths. Do not rename/remove backward-compatible route aliases without updating mobile + contracts.
 
 ## Agent Context Workflow
 
@@ -60,6 +76,7 @@ Do not document or call `npm run ai:dev` unless `package.json` is updated; it is
 
 - TypeScript is strict; avoid `any` outside the API exceptions already encoded in `eslint.config.js`.
 - Prettier uses single quotes, semicolons, trailing commas, and `printWidth: 100`.
+- Filenames are kebab-case everywhere (including components); symbols keep idiomatic casing. Prefer named exports (route files excepted). See "Architecture And Naming Conventions" above.
 - Keep shared request/response/domain types in `packages/contracts`; do not duplicate them in app or service code.
 - Keep native dependencies in `apps/mobile` and use one dependency version across the monorepo when possible.
 - Prefer small, local changes that reuse existing folder patterns before adding abstractions.
@@ -69,7 +86,7 @@ Do not document or call `npm run ai:dev` unless `package.json` is updated; it is
 
 ## Testing And CI
 
-GitHub CI for API-related changes runs `npm ci`, `npm run lint`, `npm run typecheck`, API tests with coverage thresholds, and Gitleaks. API coverage thresholds in CI are 70% lines and 70% functions.
+GitHub CI for API-related changes runs `npm ci`, `npm run lint`, `npm run typecheck`, API tests with coverage, and Gitleaks. 70% lines/functions is the intended API coverage standard, but the chained `api:test:coverage` script does not currently fail CI on it (threshold flags don't propagate to vitest; real baseline ~59%). Write tests as if the gate were enforced — don't rely on CI to block low coverage.
 
 Before handing off code changes, run the narrowest relevant checks plus broader checks for shared or cross-cutting changes. For contract or DB package changes, run package builds and `npm run typecheck`; for API behavior, run API tests; for mobile UI/client changes, run mobile lint/typecheck/tests where applicable.
 
