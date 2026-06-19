@@ -10,6 +10,7 @@ export const queryKeys = {
   notifications: (role: 'business' | 'influencer') => ['notifications', role] as const,
   discovery: (params?: Record<string, unknown>) => ['discovery', params ?? {}] as const,
   payout: ['payout'] as const,
+  savedCards: ['saved-cards'] as const,
   businessProfile: ['business-profile'] as const,
 };
 
@@ -25,6 +26,7 @@ export const coreInvalidationKeys = [
   queryKeys.notifications('business'),
   queryKeys.earnings,
   queryKeys.payout,
+  queryKeys.savedCards,
   queryKeys.discovery(),
   queryKeys.businessProfile,
 ] as const;

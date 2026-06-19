@@ -196,6 +196,16 @@ export function usePayout() {
   });
 }
 
+export function useSavedCards() {
+  const session = useAuthStore((state) => state.session);
+  const { role } = useRoleFromBootstrap();
+  return useQuery({
+    queryKey: queryKeys.savedCards,
+    queryFn: endpoints.savedCards,
+    enabled: Boolean(session && role === 'business'),
+  });
+}
+
 export function useInfluencerDiscovery(params?: {
   limit?: number;
   offset?: number;
@@ -293,7 +303,13 @@ export function useMarketplaceMutations() {
       onSuccess: invalidateCore,
     }),
     createBookingOrder: useMutation({
-      mutationFn: createBookingOrder,
+      mutationFn: ({
+        input,
+        idempotencyKey,
+      }: {
+        input: Parameters<typeof createBookingOrder>[0];
+        idempotencyKey?: string;
+      }) => createBookingOrder(input, idempotencyKey),
     }),
     verifyBookingPayment: useMutation({
       mutationFn: ({

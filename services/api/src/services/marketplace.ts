@@ -10,6 +10,7 @@ import type {
   GeocodingProvider,
   InstagramProvider,
   PaymentProvider,
+  PlacesProvider,
   PushProvider,
   StorageProvider,
   WeatherProvider,
@@ -64,6 +65,7 @@ export type ProviderBundle = {
   payment?: PaymentProvider;
   email?: EmailProvider;
   geocoding?: GeocodingProvider;
+  places?: PlacesProvider;
   weather?: WeatherProvider;
   instagram?: InstagramProvider;
   storage?: StorageProvider;
@@ -95,7 +97,7 @@ export function createServices(
   );
   return {
     discovery: new DiscoveryService(store),
-    profiles: new ProfileService(store, providers.geocoding),
+    profiles: new ProfileService(store, providers.geocoding, providers.places),
     campaigns: campaignCore,
     payments,
     delivery: new DeliveryService(store, notifications, providers.storage),
@@ -156,9 +158,27 @@ async function geocodeValues(
   }
 }
 
+function explicitCoordinateValues(input: Row, prefix: 'brand' | 'place') {
+  const latitude = Number(input[`${prefix}_latitude`]);
+  const longitude = Number(input[`${prefix}_longitude`]);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return {
+    [`${prefix}_latitude`]: latitude,
+    [`${prefix}_longitude`]: longitude,
+  };
+}
+
 function moneyPaise(value: unknown) {
   const amount = Number(value ?? 0);
   return Number.isFinite(amount) ? Math.round(amount) : 0;
+}
+
+function isMissingBookingPaymentIntentsTable(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  return (
+    code === '42P01' && typeof message === 'string' && message.includes('booking_payment_intents')
+  );
 }
 
 function platformFeePaise(pricePaise: number) {
@@ -231,11 +251,21 @@ function withBusinessProfileImage(profile?: Row | null, account?: Row | null) {
 
   return {
     ...profile,
+    brand_type: profile.brand_type ?? profile.brand_category,
     email: typeof account?.email === 'string' ? account.email : undefined,
     profile_photo_url: profilePhoto,
     avatar_url: accountAvatar || undefined,
     instagram_connected: hasInstagramConnection(profile),
   };
+}
+
+function normalizeBusinessProfilePatch(input: Row) {
+  const patch = { ...input };
+  if (patch.brand_category == null && patch.brand_type != null) {
+    patch.brand_category = patch.brand_type;
+  }
+  delete patch.brand_type;
+  return patch;
 }
 
 function withInfluencerProfileImage(profile?: Row | null, account?: Row | null) {
@@ -507,6 +537,7 @@ export class ProfileService {
   constructor(
     private readonly store: DataStore,
     private readonly geocoding?: GeocodingProvider,
+    private readonly places?: PlacesProvider,
   ) {}
 
   async bootstrap(user: AuthUser, role: UserRole | null) {
@@ -643,12 +674,15 @@ export class ProfileService {
       input as { full_name: string; phone: string; location: string },
     );
     const brandLocation = input.brand_location ?? input.location;
+    const coordinateValues =
+      explicitCoordinateValues(input, 'brand') ??
+      (await geocodeValues(this.geocoding, brandLocation, 'brand'));
     const values = {
       user_id: user.id,
       brand_name: input.brand_name,
       brand_category: input.brand_category,
       brand_location: brandLocation,
-      ...(await geocodeValues(this.geocoding, brandLocation, 'brand')),
+      ...coordinateValues,
       brand_summary: input.brand_summary,
       tagline: input.tagline,
       updated_at: nowIso(),
@@ -701,18 +735,77 @@ export class ProfileService {
   }
 
   async updateBusiness(user: AuthUser, input: Row) {
-    const coordinateValues =
-      Object.prototype.hasOwnProperty.call(input, 'brand_location') ||
-      Object.prototype.hasOwnProperty.call(input, 'location')
-        ? await geocodeValues(this.geocoding, input.brand_location ?? input.location, 'brand')
+    const patch = normalizeBusinessProfilePatch(input);
+    const existing = await this.store.findOne<Row>('business_profiles', {
+      eq: { user_id: user.id },
+    });
+    const explicitCoordinates = explicitCoordinateValues(patch, 'brand');
+    const locationChanged =
+      Object.prototype.hasOwnProperty.call(patch, 'brand_location') &&
+      String(patch.brand_location ?? '').trim() !== String(existing?.brand_location ?? '').trim();
+    const coordinateValues = explicitCoordinates
+      ? explicitCoordinates
+      : locationChanged || Object.prototype.hasOwnProperty.call(patch, 'location')
+        ? await geocodeValues(this.geocoding, patch.brand_location ?? patch.location, 'brand')
         : {};
     const [profile] = await this.store.update<Row>(
       'business_profiles',
       { eq: { user_id: user.id } },
-      { ...input, ...coordinateValues, updated_at: nowIso() },
+      { ...patch, ...coordinateValues, updated_at: nowIso() },
     );
     if (!profile) throw notFound('Business profile');
-    return profile;
+    const account = await this.store.findOne<Row>('profiles', { eq: { id: user.id } });
+    return withBusinessProfileImage(profile, account);
+  }
+
+  async reverseGeocode(input: { latitude: number; longitude: number }) {
+    const fallback = { label: 'Selected location' };
+    if (!this.geocoding?.reverseGeocode) return fallback;
+    try {
+      return (await this.geocoding.reverseGeocode(input)) ?? fallback;
+    } catch (error) {
+      logger.warn(
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Reverse geocoding failed',
+      );
+      return fallback;
+    }
+  }
+
+  async geocode(input: { query: string }) {
+    const query = input.query.trim();
+    if (!this.geocoding) {
+      throw badRequest('GEOCODING_PROVIDER_UNAVAILABLE', 'Location search is not configured');
+    }
+    const result = await this.geocoding.geocode(query);
+    if (!result) {
+      throw badRequest('LOCATION_NOT_FOUND', 'No matching location found');
+    }
+    return {
+      label: result.label?.trim() || query,
+      latitude: result.latitude,
+      longitude: result.longitude,
+    };
+  }
+
+  async autocomplete(input: { query: string }) {
+    if (!this.places) {
+      throw badRequest('PLACES_PROVIDER_UNAVAILABLE', 'Location search is not configured');
+    }
+    return { predictions: await this.places.autocomplete(input.query.trim()) };
+  }
+
+  async placeDetails(input: { place_id: string }) {
+    if (!this.places) {
+      throw badRequest('PLACES_PROVIDER_UNAVAILABLE', 'Location search is not configured');
+    }
+    const result = await this.places.placeDetails(input.place_id);
+    if (!result) {
+      throw badRequest('LOCATION_NOT_FOUND', 'No matching location found');
+    }
+    return result;
   }
 
   async assertBusinessComplete(userId: string) {
@@ -748,10 +841,19 @@ export class CampaignService {
       eq: { id: input.influencer_profile_id, is_active: true },
     });
     if (!influencer) throw notFound('Influencer profile');
-    const pricePaise = packagePricePaise(influencer, input.package_type);
+    const quotedPricePaise =
+      paymentInput.price_offered_paise == null
+        ? undefined
+        : moneyPaise(paymentInput.price_offered_paise);
+    const pricePaise = quotedPricePaise ?? packagePricePaise(influencer, input.package_type);
     if (input.influencer_id && input.influencer_id !== influencer.user_id)
       throw badRequest('INFLUENCER_MISMATCH', 'Influencer does not match profile');
-    const feePaise = platformFeePaise(pricePaise);
+    const quotedFeePaise =
+      paymentInput.platform_fee_paise == null
+        ? undefined
+        : moneyPaise(paymentInput.platform_fee_paise);
+    const feePaise = quotedFeePaise ?? platformFeePaise(pricePaise);
+    const totalPaise = moneyPaise(paymentInput.total_charged_paise ?? pricePaise + feePaise);
     const title = `${input.objective.replaceAll('_', ' ')} with ${
       influencer.display_name ?? influencer.instagram_username ?? 'influencer'
     }`;
@@ -797,7 +899,7 @@ export class CampaignService {
         provider_payment_id: paymentInput.provider_payment_id,
         payment_method: paymentInput.payment_method ?? 'card',
         status: paymentInput.payment_order_status ?? 'authorized',
-        amount_paise: campaign.total_charged_paise ?? pricePaise + feePaise,
+        amount_paise: totalPaise,
         currency: 'INR',
         authorized_at: paymentInput.authorized_at ?? nowIso(),
         metadata: {},
@@ -1150,6 +1252,60 @@ export class PaymentService {
     return this.payment;
   }
 
+  private cardSummary(row: Row) {
+    return {
+      id: String(row.id),
+      provider: String(row.provider ?? 'razorpay'),
+      brand: typeof row.brand === 'string' ? row.brand : undefined,
+      network: typeof row.network === 'string' ? row.network : undefined,
+      type: typeof row.card_type === 'string' ? row.card_type : undefined,
+      issuer: typeof row.issuer === 'string' ? row.issuer : undefined,
+      last4: typeof row.last4 === 'string' ? row.last4 : undefined,
+      created_at: typeof row.created_at === 'string' ? row.created_at : undefined,
+      updated_at: typeof row.updated_at === 'string' ? row.updated_at : undefined,
+    };
+  }
+
+  async listSavedCards(user: AuthUser) {
+    const rows = await this.store.list<Row>(
+      'business_saved_cards',
+      {
+        eq: { user_id: user.id },
+        order: { column: 'updated_at', ascending: false },
+      },
+      'id,provider,brand,network,card_type,issuer,last4,created_at,updated_at',
+    );
+    return rows.map((row) => this.cardSummary(row));
+  }
+
+  private async saveCardFromPayment(
+    user: AuthUser,
+    payment: Awaited<ReturnType<PaymentProvider['fetchPayment']>>,
+  ) {
+    if (payment.method !== 'card') return;
+    const card = payment.card;
+    const providerCardId = payment.card_id ?? card?.id ?? payment.id;
+    const last4 = card?.last4?.trim();
+    if (!providerCardId && !last4) return;
+    const timestamp = nowIso();
+    await this.store.upsert<Row>(
+      'business_saved_cards',
+      {
+        user_id: user.id,
+        provider: 'razorpay',
+        provider_card_id: providerCardId,
+        provider_payment_id: payment.id,
+        brand: card?.network ?? undefined,
+        network: card?.network ?? undefined,
+        card_type: card?.type ?? undefined,
+        issuer: card?.issuer ?? undefined,
+        last4,
+        updated_at: timestamp,
+      },
+      'user_id,provider,provider_card_id',
+    );
+  }
+
   async createEscrowOrder(user: AuthUser, campaignId: string) {
     const campaign = await requireCampaignRole(this.store, campaignId, user.id, 'business');
     requireStatus(campaign, ['pre_authorized']);
@@ -1207,6 +1363,7 @@ export class PaymentService {
       p_provider_payment_id: input.razorpay_payment_id,
       p_payment_method: payment.method,
     });
+    await this.saveCardFromPayment(user, payment);
     await this.notifications.create(
       transitioned.influencer_id,
       'payment_secured',
@@ -1218,12 +1375,13 @@ export class PaymentService {
   async createBookingOrder(user: AuthUser, input: Row) {
     const profileService = new ProfileService(this.store);
     await profileService.assertBusinessComplete(user.id);
+    const bookingPayload = this.normalizeBookingPayload(input);
     const influencer = await this.store.getById<Row>(
       'influencer_profiles',
-      input.influencer_profile_id,
+      bookingPayload.influencer_profile_id,
     );
     if (!influencer || influencer.is_active !== true) throw notFound('Influencer profile');
-    const pricePaise = packagePricePaise(influencer, input.package_type);
+    const pricePaise = packagePricePaise(influencer, bookingPayload.package_type);
     const feePaise = platformFeePaise(pricePaise);
     const totalPaise = pricePaise + feePaise;
     const order = await this.requirePayment().createOrder({
@@ -1231,7 +1389,35 @@ export class PaymentService {
       currency: 'INR',
       payment_capture: 0,
     });
+    let intent: Row | null = null;
+    try {
+      intent = await this.store.insert<Row>('booking_payment_intents', {
+        business_id: user.id,
+        influencer_profile_id: bookingPayload.influencer_profile_id,
+        package_type: bookingPayload.package_type,
+        booking_payload: bookingPayload,
+        provider: 'razorpay',
+        provider_order_id: order.id,
+        status: 'created',
+        price_offered_paise: pricePaise,
+        platform_fee_paise: feePaise,
+        total_charged_paise: totalPaise,
+        currency: order.currency,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      });
+    } catch (error) {
+      if (!isMissingBookingPaymentIntentsTable(error)) throw error;
+      logger.warn(
+        {
+          orderId: order.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Booking payment intents table is unavailable; using legacy booking verification',
+      );
+    }
     return {
+      ...(intent?.id ? { bookingIntentId: intent.id } : {}),
       orderId: order.id,
       keyId: this.config.razorpayKeyId,
       amount: order.amount,
@@ -1243,6 +1429,159 @@ export class PaymentService {
   }
 
   async verifyBookingPayment(user: AuthUser, input: Row) {
+    if (input.booking_intent_id) {
+      return this.verifyBookingPaymentIntent(user, input);
+    }
+    return this.verifyLegacyBookingPayment(user, input);
+  }
+
+  private normalizeBookingPayload(input: Row) {
+    const businessContactEmail = input.business_contact_email ?? input.contact_email;
+    const businessContactPhone = input.business_contact_phone ?? input.contact_phone;
+    return {
+      influencer_id: input.influencer_id,
+      influencer_profile_id: input.influencer_profile_id,
+      package_type: input.package_type,
+      objective: input.objective,
+      timing_mode: input.timing_mode,
+      due_date: input.due_date,
+      place_name: input.place_name,
+      business_contact_email: businessContactEmail,
+      business_contact_phone: businessContactPhone,
+    };
+  }
+
+  private bookingPayloadFromIntent(intent: Row) {
+    const payload =
+      typeof intent.booking_payload === 'string'
+        ? (JSON.parse(intent.booking_payload) as Row)
+        : intent.booking_payload;
+    return this.normalizeBookingPayload(payload ?? {});
+  }
+
+  private async verifyBookingPaymentIntent(user: AuthUser, input: Row) {
+    const intent = await this.store.getById<Row>(
+      'booking_payment_intents',
+      input.booking_intent_id,
+    );
+    if (!intent) throw notFound('Booking payment intent');
+    if (intent.business_id !== user.id) throw forbidden('Business payment intent required');
+    if (intent.status === 'completed' && intent.campaign_id) {
+      return { success: true, campaignId: intent.campaign_id };
+    }
+    if (intent.provider_order_id !== input.razorpay_order_id) {
+      throw conflict(
+        'PAYMENT_ORDER_MISMATCH',
+        'Payment verification does not match this booking order',
+      );
+    }
+    const provider = this.requirePayment();
+    if (
+      !provider.verifySignature({
+        orderId: input.razorpay_order_id,
+        paymentId: input.razorpay_payment_id,
+        signature: input.razorpay_signature,
+      })
+    ) {
+      throw forbidden('Invalid Razorpay signature');
+    }
+    const existingOrder = await this.store.findOne<Row>('payment_orders', {
+      eq: { provider: 'razorpay', provider_order_id: input.razorpay_order_id },
+    });
+    if (existingOrder?.campaign_id) {
+      await this.store.update(
+        'booking_payment_intents',
+        { eq: { id: intent.id } },
+        {
+          status: 'completed',
+          campaign_id: existingOrder.campaign_id,
+          provider_payment_id: input.razorpay_payment_id,
+          updated_at: nowIso(),
+          completed_at: nowIso(),
+        },
+      );
+      return { success: true, campaignId: existingOrder.campaign_id };
+    }
+    const order = await provider.fetchOrder(input.razorpay_order_id);
+    const expectedAmount = moneyPaise(intent.total_charged_paise);
+    if (order.amount !== expectedAmount || order.currency !== intent.currency) {
+      await this.store.update(
+        'booking_payment_intents',
+        { eq: { id: intent.id } },
+        {
+          status: 'failed',
+          provider_payment_id: input.razorpay_payment_id,
+          failure_reason: 'Paid order amount does not match the requested booking amount',
+          updated_at: nowIso(),
+          failed_at: nowIso(),
+        },
+      );
+      throw conflict(
+        'PAYMENT_AMOUNT_MISMATCH',
+        'Paid order amount does not match the requested booking amount',
+      );
+    }
+    const payment = await provider.fetchPayment(input.razorpay_payment_id);
+    if (payment.method !== 'card') {
+      await this.store.update(
+        'booking_payment_intents',
+        { eq: { id: intent.id } },
+        {
+          status: 'failed',
+          provider_payment_id: input.razorpay_payment_id,
+          payment_method: payment.method,
+          failure_reason: 'Only card pre-authorization is supported',
+          updated_at: nowIso(),
+          failed_at: nowIso(),
+        },
+      );
+      throw badRequest('UNSUPPORTED_PAYMENT_METHOD', 'Only card pre-authorization is supported');
+    }
+    await this.store.update(
+      'booking_payment_intents',
+      { eq: { id: intent.id } },
+      {
+        status: 'authorized',
+        provider_payment_id: input.razorpay_payment_id,
+        payment_method: payment.method,
+        updated_at: nowIso(),
+      },
+    );
+    await this.saveCardFromPayment(user, payment);
+    const bookingPayload = this.bookingPayloadFromIntent(intent);
+    const created = await this.campaigns.create(
+      user,
+      bookingPayload,
+      {
+        status: 'pre_authorized',
+        provider_order_id: input.razorpay_order_id,
+        provider_payment_id: input.razorpay_payment_id,
+        payment_method: payment.method,
+        payment_order_status: 'authorized',
+        price_offered_paise: intent.price_offered_paise,
+        platform_fee_paise: intent.platform_fee_paise,
+        total_charged_paise: intent.total_charged_paise,
+        authorized_at: nowIso(),
+        expires_at: futureIso(24 * HOUR_MS),
+      },
+      { skipCreative: true },
+    );
+    await this.store.update(
+      'booking_payment_intents',
+      { eq: { id: intent.id } },
+      {
+        status: 'completed',
+        campaign_id: created.campaignId,
+        updated_at: nowIso(),
+        completed_at: nowIso(),
+      },
+    );
+    await this.campaigns.generateCreative(created.campaignId);
+    return { success: true, campaignId: created.campaignId };
+  }
+
+  private async verifyLegacyBookingPayment(user: AuthUser, input: Row) {
+    const normalizedInput = this.normalizeBookingPayload(input);
     const existingOrder = await this.store.findOne<Row>('payment_orders', {
       eq: { provider: 'razorpay', provider_order_id: input.razorpay_order_id },
     });
@@ -1259,11 +1598,11 @@ export class PaymentService {
     }
     const influencer = await this.store.getById<Row>(
       'influencer_profiles',
-      input.influencer_profile_id,
+      normalizedInput.influencer_profile_id,
     );
     if (!influencer || influencer.is_active !== true) throw notFound('Influencer profile');
-    const pricePaise = packagePricePaise(influencer, input.package_type);
-    if (input.influencer_id && input.influencer_id !== influencer.user_id)
+    const pricePaise = packagePricePaise(influencer, normalizedInput.package_type);
+    if (normalizedInput.influencer_id && normalizedInput.influencer_id !== influencer.user_id)
       throw badRequest('INFLUENCER_MISMATCH', 'Influencer does not match profile');
     const order = await provider.fetchOrder(input.razorpay_order_id);
     const expectedAmount = pricePaise + platformFeePaise(pricePaise);
@@ -1277,9 +1616,10 @@ export class PaymentService {
     if (payment.method !== 'card') {
       throw badRequest('UNSUPPORTED_PAYMENT_METHOD', 'Only card pre-authorization is supported');
     }
+    await this.saveCardFromPayment(user, payment);
     const created = await this.campaigns.create(
       user,
-      { ...input, influencer_id: influencer.user_id },
+      { ...normalizedInput, influencer_id: influencer.user_id },
       {
         status: 'pre_authorized',
         provider_order_id: input.razorpay_order_id,
@@ -1342,10 +1682,22 @@ export class PaymentService {
     if (event.event === 'payment.failed') {
       const orderId = event.payload?.payment?.entity?.order_id;
       if (orderId) {
+        const failureReason =
+          event.payload?.payment?.entity?.error_description ?? 'Razorpay payment failed';
         await this.store.update(
           'payment_orders',
           { eq: { provider: 'razorpay', provider_order_id: orderId } },
-          { status: 'failed', failure_reason: 'Razorpay payment failed', updated_at: nowIso() },
+          { status: 'failed', failure_reason: failureReason, updated_at: nowIso() },
+        );
+        await this.store.update(
+          'booking_payment_intents',
+          { eq: { provider: 'razorpay', provider_order_id: orderId } },
+          {
+            status: 'failed',
+            failure_reason: failureReason,
+            updated_at: nowIso(),
+            failed_at: nowIso(),
+          },
         );
       }
     }

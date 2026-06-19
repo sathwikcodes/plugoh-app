@@ -16,6 +16,10 @@ export function paymentRoutes(deps: RouteDeps) {
   const app = new Hono<AppEnv>();
   const auth = requireAuth(deps.store, deps.authVerifier);
 
+  app.get('/payment/saved-cards', auth, requireRole('business'), async (c) => {
+    return ok(c, await deps.services.payments.listSavedCards(deps.requireUser(c)));
+  });
+
   app.post(
     '/payment/create-escrow-order',
     auth,
@@ -61,10 +65,7 @@ export function paymentRoutes(deps: RouteDeps) {
         deps.requireUser(c),
         c.req.valid('json'),
       );
-      await deps.store.rpc('claim_idempotency', {
-        p_key: deps.requireIdempotencyKey(c.req.header('idempotency-key')),
-        p_response: result,
-      });
+      await deps.storeIdempotency(deps.store, c.req.header('idempotency-key'), result);
       return ok(c, result);
     },
   );
@@ -81,10 +82,7 @@ export function paymentRoutes(deps: RouteDeps) {
         deps.requireUser(c),
         c.req.valid('json'),
       );
-      await deps.store.rpc('claim_idempotency', {
-        p_key: deps.requireIdempotencyKey(c.req.header('idempotency-key')),
-        p_response: result,
-      });
+      await deps.storeIdempotency(deps.store, c.req.header('idempotency-key'), result);
       return ok(c, result);
     },
   );
@@ -95,10 +93,14 @@ export function paymentRoutes(deps: RouteDeps) {
     requireRole('business'),
     zJson(createBookingOrderSchema),
     async (c) => {
-      return ok(
-        c,
-        await deps.services.payments.createBookingOrder(deps.requireUser(c), c.req.valid('json')),
+      const cached = await deps.claimIdempotency(deps.store, c.req.header('idempotency-key'));
+      if (cached) return ok(c, cached);
+      const result = await deps.services.payments.createBookingOrder(
+        deps.requireUser(c),
+        c.req.valid('json'),
       );
+      await deps.storeIdempotency(deps.store, c.req.header('idempotency-key'), result);
+      return ok(c, result);
     },
   );
   app.post(
@@ -114,10 +116,7 @@ export function paymentRoutes(deps: RouteDeps) {
         deps.requireUser(c),
         c.req.valid('json'),
       );
-      await deps.store.rpc('claim_idempotency', {
-        p_key: deps.requireIdempotencyKey(c.req.header('idempotency-key')),
-        p_response: result,
-      });
+      await deps.storeIdempotency(deps.store, c.req.header('idempotency-key'), result);
       return ok(c, result);
     },
   );
@@ -140,10 +139,7 @@ export function paymentRoutes(deps: RouteDeps) {
       user,
       c.req.valid('json').campaign_id,
     );
-    await deps.store.rpc('claim_idempotency', {
-      p_key: deps.requireIdempotencyKey(c.req.header('idempotency-key')),
-      p_response: result,
-    });
+    await deps.storeIdempotency(deps.store, c.req.header('idempotency-key'), result);
     return ok(c, result);
   });
   app.post('/payment/webhook', async (c) => {

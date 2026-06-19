@@ -1,6 +1,8 @@
 import { ConversationRow } from '@/components/inbox/conversation-row';
 import { InboxFilterSheet } from '@/components/inbox/inbox-filter-sheet';
+import { getTabScreenBottomPadding } from '@/components/navigation/native-tab-config';
 import { AppHeader, getAppHeaderTopPadding } from '@/components/ui/app-header';
+import { CampaignDeckEmptyState } from '@/components/ui/campaign-empty-state';
 import { GlassSearchField } from '@/components/ui/glass-search-field';
 import { NativeIconButton } from '@/components/ui/native-icon-button';
 import { TabScreenCanvas } from '@/components/ui/tab-screen-canvas';
@@ -24,15 +26,27 @@ import { influencerProfileImageUri } from '@/lib/influencer/profile-image';
 import { getConversationParty } from '@/lib/inbox/conversation-display';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import labImage from '@/assets/images/lab.png';
+import mailImage from '@/assets/images/mail.png';
 import type { InboxItem } from '@plugoh/contracts';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /** Breathing room above the native tab bar — matches campaigns tab screen. */
 const TAB_BAR_CLEARANCE = 12;
+const EMPTY_CARD_MAX_WIDTH = 390;
+const EMPTY_CARD_WIDTH_RATIO = 0.84;
+const EMPTY_CARD_FALLBACK_HEIGHT_RATIO = 0.58;
+const EMPTY_CARD_FRAME_CLEARANCE = theme.spacing.section;
 
 function SkeletonRow() {
   return (
@@ -47,12 +61,46 @@ function SkeletonRow() {
   );
 }
 
-function EmptyInboxState({ title }: { title: string }) {
+function EmptyInboxState({ title, bottomInset }: { title: string; bottomInset: number }) {
+  const window = useWindowDimensions();
+  const [slotHeight, setSlotHeight] = useState(0);
+  const topClearance = EMPTY_CARD_FRAME_CLEARANCE / 2;
+  const bottomClearance = getTabScreenBottomPadding(bottomInset);
+  const cardWidth = Math.max(
+    260,
+    Math.round(Math.min(window.width * EMPTY_CARD_WIDTH_RATIO, EMPTY_CARD_MAX_WIDTH)),
+  );
+  const availableHeight =
+    slotHeight > 0
+      ? Math.max(0, slotHeight - topClearance - bottomClearance - EMPTY_CARD_FRAME_CLEARANCE / 2)
+      : window.height * EMPTY_CARD_FALLBACK_HEIGHT_RATIO;
+  const cardHeight = Math.max(360, Math.round(availableHeight));
+
+  const handleLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      setSlotHeight(event.nativeEvent.layout.height);
+    },
+    [setSlotHeight],
+  );
+
   return (
-    <View style={styles.emptyWrap}>
-      <View style={styles.emptyCopy}>
-        <Text style={styles.emptyTitle}>{title}</Text>
-      </View>
+    <View
+      style={[
+        styles.emptyWrap,
+        {
+          paddingTop: topClearance,
+          paddingBottom: bottomClearance,
+        },
+      ]}
+      onLayout={handleLayout}
+    >
+      <CampaignDeckEmptyState
+        title={title}
+        subtitle="New messages will appear here when they arrive."
+        imageSource={mailImage}
+        cardWidth={cardWidth}
+        cardHeight={cardHeight}
+      />
     </View>
   );
 }
@@ -202,7 +250,7 @@ export default function InboxScreen() {
             ))}
           </View>
         ) : filtered.length === 0 ? (
-          <EmptyInboxState title="No messages yet" />
+          <EmptyInboxState title="No messages yet" bottomInset={insets.bottom} />
         ) : (
           <View style={styles.list}>
             <FlashList
@@ -245,7 +293,7 @@ const styles = StyleSheet.create({
   },
   searchBlock: {
     paddingHorizontal: theme.spacing.xxl,
-    paddingTop: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.md,
   },
   searchRow: {
@@ -300,22 +348,8 @@ const styles = StyleSheet.create({
   emptyWrap: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     paddingHorizontal: theme.spacing.xxl,
-  },
-  emptyCopy: {
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    ...theme.typography.section,
-    color: theme.colors.foreground,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    ...theme.typography.body,
-    color: 'rgba(255,255,255,0.58)',
-    textAlign: 'center',
-    maxWidth: 260,
   },
   skeletonRow: {
     flexDirection: 'row',

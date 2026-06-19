@@ -2,19 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import type { Influencer } from '@plugoh/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCircleButton } from '@/components/ui/glass-circle-button';
 import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
+import { TabScreenCanvas } from '@/components/ui/tab-screen-canvas';
 import { theme } from '@/constants/theme';
 import { getInfluencer } from '@/lib/api/endpoints';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 
 type CreatorProfile = Influencer & {
-  media?: Array<{ id?: string; media_url?: string; caption?: string; engagement?: number }>;
+  media?: { id?: string; media_url?: string; caption?: string; engagement?: number }[];
 };
 
 function initial(value?: string) {
@@ -134,177 +134,180 @@ export default function CreatorDetailScreen() {
   const media = data?.media ?? [];
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{ paddingBottom: insets.bottom + theme.spacing.section }}
-      contentInsetAdjustmentBehavior="never"
-      showsVerticalScrollIndicator={false}
-    >
-      <LinearGradient
-        colors={['#19151D', '#0B0C11', '#050509']}
-        locations={[0, 0.52, 1]}
-        style={[styles.hero, { paddingTop: insets.top + theme.spacing.md }]}
+    <TabScreenCanvas>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={{ paddingBottom: insets.bottom + theme.spacing.section }}
+        contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerRow}>
-          <GlassCircleButton
-            symbol="chevron.left"
-            fallbackIcon="chevron-back"
-            tintColor="#FFFFFF"
-            size={44}
-            symbolSize={20}
-            accessibilityLabel="Go back"
-            onPress={() => {
-              router.back();
-            }}
-          />
-        </View>
-
-        <View style={styles.heroContent}>
-          <View style={styles.avatar}>
-            {loading ? (
-              <ShimmerCircle size={76} />
-            ) : imageUrl ? (
-              <Image source={{ uri: imageUrl }} style={styles.avatarImage} contentFit="cover" />
-            ) : (
-              <Text style={styles.avatarInitial}>{initial(name)}</Text>
-            )}
-          </View>
-          <View style={styles.heroCopy}>
-            <AsyncText
-              loading={loading}
-              value={name}
-              selectable
-              style={styles.creatorName}
-              numberOfLines={2}
-              shimmerWidth="74%"
-              shimmerHeight={34}
+        <View style={[styles.hero, { paddingTop: insets.top + theme.spacing.md }]}>
+          <View style={styles.headerRow}>
+            <GlassCircleButton
+              symbol="chevron.left"
+              fallbackIcon="chevron-back"
+              tintColor="#FFFFFF"
+              size={44}
+              symbolSize={20}
+              accessibilityLabel="Go back"
+              onPress={() => {
+                router.back();
+              }}
             />
-            {loading ? (
-              <ShimmerText width="58%" height={18} />
-            ) : (
-              <Text selectable style={styles.handle} numberOfLines={1}>
-                {handle}
-              </Text>
-            )}
-            {!loading && positioning ? (
-              <Text style={styles.positioning} numberOfLines={1}>
-                {positioning}
-              </Text>
-            ) : null}
+          </View>
+
+          <View style={styles.heroContent}>
+            <View style={styles.avatar}>
+              {loading ? (
+                <ShimmerCircle size={76} />
+              ) : imageUrl ? (
+                <Image source={{ uri: imageUrl }} style={styles.avatarImage} contentFit="cover" />
+              ) : (
+                <Text style={styles.avatarInitial}>{initial(name)}</Text>
+              )}
+            </View>
+            <View style={styles.heroCopy}>
+              <AsyncText
+                loading={loading}
+                value={name}
+                selectable
+                style={styles.creatorName}
+                numberOfLines={2}
+                shimmerWidth="74%"
+                shimmerHeight={34}
+              />
+              {loading ? (
+                <ShimmerText width="58%" height={18} />
+              ) : (
+                <Text selectable style={styles.handle} numberOfLines={1}>
+                  {handle}
+                </Text>
+              )}
+              {!loading && positioning ? (
+                <Text style={styles.positioning} numberOfLines={1}>
+                  {positioning}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+
+          <View style={styles.signalRow}>
+            <View style={styles.signalPill}>
+              {loading ? (
+                <ShimmerText width={54} height={24} />
+              ) : (
+                <Text style={styles.signalValue} numberOfLines={1}>
+                  {formatNumber(data?.follower_count)}
+                </Text>
+              )}
+              <Text style={styles.signalLabel}>Followers</Text>
+            </View>
+            <View style={styles.signalPill}>
+              {loading ? (
+                <ShimmerText width={54} height={24} />
+              ) : (
+                <Text style={styles.signalValue} numberOfLines={1}>
+                  {formatNumber(data?.avg_likes_per_reel)}
+                </Text>
+              )}
+              <Text style={styles.signalLabel}>Avg likes</Text>
+            </View>
+            <View style={styles.signalPill}>
+              {loading ? (
+                <ShimmerText width={64} height={24} />
+              ) : (
+                <Text style={styles.signalValue} numberOfLines={1}>
+                  {formatCurrency(startingPrice)}
+                </Text>
+              )}
+              <Text style={styles.signalLabel}>From</Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.signalRow}>
-          <View style={styles.signalPill}>
-            {loading ? (
-              <ShimmerText width={54} height={24} />
-            ) : (
-              <Text style={styles.signalValue} numberOfLines={1}>
-                {formatNumber(data?.follower_count)}
+        <View style={styles.body}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Book ${name}`}
+            disabled={loading || !id}
+            onPress={() => {
+              router.push(`/(app)/booking/${id}`);
+            }}
+            style={({ pressed }) => [styles.bookButton, pressed ? styles.pressed : null]}
+          >
+            <Text style={styles.bookButtonText}>Book creator</Text>
+            <Ionicons name="arrow-forward" size={18} color="#0D0D0D" />
+          </Pressable>
+
+          <InfoGroup title="Creator details">
+            <DetailLine icon="logo-instagram" label="Instagram" value={handle} loading={loading} />
+            <DetailLine icon="sparkles" label="Category" value={category} loading={loading} />
+            <DetailLine icon="location" label="Location" value={city} loading={loading} isLast />
+          </InfoGroup>
+
+          <InfoGroup title="Pricing">
+            <PriceLine
+              icon="videocam"
+              label="Reel"
+              amount={data?.price_per_reel}
+              loading={loading}
+            />
+            <PriceLine icon="image" label="Post" amount={data?.price_per_post} loading={loading} />
+            <PriceLine
+              icon="phone-portrait"
+              label="Story"
+              amount={data?.price_per_story}
+              loading={loading}
+              isLast
+            />
+          </InfoGroup>
+
+          {loading ? (
+            <InfoGroup title="About">
+              <View style={styles.textBlock}>
+                <ShimmerText width="90%" height={16} />
+                <ShimmerText width="78%" height={16} />
+                <ShimmerText width="48%" height={16} />
+              </View>
+            </InfoGroup>
+          ) : data?.bio ? (
+            <InfoGroup title="About">
+              <Text selectable style={styles.aboutText}>
+                {data.bio}
               </Text>
-            )}
-            <Text style={styles.signalLabel}>Followers</Text>
-          </View>
-          <View style={styles.signalPill}>
-            {loading ? (
-              <ShimmerText width={54} height={24} />
-            ) : (
-              <Text style={styles.signalValue} numberOfLines={1}>
-                {formatNumber(data?.avg_likes_per_reel)}
-              </Text>
-            )}
-            <Text style={styles.signalLabel}>Avg likes</Text>
-          </View>
-          <View style={styles.signalPill}>
-            {loading ? (
-              <ShimmerText width={64} height={24} />
-            ) : (
-              <Text style={styles.signalValue} numberOfLines={1}>
-                {formatCurrency(startingPrice)}
-              </Text>
-            )}
-            <Text style={styles.signalLabel}>From</Text>
-          </View>
+            </InfoGroup>
+          ) : null}
+
+          {media.length > 0 ? (
+            <InfoGroup title="Recent content">
+              <View style={styles.mediaGrid}>
+                {media.slice(0, 4).map((item, index) => (
+                  <View key={item.id ?? `${item.media_url}-${index}`} style={styles.mediaTile}>
+                    {item.media_url ? (
+                      <Image
+                        source={{ uri: item.media_url }}
+                        style={styles.mediaImage}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View style={styles.mediaFallback}>
+                        <Ionicons name="image" size={22} color="rgba(255,255,255,0.58)" />
+                      </View>
+                    )}
+                    {item.engagement != null ? (
+                      <View style={styles.mediaBadge}>
+                        <Ionicons name="heart" size={12} color="#FFFFFF" />
+                        <Text style={styles.mediaBadgeText}>{formatNumber(item.engagement)}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </InfoGroup>
+          ) : null}
         </View>
-      </LinearGradient>
-
-      <View style={styles.body}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Book ${name}`}
-          disabled={loading || !id}
-          onPress={() => {
-            router.push(`/(app)/booking/${id}`);
-          }}
-          style={({ pressed }) => [styles.bookButton, pressed ? styles.pressed : null]}
-        >
-          <Text style={styles.bookButtonText}>Book creator</Text>
-          <Ionicons name="arrow-forward" size={18} color="#0D0D0D" />
-        </Pressable>
-
-        <InfoGroup title="Creator details">
-          <DetailLine icon="logo-instagram" label="Instagram" value={handle} loading={loading} />
-          <DetailLine icon="sparkles" label="Category" value={category} loading={loading} />
-          <DetailLine icon="location" label="Location" value={city} loading={loading} isLast />
-        </InfoGroup>
-
-        <InfoGroup title="Pricing">
-          <PriceLine icon="videocam" label="Reel" amount={data?.price_per_reel} loading={loading} />
-          <PriceLine icon="image" label="Post" amount={data?.price_per_post} loading={loading} />
-          <PriceLine
-            icon="phone-portrait"
-            label="Story"
-            amount={data?.price_per_story}
-            loading={loading}
-            isLast
-          />
-        </InfoGroup>
-
-        {loading ? (
-          <InfoGroup title="About">
-            <View style={styles.textBlock}>
-              <ShimmerText width="90%" height={16} />
-              <ShimmerText width="78%" height={16} />
-              <ShimmerText width="48%" height={16} />
-            </View>
-          </InfoGroup>
-        ) : data?.bio ? (
-          <InfoGroup title="About">
-            <Text selectable style={styles.aboutText}>
-              {data.bio}
-            </Text>
-          </InfoGroup>
-        ) : null}
-
-        {media.length > 0 ? (
-          <InfoGroup title="Recent content">
-            <View style={styles.mediaGrid}>
-              {media.slice(0, 4).map((item, index) => (
-                <View key={item.id ?? `${item.media_url}-${index}`} style={styles.mediaTile}>
-                  {item.media_url ? (
-                    <Image
-                      source={{ uri: item.media_url }}
-                      style={styles.mediaImage}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <View style={styles.mediaFallback}>
-                      <Ionicons name="image" size={22} color="rgba(255,255,255,0.58)" />
-                    </View>
-                  )}
-                  {item.engagement != null ? (
-                    <View style={styles.mediaBadge}>
-                      <Ionicons name="heart" size={12} color="#FFFFFF" />
-                      <Text style={styles.mediaBadgeText}>{formatNumber(item.engagement)}</Text>
-                    </View>
-                  ) : null}
-                </View>
-              ))}
-            </View>
-          </InfoGroup>
-        ) : null}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </TabScreenCanvas>
   );
 }
 
@@ -317,6 +320,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderBottomLeftRadius: 36,
     borderBottomRightRadius: 36,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.045)',
     paddingHorizontal: theme.spacing.xl,
     paddingBottom: theme.spacing.xl,
     gap: theme.spacing.lg,

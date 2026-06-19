@@ -3,11 +3,15 @@ import {
   businessOnboardingSchema,
   businessProfilePatchSchema,
   commonProfilePatchSchema,
+  geocodeSchema,
   influencerActivePatchSchema,
   influencerOnboardingSchema,
   influencerPricingPatchSchema,
   influencerProfilePatchSchema,
   payoutUpsertSchema,
+  placeAutocompleteSchema,
+  placeDetailsSchema,
+  reverseGeocodeSchema,
   roleUpsertSchema,
 } from '@plugoh/contracts';
 import { ok } from '../../core/response.js';
@@ -42,6 +46,42 @@ export function profileRoutes(deps: RouteDeps) {
         c,
         await deps.services.profiles.upsertCommonProfile(deps.requireUser(c), c.req.valid('json')),
       );
+    },
+  );
+  app.post(
+    '/locations/geocode',
+    auth,
+    deps.authDefaultRateLimit,
+    zJson(geocodeSchema),
+    async (c) => {
+      return ok(c, await deps.services.profiles.geocode(c.req.valid('json')));
+    },
+  );
+  app.post(
+    '/locations/reverse-geocode',
+    auth,
+    deps.authDefaultRateLimit,
+    zJson(reverseGeocodeSchema),
+    async (c) => {
+      return ok(c, await deps.services.profiles.reverseGeocode(c.req.valid('json')));
+    },
+  );
+  app.post(
+    '/locations/autocomplete',
+    auth,
+    deps.authDefaultRateLimit,
+    zJson(placeAutocompleteSchema),
+    async (c) => {
+      return ok(c, await deps.services.profiles.autocomplete(c.req.valid('json')));
+    },
+  );
+  app.post(
+    '/locations/place-details',
+    auth,
+    deps.authDefaultRateLimit,
+    zJson(placeDetailsSchema),
+    async (c) => {
+      return ok(c, await deps.services.profiles.placeDetails(c.req.valid('json')));
     },
   );
   app.post(

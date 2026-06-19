@@ -1,11 +1,14 @@
 import type {
   BusinessOnboardingRequest,
+  BusinessProfileSummary,
   BusinessProfilePatch,
   CampaignListItem,
   CampaignMessage,
   CreateCampaignRequest,
   DeliveryPreviewResponse,
   EarningsSummary,
+  GeocodeRequest,
+  GeocodeResponse,
   InboxItem,
   Influencer,
   InfluencerOnboardingRequest,
@@ -17,11 +20,20 @@ import type {
   NotificationItem,
   NotificationsReadRequest,
   PayoutUpsert,
+  PlaceAutocompleteRequest,
+  PlaceAutocompleteResponse,
+  PlaceDetailsRequest,
+  PlaceDetailsResponse,
   PushRegisterRequest,
   PushRegisterResponse,
   PushUnregisterResponse,
+  ReverseGeocodeRequest,
+  ReverseGeocodeResponse,
   RoleUpsertRequest,
+  SavedCardSummary,
   UserRole,
+  CreateBookingOrderRequest,
+  VerifyBookingPaymentRequest,
 } from '@plugoh/contracts';
 import { api, jsonRequest } from '@/lib/api/client';
 
@@ -39,6 +51,26 @@ export const endpoints = {
       method: 'PATCH',
       ...jsonRequest(input),
     }),
+  reverseGeocode: (input: ReverseGeocodeRequest) =>
+    api<ReverseGeocodeResponse>('/locations/reverse-geocode', {
+      method: 'POST',
+      ...jsonRequest(input),
+    }),
+  geocode: (input: GeocodeRequest) =>
+    api<GeocodeResponse>('/locations/geocode', {
+      method: 'POST',
+      ...jsonRequest(input),
+    }),
+  autocomplete: (input: PlaceAutocompleteRequest) =>
+    api<PlaceAutocompleteResponse>('/locations/autocomplete', {
+      method: 'POST',
+      ...jsonRequest(input),
+    }),
+  placeDetails: (input: PlaceDetailsRequest) =>
+    api<PlaceDetailsResponse>('/locations/place-details', {
+      method: 'POST',
+      ...jsonRequest(input),
+    }),
   onboarding: (input: InfluencerOnboardingRequest) =>
     api<InfluencerProfileResponse>('/influencer/onboarding', {
       method: 'POST',
@@ -50,34 +82,14 @@ export const endpoints = {
       ...jsonRequest(input),
     }),
   influencerProfile: () => api<InfluencerProfileResponse>('/influencer/profile'),
-  businessProfile: () =>
-    api<{
-      id: string;
-      user_id: string;
-      brand_name?: string;
-      brand_type?: string;
-      brand_location?: string;
-      brand_summary?: string;
-      tagline?: string;
-      ig_username?: string;
-      instagram_connected?: boolean;
-    }>('/business/profile'),
+  businessProfile: () => api<BusinessProfileSummary>('/business/profile'),
   updateInfluencerProfile: (input: InfluencerProfilePatch) =>
     api<InfluencerProfileResponse>('/influencer/profile', {
       method: 'PATCH',
       ...jsonRequest(input),
     }),
   updateBusinessProfile: (input: BusinessProfilePatch) =>
-    api<{
-      id: string;
-      user_id: string;
-      brand_name?: string;
-      brand_type?: string;
-      brand_location?: string;
-      brand_summary?: string;
-      tagline?: string;
-      ig_username?: string;
-    }>('/business/profile', {
+    api<BusinessProfileSummary>('/business/profile', {
       method: 'PATCH',
       ...jsonRequest(input),
     }),
@@ -92,6 +104,7 @@ export const endpoints = {
       ...jsonRequest({ is_active: isActive }),
     }),
   payout: () => api<PayoutUpsert | null>('/influencer/payout'),
+  savedCards: () => api<SavedCardSummary[]>('/payment/saved-cards'),
   updatePayout: (input: PayoutUpsert) =>
     api<PayoutUpsert>('/influencer/payout', {
       method: 'PUT',
@@ -257,11 +270,12 @@ export async function deliveryUrl(campaignId: string) {
   return api<DeliveryPreviewResponse>(`/campaigns/${campaignId}/delivery/url`);
 }
 
-export async function createBookingOrder(input: {
-  influencer_profile_id: string;
-  package_type: 'instagram_reel';
-}) {
+export async function createBookingOrder(
+  input: CreateBookingOrderRequest,
+  idempotencyKey?: string,
+) {
   return api<{
+    bookingIntentId?: string;
     orderId: string;
     keyId?: string;
     amount: number;
@@ -272,28 +286,12 @@ export async function createBookingOrder(input: {
   }>('/payment/create-booking-order', {
     method: 'POST',
     ...jsonRequest(input),
+    idempotencyKey,
   });
 }
 
 export async function verifyBookingPayment(
-  input: {
-    razorpay_order_id: string;
-    razorpay_payment_id: string;
-    razorpay_signature: string;
-    influencer_profile_id: string;
-    package_type: 'instagram_reel';
-    objective:
-      | 'visit_place'
-      | 'feature_product'
-      | 'showcase_service'
-      | 'promote_offer'
-      | 'brand_shoutout';
-    timing_mode: 'asap' | 'choose_date';
-    due_date?: string;
-    event_name?: string;
-    contact_email: string;
-    contact_phone: string;
-  },
+  input: VerifyBookingPaymentRequest,
   idempotencyKey: string,
 ) {
   return api<{ success: true; campaignId: string }>('/payment/verify-booking-payment', {

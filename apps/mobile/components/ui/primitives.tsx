@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type PressableProps,
   type PressableStateCallbackType,
@@ -15,6 +14,7 @@ import {
   type ViewProps,
   type ViewStyle,
 } from 'react-native';
+import { AppInput } from '@/components/ui/app-input';
 import { TabScreenCanvas, useTabScreenCanvas } from '@/components/ui/tab-screen-canvas';
 import { theme, statusTone } from '@/constants/theme';
 
@@ -120,10 +120,30 @@ export function AccentHero({ title, subtitle }: { title: string; subtitle?: stri
   );
 }
 
-export function PrimaryButton({ label, style, ...props }: PressableProps & { label: string }) {
+export function PrimaryButton({
+  label,
+  loading,
+  disabled,
+  style,
+  ...props
+}: PressableProps & { label: string; loading?: boolean }) {
+  const isDisabled = disabled || loading;
   return (
-    <Pressable {...props} style={mergePressableStyle(styles.button, style)}>
-      <Text style={styles.buttonLabel}>{label}</Text>
+    <Pressable
+      {...props}
+      disabled={isDisabled}
+      style={(state) => [
+        styles.button,
+        state.pressed && !isDisabled ? styles.buttonPressed : null,
+        isDisabled ? styles.buttonDisabled : null,
+        typeof style === 'function' ? style(state) : style,
+      ]}
+    >
+      {loading ? (
+        <ActivityIndicator color={theme.colors.buttonPrimaryText} size="small" />
+      ) : (
+        <Text style={styles.buttonLabel}>{label}</Text>
+      )}
     </Pressable>
   );
 }
@@ -136,17 +156,8 @@ export function SecondaryButton({ label, style, ...props }: PressableProps & { l
   );
 }
 
-export function LabeledField({ label, ...props }: TextInputProps & { label: string }) {
-  return (
-    <View style={styles.fieldWrap}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        {...props}
-        style={[styles.field, props.style]}
-        placeholderTextColor={theme.colors.muted}
-      />
-    </View>
-  );
+export function LabeledField({ label, style, ...props }: TextInputProps & { label: string }) {
+  return <AppInput label={label} {...props} inputStyle={style} />;
 }
 
 export function ListRow({
@@ -315,6 +326,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.buttonPrimary,
     paddingHorizontal: theme.spacing.xxl,
   },
+  buttonPressed: {
+    opacity: 0.76,
+    transform: [{ scale: 0.985 }],
+  },
+  buttonDisabled: {
+    opacity: 0.68,
+  },
   buttonLabel: {
     color: theme.colors.buttonPrimaryText,
     ...theme.typography.cardTitle,
@@ -332,23 +350,6 @@ const styles = StyleSheet.create({
   secondaryButtonLabel: {
     color: theme.colors.foreground,
     ...theme.typography.cardTitle,
-  },
-  fieldWrap: {
-    gap: theme.spacing.sm,
-  },
-  fieldLabel: {
-    ...theme.typography.label,
-    color: theme.colors.foreground,
-  },
-  field: {
-    minHeight: 48,
-    borderRadius: theme.radius.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surfaceWarm,
-    paddingHorizontal: theme.spacing.lg,
-    color: theme.colors.foreground,
-    ...theme.typography.body,
   },
   listRow: {
     minHeight: 58,

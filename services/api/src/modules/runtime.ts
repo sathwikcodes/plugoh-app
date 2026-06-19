@@ -5,6 +5,7 @@ import {
   ExpoPushProvider,
   ExternalAiProvider,
   GoogleGeocodingProvider,
+  GooglePlacesProvider,
   GoogleWeatherProvider,
   MetaInstagramProvider,
   RazorpayProvider,
@@ -15,6 +16,7 @@ import {
   type GeocodingProvider,
   type InstagramProvider,
   type PaymentProvider,
+  type PlacesProvider,
   type PushProvider,
   type StorageProvider,
   type WeatherProvider,
@@ -38,6 +40,7 @@ export function createDefaultProviders(config: EnvConfig): ProviderBundle {
     payment?: PaymentProvider;
     email?: EmailProvider;
     geocoding?: GeocodingProvider;
+    places?: PlacesProvider;
     weather?: WeatherProvider;
     instagram?: InstagramProvider;
     storage?: StorageProvider;
@@ -48,6 +51,7 @@ export function createDefaultProviders(config: EnvConfig): ProviderBundle {
     providers.payment = new RazorpayProvider(config);
   if (config.resendApiKey) providers.email = new ResendEmailProvider(config);
   if (config.googleMapsGeocodingApiKey) providers.geocoding = new GoogleGeocodingProvider(config);
+  if (config.googleMapsGeocodingApiKey) providers.places = new GooglePlacesProvider(config);
   if (config.googleMapsWeatherApiKey) providers.weather = new GoogleWeatherProvider(config);
   if (config.instagramClientId && config.instagramAppSecret && config.instagramRedirectUri)
     providers.instagram = new MetaInstagramProvider(config);
@@ -93,11 +97,62 @@ export function requireIdempotencyKey(header: string | undefined) {
 
 export async function claimIdempotency(store: DataStore, header: string | undefined) {
   const key = requireIdempotencyKey(header);
-  const result = await store.rpc<{ response: unknown }>('claim_idempotency', {
-    p_key: key,
-    p_response: null,
-  });
+  let result: { response: unknown };
+  try {
+    result = await runIdempotencyRpc(store, key, null);
+  } catch (error) {
+    if (!isUnsupportedNullIdempotencyClaim(error)) throw error;
+    return null;
+  }
   return result.response;
+}
+
+export async function storeIdempotency(
+  store: DataStore,
+  header: string | undefined,
+  response: unknown,
+) {
+  const key = requireIdempotencyKey(header);
+  await runIdempotencyRpc(store, key, response);
+}
+
+async function runIdempotencyRpc(store: DataStore, key: string, response: unknown) {
+  try {
+    return await store.rpc<{ response: unknown }>('claim_idempotency', {
+      p_key: key,
+      p_response: response,
+      p_scope: 'global',
+      p_request_hash: key,
+    });
+  } catch (error) {
+    if (!isMissingScopedIdempotencyRpc(error)) throw error;
+  }
+  return store.rpc<{ response: unknown }>('claim_idempotency', {
+    p_key: key,
+    p_response: response,
+  });
+}
+
+function isMissingScopedIdempotencyRpc(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  return (
+    code === 'RPC_ERROR' &&
+    typeof message === 'string' &&
+    message.includes('claim_idempotency') &&
+    message.includes('p_scope')
+  );
+}
+
+function isUnsupportedNullIdempotencyClaim(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  return (
+    code === '23502' &&
+    typeof message === 'string' &&
+    message.includes('idempotency_keys') &&
+    message.includes('response')
+  );
 }
 
 export async function authOrCron(

@@ -1,3 +1,4 @@
+import { AppInput } from '@/components/ui/app-input';
 import { BackHeader } from '@/components/ui/app-header';
 import { PrimaryButton } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
@@ -7,10 +8,16 @@ import {
   useInfluencerProfile,
   useMarketplaceMutations,
 } from '@/hooks/use-marketplace';
+import { BRAND_CATEGORY_OPTIONS, type BrandCategory } from '@/lib/onboarding/premium-flow';
+import {
+  consumeProfileLocationSelection,
+  subscribeProfileLocationSelection,
+  type ProfileLocationSelection,
+} from '@/lib/profile/location-selection';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { BlurView } from 'expo-blur';
-import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   ActionSheetIOS,
@@ -20,7 +27,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type TextInputProps,
 } from 'react-native';
@@ -28,7 +34,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
-const FIELD_RADIUS = 28;
+const FIELD_RADIUS = 24;
 const FIELD_BORDER = 'rgba(255,255,255,0.18)';
 const FIELD_WASH = 'rgba(255,255,255,0.055)';
 
@@ -66,68 +72,86 @@ const schema = z.object({
   display_name: z.string().trim().min(1),
   bio: z.string().trim().min(1),
   city: z.string().trim().min(1),
-  category: z.enum(categories),
+  category: z.string().trim().min(1),
 });
+
+const influencerCategoryOptions = categories.map((category) => ({
+  label: category,
+  value: category,
+}));
+
+type SelectorOption<T extends string> = {
+  label: string;
+  value: T;
+};
 
 function toCategory(value?: string | null): Category {
   const normalized = value?.toLowerCase();
   return categories.find((category) => categoryApiValues[category] === normalized) ?? 'Lifestyle';
 }
 
+function toBrandType(value?: string | null): BrandCategory {
+  const normalized = value?.toLowerCase();
+  return (
+    BRAND_CATEGORY_OPTIONS.find((option) => option.value === normalized)?.value ??
+    BRAND_CATEGORY_OPTIONS.find((option) => option.label.toLowerCase() === normalized)?.value ??
+    'other'
+  );
+}
+
+function brandTypeLabel(value?: string | null) {
+  const brandType = toBrandType(value);
+  return BRAND_CATEGORY_OPTIONS.find((option) => option.value === brandType)?.label ?? 'Other';
+}
+
+function brandTypeValue(label: string): BrandCategory {
+  return (
+    BRAND_CATEGORY_OPTIONS.find((option) => option.label === label || option.value === label)
+      ?.value ?? 'other'
+  );
+}
+
 function GlassFormField({
   label,
   multiline,
+  style,
   ...inputProps
 }: TextInputProps & { label: string; multiline?: boolean }) {
-  const inputStyle = multiline ? styles.fieldInputMultiline : styles.fieldInputSingle;
-
   return (
-    <View style={styles.fieldBlock}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <BlurView
-        tint="systemUltraThinMaterialDark"
-        intensity={86}
-        style={[styles.blurFieldShell, multiline && styles.blurFieldShellMultiline]}
-      >
-        <View pointerEvents="none" style={styles.fieldWash} />
-        <TextInput
-          {...inputProps}
-          {...(Platform.OS === 'android' ? { includeFontPadding: false } : {})}
-          multiline={multiline}
-          textAlignVertical={multiline ? 'top' : 'center'}
-          underlineColorAndroid="transparent"
-          placeholderTextColor="rgba(255,255,255,0.38)"
-          cursorColor="#FFFFFF"
-          selectionColor="#FFFFFF"
-          style={[inputStyle, inputProps.style]}
-        />
-      </BlurView>
-    </View>
+    <AppInput
+      {...inputProps}
+      label={label}
+      multiline={multiline}
+      inputStyle={style}
+      fieldStyle={multiline ? styles.multilineShell : undefined}
+    />
   );
 }
 
 function GlassCategorySelector({
   label,
   value,
+  options,
   onChange,
 }: {
   label: string;
-  value: Category;
-  onChange: (value: Category) => void;
+  value: string;
+  options: readonly SelectorOption<string>[];
+  onChange: (value: string) => void;
 }) {
   const openCategoryPicker = () => {
     if (Platform.OS === 'ios') {
-      const options = [...categories, 'Cancel'];
+      const labels = [...options.map((option) => option.label), 'Cancel'];
       ActionSheetIOS.showActionSheetWithOptions(
         {
           title: label,
-          options,
-          cancelButtonIndex: options.length - 1,
+          options: labels,
+          cancelButtonIndex: labels.length - 1,
           userInterfaceStyle: 'dark',
         },
         (buttonIndex) => {
-          if (buttonIndex < categories.length) {
-            onChange(categories[buttonIndex]);
+          if (buttonIndex < options.length) {
+            onChange(options[buttonIndex].label);
           }
         },
       );
@@ -138,10 +162,10 @@ function GlassCategorySelector({
       label,
       undefined,
       [
-        ...categories.map((category) => ({
-          text: category,
+        ...options.map((option) => ({
+          text: option.label,
           onPress: () => {
-            onChange(category);
+            onChange(option.label);
           },
         })),
         { text: 'Cancel', style: 'cancel' as const },
@@ -173,6 +197,37 @@ function GlassCategorySelector({
   );
 }
 
+function GlassLocationSelector({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+}) {
+  return (
+    <View style={styles.fieldBlock}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <BlurView tint="systemUltraThinMaterialDark" intensity={86} style={styles.blurFieldShell}>
+        <View pointerEvents="none" style={styles.fieldWash} />
+        <Pressable
+          accessibilityLabel={label}
+          accessibilityRole="button"
+          accessibilityValue={{ text: value || 'Choose location' }}
+          onPress={onPress}
+          style={({ pressed }) => [styles.selectorPressable, pressed && styles.selectorPressed]}
+        >
+          <Text style={styles.selectorText} numberOfLines={1}>
+            {value || 'Choose location'}
+          </Text>
+          <Ionicons name="map-outline" size={20} color="rgba(255,255,255,0.66)" />
+        </Pressable>
+      </BlurView>
+    </View>
+  );
+}
+
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const bootstrap = useBootstrap();
@@ -180,8 +235,14 @@ export default function EditProfileScreen() {
   const profile = useInfluencerProfile();
   const businessProfile = useBusinessProfile();
   const mutations = useMarketplaceMutations();
+  const [businessLocation, setBusinessLocation] = useState<ProfileLocationSelection | null>(null);
   type FormValues = z.infer<typeof schema>;
-  const { handleSubmit, setValue, watch } = useForm<FormValues>({
+  const {
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { isSubmitting },
+  } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { display_name: '', bio: '', city: '', category: 'Lifestyle' },
   });
@@ -192,10 +253,19 @@ export default function EditProfileScreen() {
       setValue('display_name', businessProfile.data.brand_name ?? '');
       setValue('bio', businessProfile.data.brand_summary ?? '');
       setValue('city', businessProfile.data.brand_location ?? '');
-      setValue(
-        'category',
-        (businessProfile.data.brand_type as FormValues['category'] | undefined) ?? 'Other',
-      );
+      setValue('category', brandTypeLabel(businessProfile.data.brand_type));
+      if (
+        typeof businessProfile.data.brand_latitude === 'number' &&
+        typeof businessProfile.data.brand_longitude === 'number'
+      ) {
+        setBusinessLocation({
+          label: businessProfile.data.brand_location ?? 'Selected location',
+          latitude: businessProfile.data.brand_latitude,
+          longitude: businessProfile.data.brand_longitude,
+        });
+      } else {
+        setBusinessLocation(null);
+      }
       return;
     }
     if (!profile.data) return;
@@ -205,22 +275,38 @@ export default function EditProfileScreen() {
     setValue('category', toCategory(profile.data.category));
   }, [businessProfile.data, profile.data, role, setValue]);
 
+  useFocusEffect(
+    useCallback(() => {
+      const applySelection = (selection: ProfileLocationSelection) => {
+        setBusinessLocation(selection);
+        setValue('city', selection.label, { shouldValidate: true, shouldDirty: true });
+      };
+      const consumed = consumeProfileLocationSelection();
+      if (consumed) applySelection(consumed);
+      return subscribeProfileLocationSelection(applySelection);
+    }, [setValue]),
+  );
+
   const onSubmit = handleSubmit(async (values) => {
     const data = values;
     try {
       if (role === 'business') {
-        await mutations.updateBusinessProfile.mutateAsync({
+        const payload: Parameters<typeof mutations.updateBusinessProfile.mutateAsync>[0] = {
           brand_name: data.display_name,
           brand_summary: data.bio,
-          brand_location: data.city,
-          brand_type: data.category as Parameters<
-            typeof mutations.updateBusinessProfile.mutateAsync
-          >[0]['brand_type'],
-        });
+          brand_category: brandTypeValue(data.category),
+        };
+        if (businessLocation) {
+          payload.brand_location = businessLocation.label;
+          payload.brand_latitude = businessLocation.latitude;
+          payload.brand_longitude = businessLocation.longitude;
+        }
+        await mutations.updateBusinessProfile.mutateAsync(payload);
       } else {
+        const category = toCategory(data.category);
         await mutations.updateProfile.mutateAsync({
           ...data,
-          category: categoryApiValues[data.category],
+          category: categoryApiValues[category],
         });
       }
       router.back();
@@ -245,7 +331,7 @@ export default function EditProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <BackHeader
-          title="Personal Information"
+          title="Personal Info"
           onBack={() => {
             router.back();
           }}
@@ -268,16 +354,27 @@ export default function EditProfileScreen() {
             }}
             multiline
           />
-          <GlassFormField
-            label={role === 'business' ? 'Brand location' : 'City'}
-            value={watch('city')}
-            onChangeText={(value) => {
-              setValue('city', value, { shouldValidate: true });
-            }}
-          />
+          {role === 'business' ? (
+            <GlassLocationSelector
+              label="Brand location"
+              value={watch('city')}
+              onPress={() => {
+                router.push('/(app)/profile/location-picker');
+              }}
+            />
+          ) : (
+            <GlassFormField
+              label="City"
+              value={watch('city')}
+              onChangeText={(value) => {
+                setValue('city', value, { shouldValidate: true });
+              }}
+            />
+          )}
           <GlassCategorySelector
             label={role === 'business' ? 'Brand type' : 'Category'}
             value={watch('category')}
+            options={role === 'business' ? BRAND_CATEGORY_OPTIONS : influencerCategoryOptions}
             onChange={(value) => {
               setValue('category', value, { shouldValidate: true });
             }}
@@ -293,7 +390,13 @@ export default function EditProfileScreen() {
           },
         ]}
       >
-        <PrimaryButton label="Save changes" onPress={onSubmit} style={styles.saveButton} />
+        <PrimaryButton
+          label="Save changes"
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          onPress={onSubmit}
+          style={styles.saveButton}
+        />
       </View>
     </View>
   );
@@ -330,9 +433,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
-  blurFieldShellMultiline: {
-    minHeight: MULTILINE_MIN_HEIGHT,
-    height: undefined,
+  multilineShell: {
+    height: MULTILINE_MIN_HEIGHT,
   },
   fieldWash: {
     ...StyleSheet.absoluteFillObject,
@@ -340,34 +442,8 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     ...theme.typography.label,
-    color: 'rgba(255,255,255,0.62)',
-    paddingLeft: theme.spacing.lg,
-  },
-  fieldInputSingle: {
-    ...theme.typography.body,
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-    paddingHorizontal: theme.spacing.xxl,
-    paddingTop: 0,
-    paddingBottom: 0,
-    margin: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    color: theme.colors.foreground,
-    textAlignVertical: 'center',
-  },
-  fieldInputMultiline: {
-    ...theme.typography.body,
-    minHeight: MULTILINE_MIN_HEIGHT,
-    zIndex: 1,
-    paddingHorizontal: theme.spacing.xxl,
-    paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.xl,
-    margin: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    color: theme.colors.foreground,
-    textAlignVertical: 'top',
+    color: 'rgba(255,255,255,0.74)',
+    paddingLeft: 4,
   },
   selectorPressable: {
     flex: 1,

@@ -1,10 +1,10 @@
-import type { Context } from "hono";
-import type { UserRole } from "@plugoh/contracts";
-import type { EnvConfig } from "../config/env.js";
-import type { AuthVerifier } from "../middleware/auth.js";
-import type { DataStore } from "../repositories/data-store.js";
-import type { ProviderBundle, Services } from "../services/marketplace.js";
-import type { AppEnv, AuthUser } from "../types.js";
+import type { Context } from 'hono';
+import type { UserRole } from '@plugoh/contracts';
+import type { EnvConfig } from '../config/env.js';
+import type { AuthVerifier } from '../middleware/auth.js';
+import type { DataStore } from '../repositories/data-store.js';
+import type { ProviderBundle, Services } from '../services/marketplace.js';
+import type { AppEnv, AuthUser } from '../types.js';
 
 export type ScopedServicesFactory = (c: Context<AppEnv>) => Services;
 
@@ -21,6 +21,11 @@ export type RouteDeps = {
   requireUser: (c: Context<AppEnv>) => AuthUser;
   requireRoleValue: (c: Context<AppEnv>) => UserRole;
   claimIdempotency: (store: DataStore, header: string | undefined) => Promise<unknown>;
+  storeIdempotency: (
+    store: DataStore,
+    header: string | undefined,
+    response: unknown,
+  ) => Promise<void>;
   requireIdempotencyKey: (header: string | undefined) => string;
   authOrCron: (
     c: Context<AppEnv>,

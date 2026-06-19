@@ -1,3 +1,4 @@
+import { AppInput } from '@/components/ui/app-input';
 import { GlassCard } from '@/components/ui/glass-card';
 import { BackHeader } from '@/components/ui/app-header';
 import { PrimaryButton } from '@/components/ui/primitives';
@@ -5,19 +6,15 @@ import { theme } from '@/constants/theme';
 import { useInfluencerProfile, useMarketplaceMutations } from '@/hooks/use-marketplace';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
-const FIELD_RADIUS = 28;
 const FIELD_BORDER = 'rgba(255,255,255,0.18)';
-const FIELD_WASH = 'rgba(255,255,255,0.055)';
 const PRICE_CARD_RADIUS = 28;
-const PRICE_INPUT_HEIGHT = 58;
 const STEP = 500;
 
 const schema = z.object({
@@ -115,25 +112,18 @@ function PricePackageCard({
             onChange(Math.max(0, value - STEP));
           }}
         />
-        <BlurView tint="systemUltraThinMaterialDark" intensity={86} style={styles.priceFieldShell}>
-          <View pointerEvents="none" style={styles.fieldWash} />
-          <Text style={styles.currencyPrefix}>₹</Text>
-          <TextInput
-            value={textValue}
-            onChangeText={(next) => {
-              const digits = next.replace(/\D/g, '');
-              onChange(digits ? Number(digits) : 0);
-            }}
-            keyboardType="number-pad"
-            textAlignVertical="center"
-            underlineColorAndroid="transparent"
-            placeholder="0"
-            placeholderTextColor="rgba(255,255,255,0.38)"
-            cursorColor="#FFFFFF"
-            selectionColor="#FFFFFF"
-            style={styles.priceInput}
-          />
-        </BlurView>
+        <AppInput
+          containerStyle={styles.priceField}
+          value={textValue}
+          onChangeText={(next) => {
+            const digits = next.replace(/\D/g, '');
+            onChange(digits ? Number(digits) : 0);
+          }}
+          keyboardType="number-pad"
+          placeholder="0"
+          accessibilityLabel={`${title} price`}
+          prefix={<Text style={styles.currencyPrefix}>₹</Text>}
+        />
         <PriceStepper
           icon="add"
           label={`Increase ${title}`}
@@ -306,43 +296,12 @@ const styles = StyleSheet.create({
   stepperPressed: {
     opacity: 0.76,
   },
-  priceFieldShell: {
+  priceField: {
     flex: 1,
-    height: PRICE_INPUT_HEIGHT,
-    borderRadius: FIELD_RADIUS,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: FIELD_BORDER,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  fieldWash: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: FIELD_WASH,
   },
   currencyPrefix: {
     ...theme.typography.body,
-    position: 'absolute',
-    left: theme.spacing.xl,
-    top: 0,
-    bottom: 0,
-    zIndex: 1,
     color: 'rgba(255,255,255,0.58)',
-    lineHeight: PRICE_INPUT_HEIGHT,
-  },
-  priceInput: {
-    ...theme.typography.body,
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-    paddingLeft: theme.spacing.xxl + theme.spacing.lg,
-    paddingRight: theme.spacing.xl,
-    paddingTop: 0,
-    paddingBottom: 0,
-    margin: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    color: theme.colors.foreground,
-    textAlignVertical: 'center',
   },
   footer: {
     paddingHorizontal: theme.spacing.xxl,

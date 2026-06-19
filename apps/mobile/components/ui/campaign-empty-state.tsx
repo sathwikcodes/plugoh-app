@@ -1,8 +1,10 @@
-import campaignImage from '@/assets/images/campaign.png';
+import ghostImage from '@/assets/images/ghost.png';
 import { CAMPAIGN_CARD_CORNER_RADIUS } from '@/constants/campaign-card-frame';
 import { theme } from '@/constants/theme';
 import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect } from 'react';
 import { StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import Animated, {
@@ -16,7 +18,7 @@ import Animated, {
 export function CampaignDeckEmptyState({
   title = 'No campaigns',
   subtitle = 'Brand requests will appear here.',
-  imageSource = campaignImage,
+  imageSource = ghostImage,
   cardWidth,
   cardHeight,
 }: {
@@ -27,20 +29,29 @@ export function CampaignDeckEmptyState({
   cardHeight: number;
 }) {
   const imageSize = Math.min(Math.round(cardWidth * 0.34), 118);
-
-  return (
-    <View
-      style={[
-        styles.deckCard,
-        {
-          width: cardWidth,
-          height: cardHeight,
-          borderRadius: CAMPAIGN_CARD_CORNER_RADIUS,
-        },
-      ]}
-    >
-      <BlurView tint="systemUltraThinMaterialDark" intensity={74} style={StyleSheet.absoluteFill} />
+  const cardStyle = [
+    styles.deckCard,
+    {
+      width: cardWidth,
+      height: cardHeight,
+      borderRadius: CAMPAIGN_CARD_CORNER_RADIUS,
+    },
+  ];
+  const content = (
+    <>
       <View style={styles.deckCardWash} />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(255,255,255,0.13)', 'rgba(255,255,255,0.045)', 'rgba(255,255,255,0)']}
+        locations={[0, 0.5, 1]}
+        style={styles.deckCardHighlight}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.055)']}
+        locations={[0, 1]}
+        style={styles.deckCardBottomGlow}
+      />
       <View style={styles.deckCardContent}>
         <Image
           source={imageSource}
@@ -54,7 +65,21 @@ export function CampaignDeckEmptyState({
           <Text style={styles.deckCardSubtitle}>{subtitle}</Text>
         </View>
       </View>
-    </View>
+    </>
+  );
+
+  if (isLiquidGlassAvailable()) {
+    return (
+      <GlassView glassEffectStyle="regular" colorScheme="dark" style={cardStyle}>
+        {content}
+      </GlassView>
+    );
+  }
+
+  return (
+    <BlurView tint="systemUltraThinMaterialDark" intensity={82} style={cardStyle}>
+      {content}
+    </BlurView>
   );
 }
 
@@ -166,17 +191,35 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: '#050509',
+    borderColor: 'rgba(255,255,255,0.26)',
+    backgroundColor: 'rgba(255,255,255,0.035)',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.55,
-    shadowRadius: 22,
+    shadowOpacity: 0.32,
+    shadowRadius: 24,
     elevation: 16,
   },
   deckCardWash: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: 'rgba(255,255,255,0.052)',
+  },
+  deckCardHighlight: {
+    position: 'absolute',
+    top: 1,
+    left: 1,
+    right: 1,
+    height: '70%',
+    borderTopLeftRadius: CAMPAIGN_CARD_CORNER_RADIUS - 1,
+    borderTopRightRadius: CAMPAIGN_CARD_CORNER_RADIUS - 1,
+  },
+  deckCardBottomGlow: {
+    position: 'absolute',
+    left: 1,
+    right: 1,
+    bottom: 1,
+    height: '42%',
+    borderBottomLeftRadius: CAMPAIGN_CARD_CORNER_RADIUS - 1,
+    borderBottomRightRadius: CAMPAIGN_CARD_CORNER_RADIUS - 1,
   },
   deckCardContent: {
     flex: 1,

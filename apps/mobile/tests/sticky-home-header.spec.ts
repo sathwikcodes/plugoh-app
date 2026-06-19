@@ -15,6 +15,9 @@ vi.mock('expo-glass-effect', () => ({
   GlassView: 'GlassView',
   isLiquidGlassAvailable: () => false,
 }));
+vi.mock('@/components/ui/app-background', () => ({
+  AppBackground: 'AppBackground',
+}));
 vi.mock('@/components/ui/tab-screen-canvas', () => ({
   TabScreenCanvas: 'TabScreenCanvas',
   useTabScreenCanvas: () => false,

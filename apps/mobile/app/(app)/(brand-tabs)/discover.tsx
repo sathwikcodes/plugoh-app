@@ -5,23 +5,42 @@ import { SnapCardDeck } from '@/components/ui/snap-card-deck';
 import { useBusinessProfile, useInfluencerDiscovery } from '@/hooks/use-marketplace';
 import { businessProfileImageUri } from '@/lib/brand/profile-image';
 import {
-  creatorActiveFilterCount,
   creatorFilterError,
+  creatorPriceFilterForBounds,
   DEFAULT_CREATOR_FILTERS,
   getVisibleCreators,
+  type CreatorFilterDraft,
   type CreatorSort,
 } from '@/lib/filters/creators';
 import labImage from '@/assets/images/lab.png';
 import type { Influencer } from '@plugoh/contracts';
 import { impactAsync, ImpactFeedbackStyle } from 'expo-haptics';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const SORT_OPTIONS: DeckSortOption<CreatorSort>[] = [
   { value: 'followers_desc', label: 'Top followers' },
   { value: 'price_asc', label: 'Best price' },
   { value: 'engagement_desc', label: 'Engagement' },
 ];
+
+function rangeEquals(first: CreatorFilterDraft['price'], second: CreatorFilterDraft['price']) {
+  return first.min.trim() === second.min.trim() && first.max.trim() === second.max.trim();
+}
+
+function creatorFiltersEqual(first: CreatorFilterDraft, second: CreatorFilterDraft) {
+  return rangeEquals(first.followers, second.followers) && rangeEquals(first.price, second.price);
+}
+
+function creatorActiveFilterCountForDefault(
+  filters: CreatorFilterDraft,
+  defaultFilters: CreatorFilterDraft,
+) {
+  return (
+    (rangeEquals(filters.followers, defaultFilters.followers) ? 0 : 1) +
+    (rangeEquals(filters.price, defaultFilters.price) ? 0 : 1)
+  );
+}
 
 export default function BrandDiscoverScreen() {
   const [search, setSearch] = useState('');
@@ -43,11 +62,31 @@ export default function BrandDiscoverScreen() {
       max: priceValues.length > 0 ? Math.max(...priceValues) : 100000,
     };
   }, [creators]);
+  const defaultCreatorFilters = useMemo<CreatorFilterDraft>(
+    () => ({
+      followers: DEFAULT_CREATOR_FILTERS.followers,
+      price: creatorPriceFilterForBounds(priceBounds),
+    }),
+    [priceBounds],
+  );
+  const previousDefaultCreatorFilters = useRef(defaultCreatorFilters);
+  const [filters, setFilters] = useState<CreatorFilterDraft>(() => defaultCreatorFilters);
 
   const handleCreatorPress = useCallback(async (id: string) => {
     await impactAsync(ImpactFeedbackStyle.Light);
     router.push(`/(app)/creator/${id}`);
   }, []);
+
+  useEffect(() => {
+    setFilters((current) => {
+      if (!creatorFiltersEqual(current, previousDefaultCreatorFilters.current)) {
+        return current;
+      }
+
+      return defaultCreatorFilters;
+    });
+    previousDefaultCreatorFilters.current = defaultCreatorFilters;
+  }, [defaultCreatorFilters]);
 
   return (
     <DeckBrowseScreen
@@ -68,8 +107,12 @@ export default function BrandDiscoverScreen() {
       sortValue={sort}
       onSearchChange={setSearch}
       onSortChange={setSort}
-      initialFilters={DEFAULT_CREATOR_FILTERS}
-      getActiveFilterCount={creatorActiveFilterCount}
+      initialFilters={defaultCreatorFilters}
+      filtersValue={filters}
+      onFiltersChange={setFilters}
+      getActiveFilterCount={(value) =>
+        creatorActiveFilterCountForDefault(value, defaultCreatorFilters)
+      }
       validateFilters={creatorFilterError}
       getVisibleItems={({ items, filters }) => getVisibleCreators(items, filters)}
       renderFilterSheet={(input) => (

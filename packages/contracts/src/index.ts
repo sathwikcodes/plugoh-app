@@ -319,6 +319,18 @@ export interface PushUnregisterResponse {
   ok: true;
 }
 
+export interface SavedCardSummary {
+  id: string;
+  provider: string;
+  brand?: string;
+  network?: string;
+  type?: string;
+  issuer?: string;
+  last4?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface HealthResponse {
   service: string;
   status: 'ok';
@@ -344,7 +356,15 @@ export type ApiResponse<T> = ApiSuccess<T> | ApiFailure;
 
 const uuid = z.string().uuid();
 const numeric = z.coerce.number().finite();
+const latitude = numeric.min(-90).max(90);
+const longitude = numeric.min(-180).max(180);
 const optionalText = z.string().trim().min(1).optional();
+const hasCompleteBrandCoordinates = (value: {
+  brand_latitude?: number | undefined;
+  brand_longitude?: number | undefined;
+}) =>
+  (value.brand_latitude === undefined && value.brand_longitude === undefined) ||
+  (value.brand_latitude !== undefined && value.brand_longitude !== undefined);
 
 export const roleSchema = z.enum(USER_ROLES);
 export const idParamSchema = z.object({ id: uuid });
@@ -407,14 +427,21 @@ export const payoutUpsertSchema = z
     },
   );
 
-export const businessProfilePatchSchema = z.object({
-  brand_name: optionalText,
-  brand_type: z.enum(BUSINESS_TYPES).optional(),
-  brand_category: z.enum(BUSINESS_TYPES).optional(),
-  brand_location: optionalText,
-  brand_summary: optionalText,
-  tagline: optionalText,
-});
+export const businessProfilePatchSchema = z
+  .object({
+    brand_name: optionalText,
+    brand_type: z.enum(BUSINESS_TYPES).optional(),
+    brand_category: z.enum(BUSINESS_TYPES).optional(),
+    brand_location: optionalText,
+    brand_latitude: latitude.optional(),
+    brand_longitude: longitude.optional(),
+    brand_summary: optionalText,
+    tagline: optionalText,
+  })
+  .refine(hasCompleteBrandCoordinates, {
+    path: ['brand_latitude'],
+    message: 'brand_latitude and brand_longitude must be provided together',
+  });
 
 export const roleUpsertSchema = z.object({
   role: roleSchema,
@@ -428,15 +455,39 @@ export const commonProfilePatchSchema = z.object({
 
 export const influencerOnboardingSchema = commonProfilePatchSchema;
 
-export const businessOnboardingSchema = commonProfilePatchSchema.merge(
-  z.object({
-    brand_name: z.string().trim().min(1),
-    brand_category: z.enum(BUSINESS_TYPES),
-    brand_location: optionalText,
-    brand_summary: optionalText,
-    tagline: optionalText,
-  }),
-);
+export const businessOnboardingSchema = commonProfilePatchSchema
+  .merge(
+    z.object({
+      brand_name: z.string().trim().min(1),
+      brand_category: z.enum(BUSINESS_TYPES),
+      brand_location: optionalText,
+      brand_latitude: latitude.optional(),
+      brand_longitude: longitude.optional(),
+      brand_summary: optionalText,
+      tagline: optionalText,
+    }),
+  )
+  .refine(hasCompleteBrandCoordinates, {
+    path: ['brand_latitude'],
+    message: 'brand_latitude and brand_longitude must be provided together',
+  });
+
+export const reverseGeocodeSchema = z.object({
+  latitude,
+  longitude,
+});
+
+export const geocodeSchema = z.object({
+  query: z.string().trim().min(3),
+});
+
+export const placeAutocompleteSchema = z.object({
+  query: z.string().trim().min(3),
+});
+
+export const placeDetailsSchema = z.object({
+  place_id: z.string().trim().min(1),
+});
 
 export const createCampaignSchema = z
   .object({
@@ -483,16 +534,53 @@ export const verifyEscrowSchema = z.object({
   campaign_id: uuid,
 });
 
-export const createBookingOrderSchema = z.object({
-  influencer_profile_id: uuid,
-  package_type: z.enum(PACKAGE_TYPES),
-});
+export const createBookingOrderSchema = createCampaignSchema;
 
-export const verifyBookingPaymentSchema = createCampaignSchema.extend({
+export const bookingPaymentVerificationSchema = z.object({
+  booking_intent_id: uuid,
   razorpay_order_id: z.string().min(1),
   razorpay_payment_id: z.string().min(1),
   razorpay_signature: z.string().min(1),
 });
+
+export const legacyVerifyBookingPaymentSchema = z
+  .object({
+    influencer_id: uuid.optional(),
+    influencer_profile_id: uuid,
+    package_type: z.enum(PACKAGE_TYPES),
+    objective: z.enum(BOOKING_OBJECTIVES),
+    timing_mode: z.enum(['asap', 'choose_date']),
+    due_date: z.string().date().optional(),
+    place_name: optionalText,
+    business_contact_email: z.string().email().optional(),
+    business_contact_phone: z.string().min(5).optional(),
+    contact_email: z.string().email().optional(),
+    contact_phone: z.string().min(5).optional(),
+    razorpay_order_id: z.string().min(1),
+    razorpay_payment_id: z.string().min(1),
+    razorpay_signature: z.string().min(1),
+  })
+  .refine((value) => value.timing_mode !== 'choose_date' || value.due_date, {
+    path: ['due_date'],
+    message: 'due_date is required when timing_mode is choose_date',
+  })
+  .refine((value) => value.objective !== 'visit_place' || value.place_name, {
+    path: ['place_name'],
+    message: 'place_name is required when objective is visit_place',
+  })
+  .refine((value) => value.business_contact_email || value.contact_email, {
+    path: ['business_contact_email'],
+    message: 'business_contact_email is required',
+  })
+  .refine((value) => value.business_contact_phone || value.contact_phone, {
+    path: ['business_contact_phone'],
+    message: 'business_contact_phone is required',
+  });
+
+export const verifyBookingPaymentSchema = z.union([
+  bookingPaymentVerificationSchema,
+  legacyVerifyBookingPaymentSchema,
+]);
 
 export const campaignIdSchema = z.object({
   campaign_id: uuid,
@@ -553,6 +641,15 @@ export type InfluencerPricingPatch = z.infer<typeof influencerPricingPatchSchema
 export type InfluencerActivePatch = z.infer<typeof influencerActivePatchSchema>;
 export type InfluencerOnboardingRequest = z.infer<typeof influencerOnboardingSchema>;
 export type BusinessOnboardingRequest = z.infer<typeof businessOnboardingSchema>;
+export type GeocodeRequest = z.infer<typeof geocodeSchema>;
+export type GeocodeResponse = { label: string; latitude: number; longitude: number };
+export type ReverseGeocodeRequest = z.infer<typeof reverseGeocodeSchema>;
+export type ReverseGeocodeResponse = { label: string };
+export type PlaceAutocompleteRequest = z.infer<typeof placeAutocompleteSchema>;
+export type PlacePrediction = { place_id: string; label: string; sublabel: string };
+export type PlaceAutocompleteResponse = { predictions: PlacePrediction[] };
+export type PlaceDetailsRequest = z.infer<typeof placeDetailsSchema>;
+export type PlaceDetailsResponse = { label: string; latitude: number; longitude: number };
 export type PayoutUpsert = z.infer<typeof payoutUpsertSchema>;
 export type BusinessProfilePatch = z.infer<typeof businessProfilePatchSchema>;
 export type CreateCampaignRequest = z.infer<typeof createCampaignSchema>;
@@ -561,6 +658,7 @@ export type DisputeRequest = z.infer<typeof disputeSchema>;
 export type CreateEscrowOrderRequest = z.infer<typeof createEscrowOrderSchema>;
 export type VerifyEscrowRequest = z.infer<typeof verifyEscrowSchema>;
 export type CreateBookingOrderRequest = z.infer<typeof createBookingOrderSchema>;
+export type BookingPaymentVerificationRequest = z.infer<typeof bookingPaymentVerificationSchema>;
 export type VerifyBookingPaymentRequest = z.infer<typeof verifyBookingPaymentSchema>;
 export type CampaignIdRequest = z.infer<typeof campaignIdSchema>;
 export type DeliverySubmitRequest = z.infer<typeof deliverySubmitSchema>;

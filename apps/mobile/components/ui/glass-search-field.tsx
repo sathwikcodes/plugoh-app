@@ -1,99 +1,44 @@
-import { theme } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-
-const SEARCH_HEIGHT = 46;
-const SEARCH_TEXT = '#FFFFFF';
-const SEARCH_PLACEHOLDER_TONE = 'rgba(255,255,255,0.74)';
-const SEARCH_SELECTION = '#FFFFFF';
+import { AppInput } from '@/components/ui/app-input';
+import { type TextInputProps } from 'react-native';
 
 export type GlassSearchFieldProps = {
   value: string;
   onChangeText: (text: string) => void;
   placeholder: string;
+  accessibilityLabel?: string;
+  autoCapitalize?: TextInputProps['autoCapitalize'];
+  autoCorrect?: boolean;
+  loading?: boolean;
+  onSubmitEditing?: TextInputProps['onSubmitEditing'];
+  returnKeyType?: TextInputProps['returnKeyType'];
+  spellCheck?: boolean;
 };
 
-export function GlassSearchField({ value, onChangeText, placeholder }: GlassSearchFieldProps) {
+export function GlassSearchField({
+  value,
+  onChangeText,
+  placeholder,
+  accessibilityLabel = 'Search campaigns',
+  autoCapitalize = 'none',
+  autoCorrect = false,
+  loading = false,
+  onSubmitEditing,
+  returnKeyType = 'search',
+  spellCheck = false,
+}: GlassSearchFieldProps) {
   return (
-    <BlurView tint="systemUltraThinMaterialDark" intensity={68} style={styles.shell}>
-      <View style={styles.inner}>
-        <Ionicons name="search" size={19} color={SEARCH_TEXT} style={styles.icon} />
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={SEARCH_PLACEHOLDER_TONE}
-          cursorColor={SEARCH_TEXT}
-          selectionColor={SEARCH_SELECTION}
-          returnKeyType="search"
-          autoCapitalize="none"
-          autoCorrect={false}
-          spellCheck={false}
-          accessibilityLabel="Search campaigns"
-          style={styles.input}
-        />
-        {value.length > 0 ? (
-          <Pressable
-            onPress={() => {
-              onChangeText('');
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-            hitSlop={10}
-            style={({ pressed }) => [
-              styles.clearButton,
-              pressed ? styles.clearButtonPressed : null,
-            ]}
-          >
-            <Ionicons name="close-circle" size={18} color={SEARCH_TEXT} />
-          </Pressable>
-        ) : null}
-      </View>
-    </BlurView>
+    <AppInput
+      variant="search"
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      accessibilityLabel={accessibilityLabel}
+      autoCapitalize={autoCapitalize}
+      autoCorrect={autoCorrect}
+      spellCheck={spellCheck}
+      loading={loading}
+      onSubmitEditing={onSubmitEditing}
+      returnKeyType={returnKeyType}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  shell: {
-    borderRadius: theme.radius.pill,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  inner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    height: SEARCH_HEIGHT,
-  },
-  icon: {
-    marginTop: 1,
-  },
-  input: {
-    fontFamily: theme.typography.body.fontFamily,
-    fontSize: theme.typography.body.fontSize,
-    fontWeight: theme.typography.body.fontWeight,
-    letterSpacing: theme.typography.body.letterSpacing,
-    flex: 1,
-    height: SEARCH_HEIGHT,
-    padding: 0,
-    margin: 0,
-    backgroundColor: 'transparent',
-    color: SEARCH_TEXT,
-    textAlignVertical: 'center',
-    includeFontPadding: false,
-  },
-  clearButton: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clearButtonPressed: {
-    opacity: 0.72,
-  },
-});

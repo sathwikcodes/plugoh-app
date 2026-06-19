@@ -8,11 +8,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppInput } from './app-input';
 import { LiquidModalBackdrop, LiquidSheetSurface } from './liquid-sheet-surface';
 
 type FilterSheetProps = {
@@ -246,7 +246,9 @@ export function FilterRange({
     <View style={styles.rangeGroup}>
       <Text style={styles.rangeLabel}>{label}</Text>
       <View style={styles.rangeRow}>
-        <TextInput
+        <AppInput
+          size="sm"
+          containerStyle={styles.rangeInputContainer}
           accessibilityLabel={`${label} minimum`}
           value={minValue}
           onChangeText={onMinChange}
@@ -254,10 +256,11 @@ export function FilterRange({
           placeholderTextColor="rgba(255,255,255,0.32)"
           keyboardType="numeric"
           inputMode="numeric"
-          style={styles.rangeInput}
+          inputStyle={styles.rangeInputText}
         />
-        <View style={styles.rangeDivider} />
-        <TextInput
+        <AppInput
+          size="sm"
+          containerStyle={styles.rangeInputContainer}
           accessibilityLabel={`${label} maximum`}
           value={maxValue}
           onChangeText={onMaxChange}
@@ -265,7 +268,7 @@ export function FilterRange({
           placeholderTextColor="rgba(255,255,255,0.32)"
           keyboardType="numeric"
           inputMode="numeric"
-          style={styles.rangeInput}
+          inputStyle={styles.rangeInputText}
         />
       </View>
       {error ? <Text style={styles.rangeError}>{error}</Text> : null}
@@ -411,26 +414,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   rangeRow: {
-    minHeight: 52,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
     flexDirection: 'row',
     alignItems: 'center',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.055)',
+    gap: theme.spacing.sm,
   },
-  rangeInput: {
+  rangeInputContainer: {
     flex: 1,
-    minHeight: 52,
-    paddingHorizontal: theme.spacing.md,
-    color: theme.colors.foreground,
-    ...theme.typography.mono,
   },
-  rangeDivider: {
-    width: StyleSheet.hairlineWidth,
-    alignSelf: 'stretch',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+  rangeInputText: {
+    ...theme.typography.mono,
   },
   rangeError: {
     ...theme.typography.label,

@@ -1,22 +1,12 @@
-import { authTypography } from '@/components/auth/typography';
+import { AppInput } from '@/components/ui/app-input';
 import { forwardRef } from 'react';
-import { StyleSheet, TextInput, TextInputProps } from 'react-native';
+import { TextInput, type TextInputProps } from 'react-native';
 
 type Props = TextInputProps;
 
-export const LumaTextField = forwardRef<TextInput, Props>(function LumaTextField(props, ref) {
-  return <TextInput ref={ref} placeholderTextColor="#444444" style={styles.input} {...props} />;
-});
-
-const styles = StyleSheet.create({
-  input: {
-    ...authTypography.body,
-    height: 52,
-    borderRadius: 10,
-    backgroundColor: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#2E2E2E',
-    paddingHorizontal: 16,
-    color: '#FFFFFF',
-  },
+export const LumaTextField = forwardRef<TextInput, Props>(function LumaTextField(
+  { style, ...props },
+  ref,
+) {
+  return <AppInput ref={ref} {...props} inputStyle={style} />;
 });

@@ -2,6 +2,9 @@ type BasicsDraft = {
   full_name: string;
   phone: string;
   location: string;
+  location_label?: string;
+  location_latitude?: number | null;
+  location_longitude?: number | null;
 };
 
 let draft: BasicsDraft | null = null;

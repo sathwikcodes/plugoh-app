@@ -1,3 +1,11 @@
+import homeTab from '@/assets/images/home-tab.png';
+import homeTabSelected from '@/assets/images/home-tab-selected.png';
+import inboxTab from '@/assets/images/inbox-tab.png';
+import inboxTabSelected from '@/assets/images/inbox-tab-selected.png';
+import searchTab from '@/assets/images/search-tab.png';
+import searchTabSelected from '@/assets/images/search-tab-selected.png';
+import workTab from '@/assets/images/work-tab.png';
+import workTabSelected from '@/assets/images/work-tab-selected.png';
 import { plugohNativeTabOptions } from '@/components/navigation/native-tab-config';
 import { TabScreenCanvasProvider } from '@/components/ui/tab-screen-canvas';
 import { theme } from '@/constants/theme';
@@ -18,29 +26,22 @@ export default function BrandTabsLayout() {
       <View style={styles.root}>
         <NativeTabs {...plugohNativeTabOptions}>
           <NativeTabs.Trigger name="index">
-            <Icon sf={{ default: 'house', selected: 'house.fill' }} />
+            <Icon src={{ default: homeTab, selected: homeTabSelected }} />
             <Label hidden>Home</Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="discover">
-            <Icon
-              sf={{ default: 'magnifyingglass.circle', selected: 'magnifyingglass.circle.fill' }}
-            />
+            <Icon src={{ default: searchTab, selected: searchTabSelected }} />
             <Label hidden>Find</Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="campaigns">
-            <Icon sf={{ default: 'briefcase', selected: 'briefcase.fill' }} />
+            <Icon src={{ default: workTab, selected: workTabSelected }} />
             <Label hidden>Work</Label>
           </NativeTabs.Trigger>
 
           <NativeTabs.Trigger name="inbox">
-            <Icon
-              sf={{
-                default: 'bubble.left.and.bubble.right',
-                selected: 'bubble.left.and.bubble.right.fill',
-              }}
-            />
+            <Icon src={{ default: inboxTab, selected: inboxTabSelected }} />
             <Label hidden>Inbox</Label>
           </NativeTabs.Trigger>
         </NativeTabs>

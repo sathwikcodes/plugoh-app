@@ -1,12 +1,12 @@
 import { LiquidGlassShell } from '@/components/inbox/liquid-glass-shell';
+import { AppInput } from '@/components/ui/app-input';
 import { GlassCircleButton } from '@/components/ui/glass-circle-button';
 import { theme } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 const CONTROL_HEIGHT = 44;
-const INPUT_LINE_HEIGHT = 20;
 
 type Props = {
   value: string;
@@ -37,20 +37,18 @@ export function ComposeBar({
         symbolSize={18}
         accessibilityLabel="Attach file"
       />
-      <LiquidGlassShell style={styles.inputShell}>
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder="Message..."
-          placeholderTextColor="rgba(255,255,255,0.74)"
-          cursorColor="#FFFFFF"
-          selectionColor="rgba(255,255,255,0.32)"
-          multiline
-          style={styles.input}
-          returnKeyType="default"
-          maxLength={4000}
-        />
-      </LiquidGlassShell>
+      <AppInput
+        containerStyle={styles.inputShell}
+        fieldStyle={styles.inputField}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder="Message..."
+        placeholderTextColor="rgba(255,255,255,0.74)"
+        autoGrow={{ minHeight: CONTROL_HEIGHT, maxHeight: 120 }}
+        returnKeyType="default"
+        maxLength={4000}
+        accessibilityLabel="Message"
+      />
       <Pressable
         onPress={onSend}
         disabled={!canSend}
@@ -92,22 +90,9 @@ const styles = StyleSheet.create({
   },
   inputShell: {
     flex: 1,
-    minHeight: CONTROL_HEIGHT,
-    maxHeight: 120,
-    borderRadius: CONTROL_HEIGHT / 2,
   },
-  input: {
-    minHeight: CONTROL_HEIGHT,
-    maxHeight: 120,
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: 11,
-    paddingBottom: 10,
-    ...theme.typography.body,
-    lineHeight: INPUT_LINE_HEIGHT,
-    color: '#FFFFFF',
-    backgroundColor: 'transparent',
-    includeFontPadding: false,
-    textAlignVertical: 'center',
+  inputField: {
+    borderRadius: CONTROL_HEIGHT / 2,
   },
   sendPressable: {
     width: CONTROL_HEIGHT,

@@ -1,12 +1,17 @@
-import { Hono } from "hono";
-import type { EnvConfig } from "./config/env.js";
-import { readEnv } from "./config/env.js";
-import { createSupabaseAuthVerifier, type AuthVerifier } from "./middleware/auth.js";
-import { SupabaseDataStore, type DataStore } from "./repositories/data-store.js";
-import type { ProviderBundle } from "./services/marketplace.js";
-import type { AppEnv } from "./types.js";
-import type { RouteDeps } from "./modules/deps.js";
-import { applyGlobalMiddleware, buildDeps, createRateLimiters, mountDomainRoutes } from "./modules/bootstrap.js";
+import { Hono } from 'hono';
+import type { EnvConfig } from './config/env.js';
+import { readEnv } from './config/env.js';
+import { createSupabaseAuthVerifier, type AuthVerifier } from './middleware/auth.js';
+import { SupabaseDataStore, type DataStore } from './repositories/data-store.js';
+import type { ProviderBundle } from './services/marketplace.js';
+import type { AppEnv } from './types.js';
+import type { RouteDeps } from './modules/deps.js';
+import {
+  applyGlobalMiddleware,
+  buildDeps,
+  createRateLimiters,
+  mountDomainRoutes,
+} from './modules/bootstrap.js';
 import {
   authOrCron,
   claimIdempotency,
@@ -16,7 +21,8 @@ import {
   requireRoleValue,
   requireUser,
   scopedReadServices,
-} from "./modules/runtime.js";
+  storeIdempotency,
+} from './modules/runtime.js';
 
 export type AppOptions = {
   config?: Partial<EnvConfig>;
@@ -46,6 +52,7 @@ export function createApp(options: AppOptions = {}) {
       requireUser,
       requireRoleValue,
       claimIdempotency,
+      storeIdempotency,
       requireIdempotencyKey,
       authOrCron,
       scopedReadServices: (c) => scopedReadServices(c, store, providers, config),

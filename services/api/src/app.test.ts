@@ -8,6 +8,7 @@ import {
   FakeGeocodingProvider,
   FakeInstagramProvider,
   FakePaymentProvider,
+  FakePlacesProvider,
   FakeStorageProvider,
 } from './testing/fakes.js';
 import { MemoryDataStore } from './testing/memory-store.js';
@@ -25,8 +26,20 @@ function webhookSignature(body: string) {
   return crypto.createHmac('sha256', 'webhook_secret').update(body).digest('hex');
 }
 
-function makeApp(seed = {}) {
-  const store = new MemoryDataStore({
+function bookingPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    influencer_profile_id: influencerProfileId,
+    package_type: 'instagram_reel',
+    objective: 'feature_product',
+    timing_mode: 'asap',
+    business_contact_email: 'brand@test.dev',
+    business_contact_phone: '+919999999999',
+    ...overrides,
+  };
+}
+
+function defaultSeed(seed = {}) {
+  return {
     profiles: [
       { id: businessId, email: 'brand@test.dev', full_name: 'Brand Owner' },
       { id: influencerId, email: 'creator@test.dev', full_name: 'Creator' },
@@ -66,11 +79,19 @@ function makeApp(seed = {}) {
     instagram_media: [],
     influencer_payout_accounts: [],
     ...seed,
-  });
+  };
+}
+
+function makeApp(seed = {}) {
+  return makeAppWithStore(new MemoryDataStore(defaultSeed(seed)));
+}
+
+function makeAppWithStore(store: MemoryDataStore) {
   const payment = new FakePaymentProvider();
   const storage = new FakeStorageProvider();
   const ai = new FakeAiProvider();
   const geocoding = new FakeGeocodingProvider();
+  const places = new FakePlacesProvider();
   const app = createApp({
     store,
     config: {
@@ -91,11 +112,12 @@ function makeApp(seed = {}) {
       storage,
       email: new FakeEmailProvider(),
       geocoding,
+      places,
       instagram: new FakeInstagramProvider(),
       ai,
     },
   });
-  return { app, store, payment, storage, ai, geocoding };
+  return { app, store, payment, storage, ai, geocoding, places };
 }
 
 class SearchFallbackStore extends MemoryDataStore {
@@ -118,6 +140,60 @@ class NoConflictUpsertStore extends MemoryDataStore {
       throw new Error(`unexpected upsert on ${table}`);
     }
     return super.upsert<T>(table, values, onConflict, select);
+  }
+}
+
+class OldClaimIdempotencyStore extends MemoryDataStore {
+  override async rpc<T extends Record<string, any>>(fnName: string, params: Record<string, any>) {
+    if (fnName === 'claim_idempotency' && params.p_scope != null) {
+      throw Object.assign(
+        new Error(
+          'Could not find the function public.claim_idempotency(p_key, p_response, p_scope, p_request_hash)',
+        ),
+        { code: 'RPC_ERROR' },
+      );
+    }
+    if (fnName === 'claim_idempotency' && params.p_response == null) {
+      throw Object.assign(
+        new Error(
+          'null value in column "response" of relation "idempotency_keys" violates not-null constraint',
+        ),
+        { code: '23502' },
+      );
+    }
+    return super.rpc<T>(fnName, params);
+  }
+}
+
+class OverloadedClaimIdempotencyStore extends MemoryDataStore {
+  override async rpc<T extends Record<string, any>>(fnName: string, params: Record<string, any>) {
+    if (
+      fnName === 'claim_idempotency' &&
+      (params.p_scope == null || params.p_request_hash == null)
+    ) {
+      throw Object.assign(
+        new Error(
+          'Could not choose the best candidate function between: public.claim_idempotency(p_key => text, p_response => jsonb), public.claim_idempotency(p_key => text, p_response => jsonb, p_scope => text, p_request_hash => text)',
+        ),
+        { code: 'RPC_ERROR' },
+      );
+    }
+    return super.rpc<T>(fnName, params);
+  }
+}
+
+class MissingBookingIntentStore extends MemoryDataStore {
+  override async insert<T extends Record<string, any>>(
+    table: string,
+    values: Record<string, any>,
+    select?: string,
+  ) {
+    if (table === 'booking_payment_intents') {
+      throw Object.assign(new Error('relation "booking_payment_intents" does not exist'), {
+        code: '42P01',
+      });
+    }
+    return super.insert<T>(table, values, select);
   }
 }
 
@@ -293,7 +369,26 @@ describe('Plugoh API', () => {
   });
 
   it('keeps business profile patch as edit-only for business users', async () => {
-    const { app, store } = makeApp();
+    const { app, store } = makeApp({
+      profiles: [
+        {
+          id: businessId,
+          email: 'brand@test.dev',
+          full_name: 'Brand Owner',
+          avatar_url: 'https://cdn.test/brand-avatar.jpg',
+        },
+      ],
+      business_profiles: [
+        {
+          id: 'bp-1',
+          user_id: businessId,
+          brand_name: 'Plugoh Cafe',
+          brand_category: 'restaurant_cafe',
+          brand_location: 'Hyderabad',
+          instagram_profile_picture_url: 'https://cdn.test/brand-instagram.jpg',
+        },
+      ],
+    });
     const forbiddenRes = await app.request('/business/profile', {
       method: 'PATCH',
       headers: { authorization: 'Bearer influencer', 'content-type': 'application/json' },
@@ -307,7 +402,60 @@ describe('Plugoh API', () => {
       body: JSON.stringify({ brand_name: 'New Name' }),
     });
     expect(okRes.status).toBe(200);
+    const body = await json(okRes);
     expect(store.tables.get('business_profiles')?.[0].brand_name).toBe('New Name');
+    expect(body.data.profile_photo_url).toBe('https://cdn.test/brand-instagram.jpg');
+    expect(body.data.avatar_url).toBe('https://cdn.test/brand-avatar.jpg');
+  });
+
+  it('normalizes legacy brand_type patches without writing unknown business profile columns', async () => {
+    const { app, store, geocoding } = makeApp();
+    const res = await app.request('/business/profile', {
+      method: 'PATCH',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        brand_summary: 'Updated brand story',
+        brand_type: 'd2c_brand',
+        brand_location: 'Hyderabad',
+      }),
+    });
+    const body = await json(res);
+
+    expect(res.status).toBe(200);
+    const profile = store.tables.get('business_profiles')?.[0];
+    expect(profile?.brand_summary).toBe('Updated brand story');
+    expect(profile?.brand_category).toBe('d2c_brand');
+    expect(profile).not.toHaveProperty('brand_type');
+    expect(body.data.brand_type).toBe('d2c_brand');
+    expect(geocoding.calls).toEqual([]);
+  });
+
+  it('persists explicit business profile coordinates and keeps text geocoding fallback', async () => {
+    const { app, store, geocoding } = makeApp();
+
+    const explicit = await app.request('/business/profile', {
+      method: 'PATCH',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        brand_location: 'Road 36, Hyderabad',
+        brand_latitude: 17.435,
+        brand_longitude: 78.4,
+      }),
+    });
+    expect(explicit.status).toBe(200);
+    expect(geocoding.calls).toEqual([]);
+    expect(store.tables.get('business_profiles')?.[0].brand_latitude).toBe(17.435);
+    expect(store.tables.get('business_profiles')?.[0].brand_longitude).toBe(78.4);
+
+    const fallback = await app.request('/business/profile', {
+      method: 'PATCH',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({ brand_location: 'Banjara Hills, Hyderabad' }),
+    });
+    expect(fallback.status).toBe(200);
+    expect(geocoding.calls).toEqual(['Banjara Hills, Hyderabad']);
+    expect(store.tables.get('business_profiles')?.[0].brand_latitude).toBe(17.4065);
+    expect(store.tables.get('business_profiles')?.[0].brand_longitude).toBe(78.4772);
   });
 
   it('creates business onboarding without relying on datastore upsert conflict targets', async () => {
@@ -348,6 +496,154 @@ describe('Plugoh API', () => {
     expect(businessProfile?.brand_name).toBe('Plugoh Cafe');
     expect(businessProfile?.brand_latitude).toBe(17.4065);
     expect(businessProfile?.brand_longitude).toBe(78.4772);
+  });
+
+  it('stores explicit business onboarding coordinates without geocoding', async () => {
+    const store = new NoConflictUpsertStore({
+      profiles: [],
+      user_roles: [],
+      business_profiles: [],
+      influencer_profiles: [],
+      campaigns: [],
+      campaign_messages: [],
+      notifications: [],
+      deliveries: [],
+      escrow_ledger_entries: [],
+      instagram_media: [],
+      influencer_payout_accounts: [],
+    });
+    const geocoding = new FakeGeocodingProvider();
+    const app = createApp({
+      store,
+      config: { port: 4000, demoEnabled: false },
+      authVerifier: async () => ({ id: businessId, email: 'brand@test.dev' }),
+      providers: { geocoding },
+    });
+    const res = await app.request('/business/onboarding', {
+      method: 'POST',
+      headers: { authorization: 'Bearer any', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        full_name: 'Brand Owner',
+        phone: '+919999999999',
+        location: 'Jubilee Hills, Hyderabad',
+        brand_location: 'Jubilee Hills, Hyderabad',
+        brand_latitude: 17.4319,
+        brand_longitude: 78.4071,
+        brand_name: 'Plugoh Cafe',
+        brand_category: 'restaurant_cafe',
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(geocoding.calls).toEqual([]);
+    const businessProfile = store.tables.get('business_profiles')?.[0];
+    expect(businessProfile?.brand_location).toBe('Jubilee Hills, Hyderabad');
+    expect(businessProfile?.brand_latitude).toBe(17.4319);
+    expect(businessProfile?.brand_longitude).toBe(78.4071);
+  });
+
+  it('validates coordinate ranges and reverse-geocodes map selections', async () => {
+    const { app, geocoding } = makeApp();
+    const invalid = await app.request('/business/profile', {
+      method: 'PATCH',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        brand_location: 'Invalid',
+        brand_latitude: 120,
+        brand_longitude: 78.4,
+      }),
+    });
+    expect(invalid.status).toBe(400);
+
+    const reverse = await app.request('/locations/reverse-geocode', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({ latitude: 17.4319, longitude: 78.4071 }),
+    });
+    expect(reverse.status).toBe(200);
+    expect((await json(reverse)).data.label).toBe('Jubilee Hills, Hyderabad');
+    expect(geocoding.reverseCalls).toEqual([{ latitude: 17.4319, longitude: 78.4071 }]);
+
+    const geocode = await app.request('/locations/geocode', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({ query: 'Road 36 Jubilee Hills Hyderabad' }),
+    });
+    expect(geocode.status).toBe(200);
+    expect(await json(geocode)).toMatchObject({
+      data: {
+        label: 'Road 36 Jubilee Hills Hyderabad',
+        latitude: 17.4065,
+        longitude: 78.4772,
+      },
+    });
+  });
+
+  it('returns place autocomplete predictions and resolves details', async () => {
+    const { app, places } = makeApp();
+
+    const autocomplete = await app.request('/locations/autocomplete', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({ query: 'Jubilee' }),
+    });
+    expect(autocomplete.status).toBe(200);
+    expect(await json(autocomplete)).toMatchObject({
+      data: {
+        predictions: [
+          { place_id: 'place_jubilee', label: 'Jubilee Hills', sublabel: 'Hyderabad, Telangana' },
+          { place_id: 'place_banjara', label: 'Banjara Hills', sublabel: 'Hyderabad, Telangana' },
+        ],
+      },
+    });
+    expect(places.autocompleteCalls).toEqual(['Jubilee']);
+
+    const details = await app.request('/locations/place-details', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({ place_id: 'place_jubilee' }),
+    });
+    expect(details.status).toBe(200);
+    expect(await json(details)).toMatchObject({
+      data: { label: 'Jubilee Hills, Hyderabad', latitude: 17.4319, longitude: 78.4071 },
+    });
+    expect(places.detailsCalls).toEqual(['place_jubilee']);
+  });
+
+  it('rejects place search when the places provider is unavailable', async () => {
+    const store = new MemoryDataStore({
+      profiles: [{ id: businessId, email: 'brand@test.dev', full_name: 'Brand Owner' }],
+      user_roles: [{ id: 'role-business', user_id: businessId, role: 'business' }],
+    });
+    const app = createApp({
+      store,
+      config: { port: 4000, demoEnabled: false },
+      authVerifier: async () => ({ id: businessId, email: 'brand@test.dev' }),
+      providers: {},
+    });
+
+    const autocomplete = await app.request('/locations/autocomplete', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({ query: 'Jubilee' }),
+    });
+    expect(autocomplete.status).toBe(400);
+
+    const details = await app.request('/locations/place-details', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({ place_id: 'place_jubilee' }),
+    });
+    expect(details.status).toBe(400);
+  });
+
+  it('returns not-found when place details has no match', async () => {
+    const { app } = makeApp();
+    const details = await app.request('/locations/place-details', {
+      method: 'POST',
+      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      body: JSON.stringify({ place_id: 'place_missing' }),
+    });
+    expect(details.status).toBe(400);
   });
 
   it('creates a campaign and notifies the influencer', async () => {
@@ -829,6 +1125,256 @@ describe('Plugoh API', () => {
     expect(paymentOrder?.status).toBe('authorized');
     expect(campaign?.ai_title).toBe('Aura Reel');
     expect(campaign?.card_image_url).toContain(`campaigns/${campaignIdFromResponse}/card.png`);
+
+    const savedCardsRes = await app.request('/payment/saved-cards', {
+      headers: { authorization: 'Bearer business' },
+    });
+    const savedCardsBody = await json(savedCardsRes);
+    expect(savedCardsRes.status).toBe(200);
+    expect(savedCardsBody.data[0]).toMatchObject({
+      provider: 'razorpay',
+      brand: 'Visa',
+      last4: '4242',
+    });
+  });
+
+  it('verifies booking payment intents idempotently without duplicate campaigns', async () => {
+    const { app, store } = makeApp();
+    const createRes = await app.request('/payment/create-booking-order', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-idempotent-base',
+      },
+      body: JSON.stringify(bookingPayload()),
+    });
+    const createBody = await json(createRes);
+    const orderId = createBody.data.orderId;
+    const paymentId = 'pay_card';
+    const payload = {
+      booking_intent_id: createBody.data.bookingIntentId,
+      razorpay_order_id: orderId,
+      razorpay_payment_id: paymentId,
+      razorpay_signature: signature(orderId, paymentId),
+    };
+
+    const first = await app.request('/payment/verify-booking-payment', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-intent-verify-1',
+      },
+      body: JSON.stringify(payload),
+    });
+    const second = await app.request('/payment/verify-booking-payment', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-intent-verify-1',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect((await json(second)).data.campaignId).toBe((await json(first)).data.campaignId);
+    expect(store.tables.get('campaigns') ?? []).toHaveLength(1);
+    expect(store.tables.get('payment_orders') ?? []).toHaveLength(1);
+    expect(store.tables.get('booking_payment_intents')?.[0]).toMatchObject({
+      status: 'completed',
+      provider_payment_id: paymentId,
+      campaign_id: (store.tables.get('campaigns') ?? [])[0]?.id,
+    });
+  });
+
+  it('creates booking payment intents idempotently without duplicate Razorpay orders', async () => {
+    const { app, store, payment } = makeApp();
+    const request = {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-create-1',
+      },
+      body: JSON.stringify(bookingPayload()),
+    };
+
+    const first = await app.request('/payment/create-booking-order', request);
+    const second = await app.request('/payment/create-booking-order', request);
+    const firstBody = await json(first);
+    const secondBody = await json(second);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(secondBody.data).toEqual(firstBody.data);
+    expect(store.tables.get('booking_payment_intents') ?? []).toHaveLength(1);
+    expect(payment.orders.size).toBe(1);
+  });
+
+  it('creates booking orders when the deployed idempotency RPC rejects null pre-claims', async () => {
+    const { app, store } = makeAppWithStore(new OldClaimIdempotencyStore(defaultSeed()));
+
+    const res = await app.request('/payment/create-booking-order', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-old-idempotency-rpc',
+      },
+      body: JSON.stringify(bookingPayload()),
+    });
+    const body = await json(res);
+
+    expect(res.status).toBe(200);
+    expect(body.data.bookingIntentId).toEqual(expect.any(String));
+    expect(store.tables.get('booking_payment_intents') ?? []).toHaveLength(1);
+  });
+
+  it('creates booking orders when Supabase sees overloaded idempotency RPC functions', async () => {
+    const { app, store, payment } = makeAppWithStore(
+      new OverloadedClaimIdempotencyStore(defaultSeed()),
+    );
+    const request = {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-overloaded-idempotency-rpc',
+      },
+      body: JSON.stringify(bookingPayload()),
+    };
+
+    const first = await app.request('/payment/create-booking-order', request);
+    const second = await app.request('/payment/create-booking-order', request);
+    const firstBody = await json(first);
+    const secondBody = await json(second);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(secondBody.data).toEqual(firstBody.data);
+    expect(store.tables.get('booking_payment_intents') ?? []).toHaveLength(1);
+    expect(payment.orders.size).toBe(1);
+  });
+
+  it('falls back to legacy booking verification when booking payment intents are not migrated', async () => {
+    const { app, store } = makeAppWithStore(new MissingBookingIntentStore(defaultSeed()));
+
+    const createRes = await app.request('/payment/create-booking-order', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-missing-intent-table',
+      },
+      body: JSON.stringify(bookingPayload()),
+    });
+    const createBody = await json(createRes);
+    const orderId = createBody.data.orderId;
+    const paymentId = 'pay_card';
+
+    expect(createRes.status).toBe(200);
+    expect(createBody.data.bookingIntentId).toBeUndefined();
+
+    const verifyRes = await app.request('/payment/verify-booking-payment', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-legacy-missing-intent-table',
+      },
+      body: JSON.stringify({
+        ...bookingPayload(),
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature(orderId, paymentId),
+      }),
+    });
+
+    expect(verifyRes.status).toBe(200);
+    expect((await json(verifyRes)).data.campaignId).toEqual(expect.any(String));
+    expect(store.tables.get('campaigns') ?? []).toHaveLength(1);
+    expect(store.tables.get('payment_orders') ?? []).toHaveLength(1);
+  });
+
+  it('rejects booking payment intents when the paid amount does not match', async () => {
+    const { app, store, payment } = makeApp();
+    const createRes = await app.request('/payment/create-booking-order', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-amount-mismatch',
+      },
+      body: JSON.stringify(bookingPayload()),
+    });
+    const createBody = await json(createRes);
+    const orderId = createBody.data.orderId;
+    payment.orders.set(orderId, { id: orderId, amount: 100, currency: 'INR' });
+
+    const res = await app.request('/payment/verify-booking-payment', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-intent-amount-mismatch',
+      },
+      body: JSON.stringify({
+        booking_intent_id: createBody.data.bookingIntentId,
+        razorpay_order_id: orderId,
+        razorpay_payment_id: 'pay_card',
+        razorpay_signature: signature(orderId, 'pay_card'),
+      }),
+    });
+
+    expect(res.status).toBe(409);
+    expect(store.tables.get('campaigns') ?? []).toHaveLength(0);
+    expect(store.tables.get('booking_payment_intents')?.[0]).toMatchObject({
+      status: 'failed',
+      failure_reason: 'Paid order amount does not match the requested booking amount',
+    });
+  });
+
+  it('rejects non-card booking payment intents with a clear error', async () => {
+    const { app, store } = makeApp();
+    const createRes = await app.request('/payment/create-booking-order', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-upi',
+      },
+      body: JSON.stringify(bookingPayload()),
+    });
+    const createBody = await json(createRes);
+    const orderId = createBody.data.orderId;
+    const paymentId = 'pay_upi';
+
+    const res = await app.request('/payment/verify-booking-payment', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-intent-upi',
+      },
+      body: JSON.stringify({
+        booking_intent_id: createBody.data.bookingIntentId,
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature(orderId, paymentId),
+      }),
+    });
+    const body = await json(res);
+
+    expect(res.status).toBe(400);
+    expect(body.error.code).toBe('UNSUPPORTED_PAYMENT_METHOD');
+    expect(store.tables.get('campaigns') ?? []).toHaveLength(0);
+    expect(store.tables.get('booking_payment_intents')?.[0]).toMatchObject({
+      status: 'failed',
+      payment_method: 'upi',
+    });
   });
 
   it('does not regenerate creative for campaigns that already have a card image', async () => {
@@ -864,21 +1410,51 @@ describe('Plugoh API', () => {
   });
 
   it('derives combo package pricing on create booking order', async () => {
-    const { app } = makeApp();
+    const { app, store } = makeApp();
     const res = await app.request('/payment/create-booking-order', {
       method: 'POST',
-      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-combo',
+      },
+      body: JSON.stringify(bookingPayload()),
+    });
+    const body = await json(res);
+    expect(res.status).toBe(200);
+    expect(body.data.bookingIntentId).toEqual(expect.any(String));
+    expect(body.data.keyId).toBe('rzp_test_public');
+    expect(body.data.price_offered_paise).toBe(3000);
+    expect(body.data.platform_fee_paise).toBe(360);
+    expect(body.data.total_charged_paise).toBe(3360);
+    const intent = store.tables
+      .get('booking_payment_intents')
+      ?.find((row) => row.id === body.data.bookingIntentId);
+    expect(intent).toMatchObject({
+      business_id: businessId,
+      influencer_profile_id: influencerProfileId,
+      provider_order_id: body.data.orderId,
+      status: 'created',
+      total_charged_paise: 3360,
+    });
+  });
+
+  it('validates full booking details before taking payment', async () => {
+    const { app, store } = makeApp();
+    const res = await app.request('/payment/create-booking-order', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-validation',
+      },
       body: JSON.stringify({
         influencer_profile_id: influencerProfileId,
         package_type: 'instagram_reel',
       }),
     });
-    const body = await json(res);
-    expect(res.status).toBe(200);
-    expect(body.data.keyId).toBe('rzp_test_public');
-    expect(body.data.price_offered_paise).toBe(3000);
-    expect(body.data.platform_fee_paise).toBe(360);
-    expect(body.data.total_charged_paise).toBe(3360);
+    expect(res.status).toBe(400);
+    expect(store.tables.get('booking_payment_intents') ?? []).toHaveLength(0);
   });
 
   it('rejects booking order creation before taking payment when the business profile is incomplete', async () => {
@@ -894,11 +1470,12 @@ describe('Plugoh API', () => {
     });
     const res = await app.request('/payment/create-booking-order', {
       method: 'POST',
-      headers: { authorization: 'Bearer business', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        influencer_profile_id: influencerProfileId,
-        package_type: 'instagram_reel',
-      }),
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-incomplete-business',
+      },
+      body: JSON.stringify(bookingPayload()),
     });
     expect(res.status).toBe(403);
   });

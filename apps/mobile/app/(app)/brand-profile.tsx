@@ -1,8 +1,10 @@
 import { GlassCard } from '@/components/ui/glass-card';
 import { BackHeader } from '@/components/ui/app-header';
+import { Screen } from '@/components/ui/primitives';
 import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { theme } from '@/constants/theme';
-import { useBootstrap, useBusinessProfile } from '@/hooks/use-marketplace';
+import { useBootstrap, useBusinessProfile, useSavedCards } from '@/hooks/use-marketplace';
+import { unregisterPush } from '@/lib/api/endpoints';
 import { logout } from '@/lib/auth/logout';
 import {
   getPushNotificationsPreference,
@@ -14,9 +16,11 @@ import {
 } from '@/lib/notifications/register';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import bellImage from '@/assets/images/bell.png';
+import cardImage from '@/assets/images/card.png';
 import ghostImage from '@/assets/images/ghost.png';
 import instagramImage from '@/assets/images/instagram.png';
 import { Ionicons } from '@expo/vector-icons';
+import type { SavedCardSummary } from '@plugoh/contracts';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
@@ -28,14 +32,12 @@ import {
   type AppStateStatus,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   Text,
   View,
   type ImageSourcePropType,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SETTINGS_GROUP_RADIUS = 28;
 const SIGN_OUT_GLASS_TINT = 'rgba(211, 83, 83, 0.28)';
@@ -51,6 +53,13 @@ function initials(name?: string | null): string {
     .join('')
     .toUpperCase()
     .slice(0, 2);
+}
+
+function savedCardsSubtitle(cards?: SavedCardSummary[]) {
+  const first = cards?.[0];
+  if (!first) return 'No saved cards yet';
+  const brand = first.brand || first.network || 'Card';
+  return first.last4 ? `${brand} · ····${first.last4}` : brand;
 }
 
 // ─── SettingRow ───────────────────────────────────────────────────────────────
@@ -148,6 +157,11 @@ function NotificationToggleRow({ first }: { first?: boolean }) {
       } else {
         setPushNotificationsPreference(false);
         setPreferenceState(false);
+        try {
+          await unregisterPush();
+        } catch {
+          // Local opt-out still applies if network fails.
+        }
         await refreshPermission();
       }
     } finally {
@@ -196,11 +210,12 @@ function NotificationToggleRow({ first }: { first?: boolean }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BrandProfileScreen() {
-  const insets = useSafeAreaInsets();
   const bootstrap = useBootstrap();
   const profile = useBusinessProfile();
+  const savedCards = useSavedCards();
   const bootstrapLoading = shouldShowInitialLoader(bootstrap);
   const profileLoading = bootstrapLoading || shouldShowInitialLoader(profile);
+  const savedCardsLoading = bootstrapLoading || shouldShowInitialLoader(savedCards);
 
   const igConnected = Boolean(profile.data?.instagram_connected);
   const brandName = profile.data?.brand_name;
@@ -223,18 +238,14 @@ export default function BrandProfileScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.root, { backgroundColor: theme.colors.backgroundClear }]}
-      contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <Screen contentContainerStyle={styles.scrollContent}>
       {/* Page header */}
       <BackHeader
         title="Profile"
         onBack={() => {
           router.back();
         }}
-        style={[styles.pageHeaderRow, { paddingTop: insets.top + theme.spacing.md }]}
+        style={styles.pageHeaderRow}
       />
 
       {/* ── Profile hero row ── */}
@@ -268,13 +279,6 @@ export default function BrandProfileScreen() {
             </Text>
           ) : bootstrapLoading ? (
             <ShimmerText width="58%" height={14} />
-          ) : null}
-          {profile.data?.brand_type ? (
-            <Text style={styles.profileSub} numberOfLines={1}>
-              {profile.data.brand_type}
-            </Text>
-          ) : profileLoading ? (
-            <ShimmerText width="42%" height={16} />
           ) : null}
           {profile.data?.brand_location ? (
             <Text style={styles.profileLocation} numberOfLines={1}>
@@ -313,6 +317,15 @@ export default function BrandProfileScreen() {
             router.push('/(app)/profile/instagram');
           }}
         />
+        <SettingRow
+          iconSource={cardImage}
+          title="Saved cards"
+          subtitle={savedCardsSubtitle(savedCards.data)}
+          subtitleLoading={savedCardsLoading}
+          onPress={() => {
+            router.push('/(app)/profile/saved-cards');
+          }}
+        />
       </GlassCard>
 
       {/* ── Preferences group ── */}
@@ -340,20 +353,18 @@ export default function BrandProfileScreen() {
           </View>
         </Pressable>
       </GlassCard>
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
   scrollContent: {
-    paddingHorizontal: theme.spacing.xxl,
     gap: theme.spacing.sm,
   },
 
   // Page header
   pageHeaderRow: {
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
 
   // Profile row

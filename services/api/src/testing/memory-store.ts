@@ -405,6 +405,9 @@ export class MemoryDataStore implements DataStore {
     if (existing) {
       return { response: existing.response };
     }
+    if (params.p_response == null) {
+      return { response: null };
+    }
     rows.push({
       key: params.p_key,
       response: params.p_response,

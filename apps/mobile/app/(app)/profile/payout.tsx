@@ -1,3 +1,4 @@
+import { AppInput } from '@/components/ui/app-input';
 import { BackHeader } from '@/components/ui/app-header';
 import { PrimaryButton } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
@@ -16,14 +17,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type TextInputProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
-const FIELD_RADIUS = 28;
+const FIELD_RADIUS = 24;
 const FIELD_BORDER = 'rgba(255,255,255,0.18)';
 const FIELD_WASH = 'rgba(255,255,255,0.055)';
 const SINGLE_LINE_HEIGHT = 58;
@@ -47,28 +47,12 @@ function methodLabel(method: PayoutMethod) {
 
 function GlassPayoutField({
   label,
+  style,
   ...inputProps
 }: TextInputProps & {
   label: string;
 }) {
-  return (
-    <View style={styles.fieldBlock}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <BlurView tint="systemUltraThinMaterialDark" intensity={86} style={styles.blurFieldShell}>
-        <View pointerEvents="none" style={styles.fieldWash} />
-        <TextInput
-          {...inputProps}
-          {...(Platform.OS === 'android' ? { includeFontPadding: false } : {})}
-          textAlignVertical="center"
-          underlineColorAndroid="transparent"
-          placeholderTextColor="rgba(255,255,255,0.38)"
-          cursorColor="#FFFFFF"
-          selectionColor="#FFFFFF"
-          style={[styles.fieldInputSingle, inputProps.style]}
-        />
-      </BlurView>
-    </View>
-  );
+  return <AppInput {...inputProps} label={label} inputStyle={style} />;
 }
 
 function GlassMethodSelector({
@@ -300,21 +284,8 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     ...theme.typography.label,
-    color: 'rgba(255,255,255,0.62)',
-    paddingLeft: theme.spacing.lg,
-  },
-  fieldInputSingle: {
-    ...theme.typography.body,
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-    paddingHorizontal: theme.spacing.xxl,
-    paddingTop: 0,
-    paddingBottom: 0,
-    margin: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    color: theme.colors.foreground,
-    textAlignVertical: 'center',
+    color: 'rgba(255,255,255,0.74)',
+    paddingLeft: 4,
   },
   selectorPressable: {
     flex: 1,

@@ -120,6 +120,7 @@ export function buildDeps(
     requireUser: RouteDeps['requireUser'];
     requireRoleValue: RouteDeps['requireRoleValue'];
     claimIdempotency: RouteDeps['claimIdempotency'];
+    storeIdempotency: RouteDeps['storeIdempotency'];
     requireIdempotencyKey: RouteDeps['requireIdempotencyKey'];
     authOrCron: RouteDeps['authOrCron'];
     scopedReadServices: RouteDeps['scopedReadServices'];

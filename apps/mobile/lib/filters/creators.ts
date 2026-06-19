@@ -1,4 +1,5 @@
 import type { Influencer } from '@plugoh/contracts';
+import { roundedCampaignAmountMax } from './campaigns';
 import {
   emptyNumericRange,
   matchesNumericRange,
@@ -18,6 +19,13 @@ export const DEFAULT_CREATOR_FILTERS: CreatorFilterDraft = {
   followers: emptyNumericRange(),
   price: emptyNumericRange(),
 };
+
+export function creatorPriceFilterForBounds(bounds: { min: number; max: number }) {
+  return {
+    min: String(Math.max(0, Math.round(bounds.min))),
+    max: String(Math.max(1000, roundedCampaignAmountMax(bounds.max))),
+  };
+}
 
 export function creatorFilterError(filters: CreatorFilterDraft) {
   return (

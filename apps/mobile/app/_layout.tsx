@@ -69,9 +69,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!session) return;
+    void recoverPendingBookingVerify().catch(() => undefined);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
     if (!getPushNotificationsPreference()) return;
     void registerForPushNotificationsAsync();
-    void recoverPendingBookingVerify().catch(() => undefined);
   }, [session]);
 
   if (fontLoadError) {

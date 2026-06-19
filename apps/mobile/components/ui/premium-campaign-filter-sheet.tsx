@@ -10,7 +10,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
   type LayoutChangeEvent,
@@ -26,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppInput } from '@/components/ui/app-input';
 import { LiquidModalBackdrop, LiquidSheetSurface } from '@/components/ui/liquid-sheet-surface';
 import type {
   CampaignFilterDraft,
@@ -888,21 +888,19 @@ function AmountInput({
   onChangeText: (value: string) => void;
 }) {
   return (
-    <View style={styles.amountInputShell}>
-      {prefix ? <Text style={styles.currencyPrefix}>{prefix}</Text> : null}
-      <TextInput
-        accessibilityLabel={label}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="rgba(255,255,255,0.36)"
-        cursorColor="#FFFFFF"
-        selectionColor="#FFFFFF"
-        keyboardType="numeric"
-        inputMode="numeric"
-        style={styles.amountInput}
-      />
-    </View>
+    <AppInput
+      size="sm"
+      containerStyle={styles.amountInputContainer}
+      accessibilityLabel={label}
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor="rgba(255,255,255,0.36)"
+      keyboardType="numeric"
+      inputMode="numeric"
+      prefix={prefix ? <Text style={styles.currencyPrefix}>{prefix}</Text> : undefined}
+      inputStyle={styles.amountInputText}
+    />
   );
 }
 
@@ -1347,29 +1345,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing.sm,
   },
-  amountInputShell: {
+  amountInputContainer: {
     flex: 1,
-    minHeight: 56,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.13)',
-    paddingHorizontal: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.16)',
   },
   currencyPrefix: {
     ...theme.typography.callout,
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  amountInput: {
+  amountInputText: {
     ...theme.typography.mono,
-    flex: 1,
-    minHeight: 54,
-    color: '#FFFFFF',
-    includeFontPadding: false,
   },
   amountSeparator: {
     ...theme.typography.cardTitle,

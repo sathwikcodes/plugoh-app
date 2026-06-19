@@ -5,6 +5,7 @@ import type {
   GeocodingProvider,
   InstagramProvider,
   PaymentProvider,
+  PlacesProvider,
   PushProvider,
   StorageProvider,
   WeatherProvider,
@@ -13,13 +14,48 @@ import type {
 export class FakeGeocodingProvider implements GeocodingProvider {
   shouldFail = false;
   calls: string[] = [];
+  reverseCalls: Array<{ latitude: number; longitude: number }> = [];
 
   async geocode(address: string) {
     this.calls.push(address);
     if (this.shouldFail) {
       throw new Error('fake geocoding failure');
     }
-    return { latitude: 17.4065, longitude: 78.4772 };
+    return { label: address, latitude: 17.4065, longitude: 78.4772 };
+  }
+
+  async reverseGeocode(input: { latitude: number; longitude: number }) {
+    this.reverseCalls.push(input);
+    if (this.shouldFail) {
+      throw new Error('fake reverse geocoding failure');
+    }
+    return { label: 'Jubilee Hills, Hyderabad' };
+  }
+}
+
+export class FakePlacesProvider implements PlacesProvider {
+  shouldFail = false;
+  autocompleteCalls: string[] = [];
+  detailsCalls: string[] = [];
+
+  async autocomplete(query: string) {
+    this.autocompleteCalls.push(query);
+    if (this.shouldFail) {
+      throw new Error('fake places failure');
+    }
+    return [
+      { place_id: 'place_jubilee', label: 'Jubilee Hills', sublabel: 'Hyderabad, Telangana' },
+      { place_id: 'place_banjara', label: 'Banjara Hills', sublabel: 'Hyderabad, Telangana' },
+    ];
+  }
+
+  async placeDetails(placeId: string) {
+    this.detailsCalls.push(placeId);
+    if (this.shouldFail) {
+      throw new Error('fake place details failure');
+    }
+    if (placeId === 'place_missing') return null;
+    return { label: 'Jubilee Hills, Hyderabad', latitude: 17.4319, longitude: 78.4071 };
   }
 }
 
@@ -41,6 +77,7 @@ export class FakePaymentProvider implements PaymentProvider {
   keySecret = 'test_secret';
   captures: { paymentId: string; amount: number }[] = [];
   refunds: { paymentId: string; amount: number; id: string }[] = [];
+  orders = new Map<string, { id: string; amount: number; currency: 'INR' }>();
 
   async createOrder(input: {
     amount: number;
@@ -48,10 +85,18 @@ export class FakePaymentProvider implements PaymentProvider {
     receipt?: string;
     payment_capture?: 0 | 1;
   }) {
-    return { id: `order_${crypto.randomUUID()}`, amount: input.amount, currency: input.currency };
+    const order = {
+      id: `order_${crypto.randomUUID()}`,
+      amount: input.amount,
+      currency: input.currency,
+    };
+    this.orders.set(order.id, order);
+    return order;
   }
 
   async fetchOrder(orderId: string) {
+    const order = this.orders.get(orderId);
+    if (order) return order;
     return {
       id: orderId,
       amount: orderId.includes('small_amount') ? 100 : 11200,
@@ -60,9 +105,22 @@ export class FakePaymentProvider implements PaymentProvider {
   }
 
   async fetchPayment(paymentId: string) {
+    const method = paymentId.includes('upi') ? ('upi' as const) : ('card' as const);
     return {
       id: paymentId,
-      method: paymentId.includes('upi') ? ('upi' as const) : ('card' as const),
+      method,
+      ...(method === 'card'
+        ? {
+            card_id: 'card_test_4242',
+            card: {
+              id: 'card_test_4242',
+              last4: '4242',
+              network: 'Visa',
+              type: 'credit',
+              issuer: 'HDFC Bank',
+            },
+          }
+        : {}),
     };
   }
 

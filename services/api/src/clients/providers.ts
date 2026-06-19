@@ -69,6 +69,21 @@ export type RazorpayOrder = {
   currency: string;
 };
 
+export type PaymentCardMetadata = {
+  id?: string;
+  last4?: string;
+  network?: string;
+  type?: string;
+  issuer?: string;
+};
+
+export type PaymentDetails = {
+  id: string;
+  method: PaymentMethod;
+  card_id?: string;
+  card?: PaymentCardMetadata;
+};
+
 export interface PaymentProvider {
   createOrder(input: {
     amount: number;
@@ -77,19 +92,37 @@ export interface PaymentProvider {
     payment_capture?: 0 | 1;
   }): Promise<RazorpayOrder>;
   fetchOrder(orderId: string): Promise<RazorpayOrder>;
-  fetchPayment(paymentId: string): Promise<{ id: string; method: PaymentMethod }>;
+  fetchPayment(paymentId: string): Promise<PaymentDetails>;
   capturePayment(paymentId: string, amount: number): Promise<void>;
   refundPayment(paymentId: string, amount: number): Promise<{ id: string }>;
   verifySignature(input: { orderId: string; paymentId: string; signature: string }): boolean;
 }
 
 export type GeocodingResult = {
+  label?: string | undefined;
   latitude: number;
   longitude: number;
 };
 
+export type ReverseGeocodingResult = {
+  label: string;
+};
+
 export interface GeocodingProvider {
   geocode(address: string): Promise<GeocodingResult | null>;
+  reverseGeocode?(input: {
+    latitude: number;
+    longitude: number;
+  }): Promise<ReverseGeocodingResult | null>;
+}
+
+export type PlacePrediction = { place_id: string; label: string; sublabel: string };
+
+export type PlaceDetailResult = { label: string; latitude: number; longitude: number };
+
+export interface PlacesProvider {
+  autocomplete(query: string): Promise<PlacePrediction[]>;
+  placeDetails(placeId: string): Promise<PlaceDetailResult | null>;
 }
 
 export type WeatherSummary = {
@@ -132,7 +165,10 @@ export class GoogleGeocodingProvider implements GeocodingProvider {
 
     const payload = (await response.json()) as {
       status?: string;
-      results?: Array<{ geometry?: { location?: { lat?: number; lng?: number } } }>;
+      results?: Array<{
+        formatted_address?: string;
+        geometry?: { location?: { lat?: number; lng?: number } };
+      }>;
       error_message?: string;
     };
     if (payload.status === 'ZERO_RESULTS') return null;
@@ -150,9 +186,156 @@ export class GoogleGeocodingProvider implements GeocodingProvider {
       typeof location.lng === 'number' &&
       Number.isFinite(location.lng)
     ) {
-      return { latitude: location.lat, longitude: location.lng };
+      return {
+        label: payload.results?.[0]?.formatted_address?.trim(),
+        latitude: location.lat,
+        longitude: location.lng,
+      };
     }
     return null;
+  }
+
+  async reverseGeocode(input: { latitude: number; longitude: number }) {
+    if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)) return null;
+
+    const params = new URLSearchParams({
+      latlng: `${input.latitude},${input.longitude}`,
+      key: this.apiKey,
+    });
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`, {
+            signal,
+          }),
+        10_000,
+      ),
+    );
+    if (!response.ok) {
+      if (response.status >= 500)
+        throw new HttpStatusError(response.status, 'Reverse geocoding failed');
+      throw badRequest('GEOCODING_PROVIDER_ERROR', 'Google Geocoding rejected request');
+    }
+
+    const payload = (await response.json()) as {
+      status?: string;
+      results?: Array<{ formatted_address?: string }>;
+      error_message?: string;
+    };
+    if (payload.status === 'ZERO_RESULTS') return null;
+    if (payload.status !== 'OK') {
+      throw badRequest(
+        'GEOCODING_PROVIDER_ERROR',
+        payload.error_message || `Google Geocoding returned ${payload.status || 'an error'}`,
+      );
+    }
+
+    const label = payload.results?.[0]?.formatted_address?.trim();
+    return label ? { label } : null;
+  }
+}
+
+export class GooglePlacesProvider implements PlacesProvider {
+  private readonly apiKey: string;
+
+  constructor(config: EnvConfig) {
+    this.apiKey = requireConfig(config.googleMapsGeocodingApiKey, 'GOOGLE_MAPS_GEOCODING_API_KEY');
+  }
+
+  async autocomplete(query: string) {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch('https://places.googleapis.com/v1/places:autocomplete', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'X-Goog-Api-Key': this.apiKey,
+            },
+            body: JSON.stringify({ input: trimmed }),
+            signal,
+          }),
+        10_000,
+      ),
+    );
+    if (!response.ok) {
+      if (response.status >= 500)
+        throw new HttpStatusError(response.status, 'Places autocomplete failed');
+      throw badRequest('PLACES_PROVIDER_ERROR', 'Google Places rejected request');
+    }
+
+    const payload = (await response.json()) as {
+      suggestions?: Array<{
+        placePrediction?: {
+          placeId?: string;
+          text?: { text?: string };
+          structuredFormat?: {
+            mainText?: { text?: string };
+            secondaryText?: { text?: string };
+          };
+        };
+      }>;
+    };
+
+    const predictions: PlacePrediction[] = [];
+    for (const suggestion of payload.suggestions ?? []) {
+      const prediction = suggestion.placePrediction;
+      const placeId = prediction?.placeId?.trim();
+      if (!prediction || !placeId) continue;
+      const label =
+        prediction.structuredFormat?.mainText?.text?.trim() || prediction.text?.text?.trim() || '';
+      const sublabel = prediction.structuredFormat?.secondaryText?.text?.trim() || '';
+      predictions.push({ place_id: placeId, label: label || sublabel || placeId, sublabel });
+    }
+    return predictions;
+  }
+
+  async placeDetails(placeId: string) {
+    const trimmed = placeId.trim();
+    if (!trimmed) return null;
+
+    const response = await withRetry(() =>
+      withTimeout(
+        (signal) =>
+          fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(trimmed)}`, {
+            headers: {
+              'X-Goog-Api-Key': this.apiKey,
+              'X-Goog-FieldMask': 'location,formattedAddress,displayName',
+            },
+            signal,
+          }),
+        10_000,
+      ),
+    );
+    if (!response.ok) {
+      if (response.status >= 500)
+        throw new HttpStatusError(response.status, 'Place details failed');
+      throw badRequest('PLACES_PROVIDER_ERROR', 'Google Places rejected request');
+    }
+
+    const payload = (await response.json()) as {
+      location?: { latitude?: number; longitude?: number };
+      formattedAddress?: string;
+      displayName?: { text?: string };
+    };
+    const latitude = payload.location?.latitude;
+    const longitude = payload.location?.longitude;
+    if (
+      typeof latitude !== 'number' ||
+      !Number.isFinite(latitude) ||
+      typeof longitude !== 'number' ||
+      !Number.isFinite(longitude)
+    ) {
+      return null;
+    }
+
+    const name = payload.displayName?.text?.trim();
+    const address = payload.formattedAddress?.trim();
+    const label = name && address ? `${name}, ${address}` : name || address || 'Selected location';
+    return { label, latitude, longitude };
   }
 }
 
@@ -244,12 +427,20 @@ export class RazorpayProvider implements PaymentProvider {
   }
 
   async fetchPayment(paymentId: string) {
-    const payment: { id: string; method: string } = await withRetry(() =>
-      withTimeout(() => this.razorpay.payments.fetch(paymentId), 10_000),
-    );
+    const payment: {
+      id: string;
+      method: string;
+      card_id?: string;
+      card?: PaymentCardMetadata;
+    } = await withRetry(() => withTimeout(() => this.razorpay.payments.fetch(paymentId), 10_000));
     const method: PaymentMethod =
       payment.method === 'card' || payment.method === 'upi' ? payment.method : 'other';
-    return { id: payment.id, method };
+    return {
+      id: payment.id,
+      method,
+      ...(payment.card_id ? { card_id: payment.card_id } : {}),
+      ...(payment.card ? { card: payment.card } : {}),
+    };
   }
 
   async capturePayment(paymentId: string, amount: number) {
