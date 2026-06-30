@@ -1,6 +1,8 @@
 import { theme } from '@/constants/theme';
+import * as Haptics from 'expo-haptics';
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useRef } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { CampaignEmptyState } from './campaign-empty-state';
 import { ShimmerBlock, ShimmerCircle, ShimmerText } from './shimmer';
@@ -83,12 +85,23 @@ export function SnapCardDeck<TItem>({
   const scrollX = useSharedValue(0);
   const interval = cardWidth + CARD_GAP;
   const sidePadding = Math.max(0, (viewportWidth - cardWidth) / 2);
+  const lastSnappedIndex = useRef(0);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
     },
   });
+
+  function handleMomentumScrollEnd(event: { nativeEvent: { contentOffset: { x: number } } }) {
+    if (Platform.OS !== 'ios') return;
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const nextIndex = Math.min(Math.max(Math.round(offsetX / interval), 0), items.length - 1);
+    if (nextIndex !== lastSnappedIndex.current) {
+      lastSnappedIndex.current = nextIndex;
+      void Haptics.selectionAsync();
+    }
+  }
 
   if (isLoading && items.length === 0) {
     return (
@@ -133,6 +146,7 @@ export function SnapCardDeck<TItem>({
         directionalLockEnabled
         overScrollMode="never"
         onScroll={scrollHandler}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
         style={[styles.scrollView, { width: viewportWidth }]}
         contentContainerStyle={[
           styles.scrollContent,

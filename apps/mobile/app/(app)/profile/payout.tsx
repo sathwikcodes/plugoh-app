@@ -176,7 +176,7 @@ export default function PayoutScreen() {
         showsVerticalScrollIndicator={false}
       >
         <BackHeader
-          title="Payment & Payouts"
+          title="Payout"
           onBack={() => {
             router.back();
           }}
@@ -190,41 +190,46 @@ export default function PayoutScreen() {
               setValue('preferred_method', value, { shouldValidate: true });
             }}
           />
-          <GlassPayoutField
-            label="UPI ID"
-            value={watch('upi_id') ?? ''}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            onChangeText={(value) => {
-              setValue('upi_id', value, { shouldValidate: true });
-            }}
-          />
-          <GlassPayoutField
-            label="Bank account number"
-            value={watch('bank_account_no') ?? ''}
-            keyboardType="number-pad"
-            onChangeText={(value) => {
-              setValue('bank_account_no', value, { shouldValidate: true });
-            }}
-          />
-          <GlassPayoutField
-            label="IFSC"
-            value={watch('bank_ifsc') ?? ''}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            onChangeText={(value) => {
-              setValue('bank_ifsc', value.toUpperCase(), { shouldValidate: true });
-            }}
-          />
-          <GlassPayoutField
-            label="Account holder name"
-            value={watch('bank_account_name') ?? ''}
-            autoCapitalize="words"
-            onChangeText={(value) => {
-              setValue('bank_account_name', value, { shouldValidate: true });
-            }}
-          />
+          {watch('preferred_method') === 'upi' ? (
+            <GlassPayoutField
+              label="UPI ID"
+              value={watch('upi_id') ?? ''}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              onChangeText={(value) => {
+                setValue('upi_id', value, { shouldValidate: true });
+              }}
+            />
+          ) : (
+            <>
+              <GlassPayoutField
+                label="Bank account number"
+                value={watch('bank_account_no') ?? ''}
+                keyboardType="number-pad"
+                onChangeText={(value) => {
+                  setValue('bank_account_no', value, { shouldValidate: true });
+                }}
+              />
+              <GlassPayoutField
+                label="IFSC"
+                value={watch('bank_ifsc') ?? ''}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onChangeText={(value) => {
+                  setValue('bank_ifsc', value.toUpperCase(), { shouldValidate: true });
+                }}
+              />
+              <GlassPayoutField
+                label="Account holder name"
+                value={watch('bank_account_name') ?? ''}
+                autoCapitalize="words"
+                onChangeText={(value) => {
+                  setValue('bank_account_name', value, { shouldValidate: true });
+                }}
+              />
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -237,7 +242,7 @@ export default function PayoutScreen() {
         ]}
       >
         <PrimaryButton
-          label={mutations.updatePayout.isPending ? 'Saving...' : 'Save payout account'}
+          label={mutations.updatePayout.isPending ? 'Saving...' : 'Save'}
           disabled={mutations.updatePayout.isPending}
           onPress={onSubmit}
           style={styles.saveButton}

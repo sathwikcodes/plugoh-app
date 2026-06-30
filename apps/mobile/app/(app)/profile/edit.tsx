@@ -10,8 +10,12 @@ import {
 } from '@/hooks/use-marketplace';
 import { BRAND_CATEGORY_OPTIONS, type BrandCategory } from '@/lib/onboarding/premium-flow';
 import { profileLocationChannel, type LocationSelection } from '@/lib/location/location-selection';
+import { influencerProfileImageUri } from '@/lib/influencer/profile-image';
+import { businessProfileImageUri } from '@/lib/brand/profile-image';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -29,6 +33,43 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
+
+const PHOTO_SIZE = 92;
+const BADGE_SIZE = 30;
+
+function ProfilePhotoSection({ imageUri }: { imageUri: string | null | undefined }) {
+  return (
+    <View style={styles.photoSection}>
+      <Pressable
+        onPress={() => {}}
+        accessibilityLabel="Edit profile photo"
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.photoWrap, pressed && { opacity: 0.82 }]}
+      >
+        <View style={styles.photoRing}>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.photo} contentFit="cover" />
+          ) : (
+            <View style={styles.photoPlaceholder}>
+              <Ionicons name="person" size={38} color="rgba(255,255,255,0.38)" />
+            </View>
+          )}
+        </View>
+        <View style={styles.editBadgeWrap}>
+          {isLiquidGlassAvailable() ? (
+            <GlassView glassEffectStyle="regular" colorScheme="dark" style={styles.editBadge}>
+              <Ionicons name="pencil" size={13} color="rgba(255,255,255,0.92)" />
+            </GlassView>
+          ) : (
+            <BlurView tint="systemUltraThinMaterialDark" intensity={90} style={styles.editBadge}>
+              <Ionicons name="pencil" size={13} color="rgba(255,255,255,0.92)" />
+            </BlurView>
+          )}
+        </View>
+      </Pressable>
+    </View>
+  );
+}
 
 const FIELD_RADIUS = 24;
 const FIELD_BORDER = 'rgba(255,255,255,0.18)';
@@ -314,6 +355,11 @@ export default function EditProfileScreen() {
     }
   });
 
+  const imageUri =
+    role === 'business'
+      ? businessProfileImageUri(businessProfile.data)
+      : influencerProfileImageUri(profile.data);
+
   const scrollBottomPad =
     theme.spacing.hero + theme.spacing.jumbo + theme.spacing.xxl + insets.bottom;
 
@@ -333,6 +379,8 @@ export default function EditProfileScreen() {
           }}
           style={styles.pageHeaderRow}
         />
+
+        <ProfilePhotoSection imageUri={imageUri} />
 
         <View style={styles.fieldsColumn}>
           <GlassFormField
@@ -466,5 +514,54 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     alignSelf: 'stretch',
+  },
+  photoSection: {
+    alignItems: 'center',
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.md,
+  },
+  photoWrap: {
+    position: 'relative',
+  },
+  photoRing: {
+    width: PHOTO_SIZE + 6,
+    height: PHOTO_SIZE + 6,
+    borderRadius: (PHOTO_SIZE + 6) / 2,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.18)',
+    padding: 3,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+  },
+  photo: {
+    width: PHOTO_SIZE,
+    height: PHOTO_SIZE,
+    borderRadius: PHOTO_SIZE / 2,
+  },
+  photoPlaceholder: {
+    width: PHOTO_SIZE,
+    height: PHOTO_SIZE,
+    borderRadius: PHOTO_SIZE / 2,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editBadgeWrap: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+  },
+  editBadge: {
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    borderRadius: BADGE_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.24)',
   },
 });

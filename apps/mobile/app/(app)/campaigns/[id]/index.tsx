@@ -1,5 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import brandImage from '@/assets/images/brand.png';
+import chatImage from '@/assets/images/chat.png';
 import coinImage from '@/assets/images/coin.png';
+import deliverImage from '@/assets/images/deliver.png';
+import shieldImage from '@/assets/images/shield.png';
 import postImage from '@/assets/images/post.png';
 import reelImage from '@/assets/images/reel.png';
 import { BlurView } from 'expo-blur';
@@ -22,12 +26,13 @@ import {
 } from 'react-native';
 import type { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
+import { AsyncText, ShimmerText } from '@/components/ui/shimmer';
 import { TabScreenCanvas } from '@/components/ui/tab-screen-canvas';
 import { theme } from '@/constants/theme';
 import { useBootstrap, useCampaign, useMarketplaceMutations } from '@/hooks/use-marketplace';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import type { CampaignListItem } from '@plugoh/contracts';
+import type { ImageSourcePropType } from 'react-native';
 
 function formatStatus(status?: string) {
   if (!status) return 'Status unavailable';
@@ -36,7 +41,13 @@ function formatStatus(status?: string) {
 
 function formatPackageType(pkg?: string) {
   if (!pkg) return 'Not specified';
-  return pkg
+  const filtered = pkg
+    .split('+')
+    .map((s) => s.trim())
+    .filter((s) => !/^visit[_ ]?place$/i.test(s))
+    .join('+');
+  if (!filtered) return 'Not specified';
+  return filtered
     .replaceAll('_', ' ')
     .replaceAll('+', ' + ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -70,24 +81,8 @@ function brandImageUrl(campaign?: CampaignListItem) {
   );
 }
 
-function brandOwnerEmail(campaign?: CampaignListItem) {
-  return campaign?.business_profile?.email?.trim() || '';
-}
-
-function creatorImageUrl(campaign?: CampaignListItem) {
-  return (
-    campaign?.influencer_profile?.profile_photo_url ||
-    campaign?.influencer_profile?.avatar_url ||
-    undefined
-  );
-}
-
 function cardImageUrl(campaign?: CampaignListItem) {
   return campaign?.card_image_url || brandImageUrl(campaign);
-}
-
-function initial(value?: string) {
-  return value?.trim().charAt(0).toUpperCase() || 'P';
 }
 
 function parseBriefValue(brief: string | undefined, label: string) {
@@ -228,33 +223,6 @@ function creatorDisplayName(campaign?: CampaignListItem) {
   );
 }
 
-function creatorMeta(campaign?: CampaignListItem) {
-  const handle = campaign?.influencer_profile?.ig_username?.trim();
-  return handle ? `@${handle.replace(/^@/, '')}` : '';
-}
-
-function actionIconForStatus(status?: string): keyof typeof Ionicons.glyphMap {
-  switch (status) {
-    case 'completed':
-      return 'checkmark-done';
-    case 'delivery_submitted':
-      return 'cloud-done';
-    case 'in_escrow':
-      return 'lock-closed';
-    case 'requested':
-    case 'payment_pending':
-    case 'pre_authorized':
-      return 'hourglass-outline';
-    case 'declined':
-    case 'expired':
-    case 'cancelled':
-    case 'disputed':
-      return 'alert-circle-outline';
-    default:
-      return 'sparkles';
-  }
-}
-
 function CampaignLiquidSurface({
   children,
   style,
@@ -328,13 +296,15 @@ function ActionPill({
 
 function QuickActionTile({
   icon,
+  image,
   label,
   onPress,
   disabled,
   active,
   accessibilityLabel,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon?: keyof typeof Ionicons.glyphMap;
+  image?: ImageSourcePropType;
   label: string;
   onPress?: () => void;
   disabled?: boolean;
@@ -356,7 +326,16 @@ function QuickActionTile({
       ]}
     >
       <View pointerEvents="none" style={styles.quickActionInnerStroke} />
-      <Ionicons name={icon} size={20} color={disabled ? 'rgba(255,255,255,0.34)' : '#FFFFFF'} />
+      {image ? (
+        <Image
+          source={image}
+          style={[styles.quickActionImage, disabled && styles.quickActionImageDisabled]}
+          contentFit="contain"
+          accessibilityIgnoresInvertColors
+        />
+      ) : icon ? (
+        <Ionicons name={icon} size={20} color={disabled ? 'rgba(255,255,255,0.34)' : '#FFFFFF'} />
+      ) : null}
       <Text
         style={[styles.quickActionText, disabled ? styles.quickActionTextDisabled : null]}
         numberOfLines={1}
@@ -373,75 +352,6 @@ function QuickActionTile({
       {content}
     </CampaignLiquidSurface>
   );
-}
-
-function ProfileGlassTab({
-  name,
-  meta,
-  imageUrl,
-  fallbackInitial,
-  loading,
-  disabled,
-  onPress,
-  accessibilityLabel,
-}: {
-  name: string;
-  meta?: string;
-  imageUrl?: string;
-  fallbackInitial: string;
-  loading?: boolean;
-  disabled?: boolean;
-  onPress?: () => void;
-  accessibilityLabel: string;
-}) {
-  const secondaryText = meta?.trim() || 'No email provided';
-  const content = (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: Boolean(disabled) }}
-      disabled={disabled}
-      onPress={onPress}
-      hitSlop={6}
-      style={({ pressed }) => [
-        styles.profileTabPressable,
-        pressed && !disabled ? styles.pressed : null,
-        disabled ? styles.profileTabDisabled : null,
-      ]}
-    >
-      <View pointerEvents="none" style={styles.profileTabInnerStroke} />
-      <View style={styles.brandAvatar}>
-        {loading ? (
-          <ShimmerCircle size={42} />
-        ) : imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.brandAvatarImage} contentFit="cover" />
-        ) : (
-          <Text style={styles.brandAvatarInitial}>{fallbackInitial}</Text>
-        )}
-      </View>
-      <View style={styles.profileCopy}>
-        <AsyncText
-          loading={Boolean(loading)}
-          value={name}
-          selectable
-          style={styles.brandOwnerName}
-          numberOfLines={1}
-          shimmerWidth="56%"
-          shimmerHeight={20}
-        />
-        {loading ? (
-          <ShimmerText width="48%" height={14} />
-        ) : (
-          <Text selectable style={styles.profileMeta} numberOfLines={1}>
-            {secondaryText}
-          </Text>
-        )}
-      </View>
-      <Ionicons name="chevron-forward" size={17} color="rgba(255,255,255,0.5)" />
-    </Pressable>
-  );
-
-  return <CampaignLiquidSurface style={styles.profileTabGlass}>{content}</CampaignLiquidSurface>;
 }
 
 function CampaignFactLine({
@@ -590,21 +500,15 @@ export default function CampaignDetailScreen() {
 
   const item = campaign.data;
   const imageUrl = cardImageUrl(item);
-  const ownerImageUrl = brandImageUrl(item);
-  const brandEmail = brandOwnerEmail(item);
-  const creatorProfileImage = creatorImageUrl(item);
   const brandName = item?.business_profile?.brand_name?.trim() || 'Plugoh brand';
   const creatorName = creatorDisplayName(item);
   const creatorProfileId = item?.influencer_profile?.id;
-  const creatorProfileMeta = creatorMeta(item);
   const title = item ? item.ai_title?.trim() || item.title.trim() || 'Campaign' : 'Campaign';
   const brief = displayBrief(item?.brief);
   const heroHeight = Math.min(Math.max(window.width * 0.48, 154), 204);
   const titleFontSize = title.length > 42 ? 22 : title.length > 26 ? 24 : 27;
   const isResponding = mutations.acceptCampaign.isPending || mutations.declineCampaign.isPending;
   const campaignTime = campaignDateLine(item);
-  const objective =
-    parseBriefValue(item?.brief, 'Objective') || item?.objective || formatStatus(item?.status);
 
   const canRespond =
     role === 'influencer' &&
@@ -718,7 +622,7 @@ export default function CampaignDetailScreen() {
 
           <View style={styles.quickActionRow}>
             <QuickActionTile
-              icon={role === 'business' ? 'person-add' : 'business'}
+              image={brandImage}
               label={role === 'business' ? 'Creator' : 'Brand'}
               active
               accessibilityLabel={role === 'business' ? `View ${creatorName}` : `View ${brandName}`}
@@ -733,7 +637,7 @@ export default function CampaignDetailScreen() {
               }}
             />
             <QuickActionTile
-              icon="chatbubble-ellipses"
+              image={chatImage}
               label="Chat"
               accessibilityLabel={`Open chat for ${title}`}
               disabled={campaignLoading || !item}
@@ -742,22 +646,13 @@ export default function CampaignDetailScreen() {
               }}
             />
             <QuickActionTile
-              icon={canApprove ? 'checkmark-done' : 'cloud-upload'}
+              image={deliverImage}
               label={canApprove ? 'Review' : 'Deliver'}
               accessibilityLabel={canApprove ? `Review ${title}` : `Deliver ${title}`}
               disabled={campaignLoading || (!canDeliver && !canApprove)}
               onPress={() => {
                 if (canApprove) return;
                 router.push(`/(app)/delivery/${id}`);
-              }}
-            />
-            <QuickActionTile
-              icon={actionIconForStatus(item?.status)}
-              label="Status"
-              accessibilityLabel={`Campaign status is ${formatStatus(item?.status)}`}
-              disabled={campaignLoading}
-              onPress={() => {
-                Alert.alert('Campaign status', formatStatus(item?.status));
               }}
             />
           </View>
@@ -859,46 +754,12 @@ export default function CampaignDetailScreen() {
               value={formatPackageType(item?.package_type)}
               loading={campaignLoading}
             />
-            <CampaignFactLine icon="flag" value={objective} loading={campaignLoading} />
             <CampaignFactLine
-              icon="lock-closed"
-              value={`${formatStatus(item?.status)} · ${formatStatus(item?.payment_status)}`}
+              image={shieldImage}
+              value={formatStatus(item?.payment_status)}
               loading={campaignLoading}
             />
           </View>
-
-          {role === 'business' ? (
-            <View style={styles.brandLinkSection}>
-              <ProfileGlassTab
-                name={creatorName}
-                meta={creatorProfileMeta}
-                imageUrl={creatorProfileImage}
-                fallbackInitial={initial(creatorName)}
-                loading={campaignLoading}
-                disabled={campaignLoading || !creatorProfileId}
-                accessibilityLabel={`View ${creatorName} profile`}
-                onPress={() => {
-                  if (!creatorProfileId) return;
-                  router.push(`/(app)/creator/${creatorProfileId}`);
-                }}
-              />
-            </View>
-          ) : (
-            <View style={styles.brandLinkSection}>
-              <ProfileGlassTab
-                name={brandName}
-                meta={brandEmail}
-                imageUrl={ownerImageUrl}
-                fallbackInitial={initial(brandName)}
-                loading={campaignLoading}
-                disabled={campaignLoading || !item}
-                accessibilityLabel={`View ${brandName} profile`}
-                onPress={() => {
-                  router.push(`/(app)/campaigns/${id}/brand`);
-                }}
-              />
-            </View>
-          )}
 
           <LocationMapCard item={item} loading={campaignLoading} />
         </View>
@@ -1017,6 +878,13 @@ const styles = StyleSheet.create({
   },
   quickActionTextDisabled: {
     color: 'rgba(255,255,255,0.34)',
+  },
+  quickActionImage: {
+    width: 24,
+    height: 24,
+  },
+  quickActionImageDisabled: {
+    opacity: 0.34,
   },
   actionRow: {
     flexDirection: 'row',

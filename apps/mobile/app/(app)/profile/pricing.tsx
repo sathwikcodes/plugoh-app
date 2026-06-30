@@ -1,21 +1,48 @@
-import { AppInput } from '@/components/ui/app-input';
-import { GlassCard } from '@/components/ui/glass-card';
 import { BackHeader } from '@/components/ui/app-header';
 import { PrimaryButton } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
 import { useInfluencerProfile, useMarketplaceMutations } from '@/hooks/use-marketplace';
+import coinImage from '@/assets/images/coin.png';
+import postPriceImage from '@/assets/images/post_price.png';
+import reelPriceImage from '@/assets/images/reel_price.png';
+import storyPriceImage from '@/assets/images/story_price.png';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+  type ImageSourcePropType,
+} from 'react-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
-const FIELD_BORDER = 'rgba(255,255,255,0.18)';
-const PRICE_CARD_RADIUS = 28;
+const PRICE_CARD_GAP = theme.spacing.xl;
+const PRICE_CARD_HEIGHT = 220;
 const STEP = 500;
+const FIELD_BORDER = 'rgba(255,255,255,0.18)';
 
 const schema = z.object({
   price_per_reel: z.number().min(0),
@@ -26,115 +53,238 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 type PricingField = keyof FormValues;
 
-const packages: {
+type PricePackageItem = {
   field: PricingField;
   title: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  image: ImageSourcePropType;
   tone: string;
-}[] = [
-  {
-    field: 'price_per_reel',
-    title: 'Reel Collaboration',
-    icon: 'videocam-outline',
-    tone: '#E76A92',
-  },
-  { field: 'price_per_post', title: 'Feed Feature', icon: 'image-outline', tone: '#5C84D6' },
-  {
-    field: 'price_per_story',
-    title: 'Story Placement',
-    icon: 'play-circle-outline',
-    tone: '#2FA46F',
-  },
+};
+
+const packages: PricePackageItem[] = [
+  { field: 'price_per_story', title: 'Story', image: storyPriceImage, tone: '#2FA46F' },
+  { field: 'price_per_reel', title: 'Reel', image: reelPriceImage, tone: '#E76A92' },
+  { field: 'price_per_post', title: 'Post', image: postPriceImage, tone: '#5C84D6' },
 ];
 
-const formatINR = (amount: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+// ─── Price poster card ────────────────────────────────────────────────────────
 
-function PriceStepper({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-}) {
+type PriceCardProps = {
+  item: PricePackageItem;
+  index: number;
+  cardWidth: number;
+  interval: number;
+  scrollX: SharedValue<number>;
+};
+
+const PriceCard = memo(function PriceCard({
+  item,
+  index,
+  cardWidth,
+  interval,
+  scrollX,
+}: PriceCardProps) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const center = index * interval;
+    const inputRange = [center - interval, center, center + interval];
+    const rotateZ = interpolate(scrollX.value, inputRange, [-4, 0, 4], Extrapolation.CLAMP);
+    const translateY = interpolate(scrollX.value, inputRange, [18, 0, 18], Extrapolation.CLAMP);
+    const scale = interpolate(scrollX.value, inputRange, [0.46, 1, 0.46], Extrapolation.CLAMP);
+    const opacity = interpolate(scrollX.value, inputRange, [0.62, 1, 0.62], Extrapolation.CLAMP);
+    return {
+      opacity,
+      transform: [{ translateY }, { rotateZ: `${rotateZ}deg` }, { scale }],
+    };
+  }, [index, interval]);
+
   return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      hitSlop={8}
-      onPress={onPress}
-      style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperPressed]}
+    <Animated.View
+      style={[
+        {
+          width: cardWidth,
+          height: PRICE_CARD_HEIGHT,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'visible',
+        },
+        animatedStyle,
+      ]}
     >
-      <Ionicons name={icon} size={18} color="#FFFFFF" />
-    </Pressable>
+      <Image
+        source={item.image}
+        style={{ width: cardWidth, height: PRICE_CARD_HEIGHT }}
+        contentFit="contain"
+        accessibilityIgnoresInvertColors
+        accessibilityLabel={item.title}
+      />
+    </Animated.View>
   );
-}
+});
 
-function PricePackageCard({
-  title,
-  icon,
-  tone,
-  value,
-  onChange,
-}: {
-  title: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  tone: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  const textValue = value > 0 ? String(value) : '';
+// ─── Price badge carousel ─────────────────────────────────────────────────────
+
+type PriceBadgeCarouselProps = {
+  items: PricePackageItem[];
+  values: FormValues;
+  onChange: (field: PricingField, value: number) => void;
+};
+
+function PriceBadgeCarousel({ items, values, onChange }: PriceBadgeCarouselProps) {
+  const listRef = useRef<FlatList<PricePackageItem>>(null);
+  const { width } = useWindowDimensions();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const cardWidth = Math.min(Math.max(width * 0.42, 148), 172);
+  const interval = cardWidth + PRICE_CARD_GAP;
+  const sidePadding = Math.max((width - cardWidth) / 2, theme.spacing.lg);
+  const scrollX = useSharedValue(0);
+
+  const activeItem = items[activeIndex] ?? items[0];
+  const activeValue = values[activeItem.field];
+  const textValue = activeValue > 0 ? String(activeValue) : '';
+
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+    },
+  });
+
+  const handleSettledIndex = useCallback(
+    (offsetX: number) => {
+      const nextIndex = Math.min(Math.max(Math.round(offsetX / interval), 0), items.length - 1);
+      if (nextIndex !== activeIndex && Platform.OS === 'ios') {
+        void Haptics.selectionAsync();
+      }
+      setActiveIndex(nextIndex);
+    },
+    [activeIndex, interval, items.length],
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: PricePackageItem; index: number }) => (
+      <PriceCard
+        item={item}
+        index={index}
+        cardWidth={cardWidth}
+        interval={interval}
+        scrollX={scrollX}
+      />
+    ),
+    [cardWidth, interval, scrollX],
+  );
 
   return (
-    <GlassCard style={styles.packageCard} contentStyle={styles.packageInner}>
-      <View style={styles.packageTopRow}>
-        <View style={[styles.packageIconBox, { backgroundColor: tone }]}>
-          <Ionicons name={icon} size={21} color="#FFFFFF" />
-        </View>
-        <View style={styles.packageTitleWrap}>
-          <Text style={styles.packageTitle}>{title}</Text>
-          <Text style={styles.packageAmount}>{value > 0 ? formatINR(value) : 'Not set'}</Text>
-        </View>
-      </View>
+    <View style={styles.carouselShell}>
+      <Animated.FlatList
+        ref={listRef}
+        data={items}
+        horizontal
+        keyExtractor={(item) => item.field}
+        renderItem={renderItem}
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={interval}
+        snapToAlignment="start"
+        scrollEventThrottle={16}
+        removeClippedSubviews={false}
+        getItemLayout={(_, index) => ({ length: interval, offset: interval * index, index })}
+        onScroll={onScroll}
+        onMomentumScrollEnd={(e) => {
+          handleSettledIndex(e.nativeEvent.contentOffset.x);
+        }}
+        onScrollEndDrag={(e) => {
+          handleSettledIndex(e.nativeEvent.contentOffset.x);
+        }}
+        onScrollToIndexFailed={(info) => {
+          listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index });
+        }}
+        ItemSeparatorComponent={() => <View style={{ width: PRICE_CARD_GAP }} />}
+        contentContainerStyle={[styles.carouselContent, { paddingHorizontal: sidePadding }]}
+        style={styles.carouselList}
+      />
 
-      <View style={styles.priceEditorRow}>
-        <PriceStepper
-          icon="remove"
-          label={`Decrease ${title}`}
-          onPress={() => {
-            onChange(Math.max(0, value - STEP));
-          }}
-        />
-        <AppInput
-          containerStyle={styles.priceField}
-          value={textValue}
-          onChangeText={(next) => {
-            const digits = next.replace(/\D/g, '');
-            onChange(digits ? Number(digits) : 0);
-          }}
-          keyboardType="number-pad"
-          placeholder="0"
-          accessibilityLabel={`${title} price`}
-          prefix={<Text style={styles.currencyPrefix}>₹</Text>}
-        />
-        <PriceStepper
-          icon="add"
-          label={`Increase ${title}`}
-          onPress={() => {
-            onChange(value + STEP);
-          }}
-        />
+      {/* Floating price editor strip */}
+      <View style={styles.priceStrip}>
+        <Text style={styles.priceLabel}>{activeItem.title.toUpperCase()}</Text>
+        <View style={styles.priceEditorRow}>
+          <Pressable
+            accessibilityLabel={`Decrease ${activeItem.title} price`}
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => {
+              onChange(activeItem.field, Math.max(0, activeValue - STEP));
+            }}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperPressed]}
+          >
+            <Ionicons name="remove" size={18} color="#FFFFFF" />
+          </Pressable>
+          {isLiquidGlassAvailable() ? (
+            <GlassView glassEffectStyle="regular" colorScheme="dark" style={styles.priceField}>
+              <View style={styles.priceFieldInner}>
+                <Image
+                  source={coinImage}
+                  style={styles.coinIcon}
+                  contentFit="contain"
+                  accessibilityIgnoresInvertColors
+                />
+                <TextInput
+                  style={styles.priceInputNative}
+                  value={textValue}
+                  onChangeText={(next) => {
+                    const digits = next.replace(/\D/g, '');
+                    onChange(activeItem.field, digits ? Number(digits) : 0);
+                  }}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor="rgba(255,255,255,0.48)"
+                  selectionColor="#FFFFFF"
+                  cursorColor="#FFFFFF"
+                  accessibilityLabel={`${activeItem.title} price`}
+                />
+              </View>
+            </GlassView>
+          ) : (
+            <BlurView tint="systemUltraThinMaterialDark" intensity={88} style={styles.priceField}>
+              <View style={styles.priceFieldInner}>
+                <Image
+                  source={coinImage}
+                  style={styles.coinIcon}
+                  contentFit="contain"
+                  accessibilityIgnoresInvertColors
+                />
+                <TextInput
+                  style={styles.priceInputNative}
+                  value={textValue}
+                  onChangeText={(next) => {
+                    const digits = next.replace(/\D/g, '');
+                    onChange(activeItem.field, digits ? Number(digits) : 0);
+                  }}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor="rgba(255,255,255,0.48)"
+                  selectionColor="#FFFFFF"
+                  cursorColor="#FFFFFF"
+                  accessibilityLabel={`${activeItem.title} price`}
+                />
+              </View>
+            </BlurView>
+          )}
+          <Pressable
+            accessibilityLabel={`Increase ${activeItem.title} price`}
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => {
+              onChange(activeItem.field, activeValue + STEP);
+            }}
+            style={({ pressed }) => [styles.stepperButton, pressed && styles.stepperPressed]}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
       </View>
-    </GlassCard>
+    </View>
   );
 }
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PricingScreen() {
   const insets = useSafeAreaInsets();
@@ -173,6 +323,12 @@ export default function PricingScreen() {
   const scrollBottomPad =
     theme.spacing.hero + theme.spacing.jumbo + theme.spacing.xxl + insets.bottom;
 
+  const values: FormValues = {
+    price_per_reel: watch('price_per_reel'),
+    price_per_post: watch('price_per_post'),
+    price_per_story: watch('price_per_story'),
+  };
+
   return (
     <View style={styles.root}>
       <ScrollView
@@ -190,32 +346,17 @@ export default function PricingScreen() {
           style={styles.pageHeaderRow}
         />
 
-        <View style={styles.packageColumn}>
-          {packages.map((item) => (
-            <PricePackageCard
-              key={item.field}
-              title={item.title}
-              icon={item.icon}
-              tone={item.tone}
-              value={watch(item.field)}
-              onChange={(value) => {
-                setPrice(item.field, value);
-              }}
-            />
-          ))}
-        </View>
+        <PriceBadgeCarousel items={packages} values={values} onChange={setPrice} />
       </ScrollView>
 
       <View
         style={[
           styles.footer,
-          {
-            paddingBottom: Math.max(insets.bottom, theme.spacing.md) + theme.spacing.md,
-          },
+          { paddingBottom: Math.max(insets.bottom, theme.spacing.md) + theme.spacing.md },
         ]}
       >
         <PrimaryButton
-          label={mutations.updatePricing.isPending ? 'Saving...' : 'Save rate card'}
+          label={mutations.updatePricing.isPending ? 'Saving...' : 'Save'}
           disabled={mutations.updatePricing.isPending}
           onPress={onSubmit}
           style={styles.saveButton}
@@ -241,47 +382,40 @@ const styles = StyleSheet.create({
   pageHeaderRow: {
     marginBottom: theme.spacing.xs,
   },
-  packageColumn: {
-    gap: theme.spacing.xl,
+
+  // ── Carousel ──
+  carouselShell: {
+    marginHorizontal: -theme.spacing.xxl,
+    minHeight: PRICE_CARD_HEIGHT + 140,
   },
-  packageCard: {
-    borderRadius: PRICE_CARD_RADIUS,
-    overflow: 'hidden',
+  carouselList: {
+    overflow: 'visible',
   },
-  packageInner: {
-    padding: theme.spacing.xl,
-    gap: theme.spacing.xl,
-  },
-  packageTopRow: {
-    flexDirection: 'row',
+  carouselContent: {
     alignItems: 'center',
+  },
+
+  // ── Floating price editor strip ──
+  priceStrip: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.xxl,
     gap: theme.spacing.lg,
   },
-  packageIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  packageTitleWrap: {
-    flex: 1,
-    gap: theme.spacing.xs,
-    minWidth: 0,
-  },
-  packageTitle: {
-    ...theme.typography.cardTitle,
+  priceLabel: {
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '600',
     color: theme.colors.foreground,
-  },
-  packageAmount: {
-    ...theme.typography.mono,
-    color: 'rgba(255,255,255,0.62)',
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   priceEditorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
+    width: '100%',
   },
   stepperButton: {
     width: 46,
@@ -292,17 +426,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: FIELD_BORDER,
     backgroundColor: 'rgba(255,255,255,0.08)',
+    flexShrink: 0,
   },
   stepperPressed: {
     opacity: 0.76,
   },
   priceField: {
     flex: 1,
+    height: 60,
+    borderRadius: 24,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: FIELD_BORDER,
+    backgroundColor: 'rgba(255,255,255,0.055)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  currencyPrefix: {
-    ...theme.typography.body,
-    color: 'rgba(255,255,255,0.58)',
+  priceFieldInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
+  coinIcon: {
+    width: 22,
+    height: 22,
+    flexShrink: 0,
+  },
+  priceInputNative: {
+    color: '#FFFFFF',
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: theme.typography.body.fontSize,
+    fontWeight: theme.typography.body.fontWeight,
+    padding: 0,
+    margin: 0,
+    minWidth: 36,
+    maxWidth: 130,
+    includeFontPadding: false,
+  },
+
+  // ── Footer ──
   footer: {
     paddingHorizontal: theme.spacing.xxl,
     paddingTop: theme.spacing.lg,

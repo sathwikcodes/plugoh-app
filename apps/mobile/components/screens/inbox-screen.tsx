@@ -68,7 +68,6 @@ const ROLE_CONFIG: Record<InboxRole, InboxRoleConfig> = {
   },
 };
 
-const TAB_BAR_CLEARANCE = 12;
 const EMPTY_CARD_MAX_WIDTH = 390;
 const EMPTY_CARD_WIDTH_RATIO = 0.84;
 const EMPTY_CARD_FALLBACK_HEIGHT_RATIO = 0.58;
@@ -217,7 +216,7 @@ export function InboxScreen({ role, profileImageUri }: InboxScreenProps) {
   const Separator = useCallback(() => <View style={styles.separator} />, []);
 
   const listContentStyle = useMemo(
-    () => ({ paddingBottom: Math.max(insets.bottom, theme.spacing.sm) + TAB_BAR_CLEARANCE }),
+    () => ({ paddingBottom: getTabScreenBottomPadding(insets.bottom) }),
     [insets.bottom],
   );
 

@@ -344,7 +344,7 @@ export default function ProfileScreen() {
         />
         <SettingRow
           iconSource={cardImage}
-          title="Payment & Payouts"
+          title="Payout"
           subtitle={payoutSubtitle(payout.data)}
           subtitleLoading={payoutLoading}
           onPress={() => {

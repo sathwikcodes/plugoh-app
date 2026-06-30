@@ -1,11 +1,12 @@
 import { GlassCard } from '@/components/ui/glass-card';
 import { theme } from '@/constants/theme';
 import { CARD_CLUSTER_RADIUS, WITHDRAW_BTN_HEIGHT } from '@/lib/influencer/earnings';
+import lockerImage from '@/assets/images/locker.png';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { impactAsync, ImpactFeedbackStyle } from 'expo-haptics';
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 function GlassWithdrawButton({ onPress }: { onPress: () => void }) {
   const shell: ViewStyle = {
@@ -21,7 +22,7 @@ function GlassWithdrawButton({ onPress }: { onPress: () => void }) {
   const label = (
     <View style={styles.row}>
       <Ionicons name="arrow-up-circle-outline" size={22} color="rgba(255,255,255,0.92)" />
-      <Text style={styles.label}>Withdraw</Text>
+      <Text style={styles.btnLabel}>Withdraw</Text>
     </View>
   );
 
@@ -62,6 +63,9 @@ function GlassWithdrawButton({ onPress }: { onPress: () => void }) {
 export function EarningsWithdrawColumn({ onPress }: { onPress: () => void }) {
   return (
     <GlassCard style={styles.shell} contentStyle={styles.inner}>
+      <View style={styles.top}>
+        <Image source={lockerImage} style={styles.image} resizeMode="contain" />
+      </View>
       <GlassWithdrawButton onPress={onPress} />
     </GlassCard>
   );
@@ -77,9 +81,19 @@ const styles = StyleSheet.create({
   inner: {
     flex: 1,
     minHeight: 0,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
+  },
+  top: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.xs,
+  },
+  image: {
+    width: 64,
+    height: 64,
   },
   pressable: {
     flex: 1,
@@ -97,7 +111,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing.sm,
   },
-  label: {
+  btnLabel: {
     ...theme.typography.cardTitle,
     color: 'rgba(255,255,255,0.95)',
     fontWeight: '700',
