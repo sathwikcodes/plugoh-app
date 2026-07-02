@@ -22,7 +22,7 @@ export const BUSINESS_TYPES = [
   'personal_brand',
   'other',
 ] as const;
-export const PACKAGE_TYPES = ['instagram_reel'] as const;
+export const PACKAGE_TYPES = ['instagram_reel', 'instagram_post', 'instagram_story'] as const;
 export const BOOKING_OBJECTIVES = [
   'visit_place',
   'feature_product',
@@ -138,6 +138,8 @@ export interface Influencer {
   avg_likes_per_reel?: number;
   avg_views_per_reel?: number;
   price_per_reel_paise?: number;
+  price_per_post_paise?: number;
+  price_per_story_paise?: number;
   /** Legacy/mobile rupee-backed aliases retained for older UI payloads. */
   price_per_reel?: number | null;
   price_per_post?: number | null;
@@ -222,6 +224,7 @@ export interface CampaignListItem {
   timing_mode?: string;
   due_date?: string;
   place_name?: string;
+  notes?: string;
   place_latitude?: number | null;
   place_longitude?: number | null;
   location_weather?: LocationWeatherSummary | null;
@@ -397,6 +400,8 @@ export const influencerProfilePatchSchema = z.object({
 
 export const influencerPricingPatchSchema = z.object({
   price_per_reel_paise: numeric.optional(),
+  price_per_post_paise: numeric.optional(),
+  price_per_story_paise: numeric.optional(),
 });
 
 export const influencerActivePatchSchema = z.object({
@@ -494,20 +499,15 @@ export const createCampaignSchema = z
     influencer_id: uuid.optional(),
     influencer_profile_id: uuid,
     package_type: z.enum(PACKAGE_TYPES),
-    objective: z.enum(BOOKING_OBJECTIVES),
-    timing_mode: z.enum(['asap', 'choose_date']),
+    objective: z.enum(BOOKING_OBJECTIVES).optional(),
+    timing_mode: z.enum(['asap', 'choose_date']).optional(),
     due_date: z.string().date().optional(),
     place_name: optionalText,
-    business_contact_email: z.string().email(),
-    business_contact_phone: z.string().min(5),
+    notes: optionalText,
   })
   .refine((value) => value.timing_mode !== 'choose_date' || value.due_date, {
     path: ['due_date'],
     message: 'due_date is required when timing_mode is choose_date',
-  })
-  .refine((value) => value.objective !== 'visit_place' || value.place_name, {
-    path: ['place_name'],
-    message: 'place_name is required when objective is visit_place',
   });
 
 export const campaignListQuerySchema = paginationQuerySchema.extend({
@@ -548,14 +548,11 @@ export const legacyVerifyBookingPaymentSchema = z
     influencer_id: uuid.optional(),
     influencer_profile_id: uuid,
     package_type: z.enum(PACKAGE_TYPES),
-    objective: z.enum(BOOKING_OBJECTIVES),
-    timing_mode: z.enum(['asap', 'choose_date']),
+    objective: z.enum(BOOKING_OBJECTIVES).optional(),
+    timing_mode: z.enum(['asap', 'choose_date']).optional(),
     due_date: z.string().date().optional(),
     place_name: optionalText,
-    business_contact_email: z.string().email().optional(),
-    business_contact_phone: z.string().min(5).optional(),
-    contact_email: z.string().email().optional(),
-    contact_phone: z.string().min(5).optional(),
+    notes: optionalText,
     razorpay_order_id: z.string().min(1),
     razorpay_payment_id: z.string().min(1),
     razorpay_signature: z.string().min(1),
@@ -563,18 +560,6 @@ export const legacyVerifyBookingPaymentSchema = z
   .refine((value) => value.timing_mode !== 'choose_date' || value.due_date, {
     path: ['due_date'],
     message: 'due_date is required when timing_mode is choose_date',
-  })
-  .refine((value) => value.objective !== 'visit_place' || value.place_name, {
-    path: ['place_name'],
-    message: 'place_name is required when objective is visit_place',
-  })
-  .refine((value) => value.business_contact_email || value.contact_email, {
-    path: ['business_contact_email'],
-    message: 'business_contact_email is required',
-  })
-  .refine((value) => value.business_contact_phone || value.contact_phone, {
-    path: ['business_contact_phone'],
-    message: 'business_contact_phone is required',
   });
 
 export const verifyBookingPaymentSchema = z.union([

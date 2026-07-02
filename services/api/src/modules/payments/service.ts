@@ -226,8 +226,6 @@ export class PaymentService {
   }
 
   private normalizeBookingPayload(input: Row) {
-    const businessContactEmail = input.business_contact_email ?? input.contact_email;
-    const businessContactPhone = input.business_contact_phone ?? input.contact_phone;
     return {
       influencer_id: input.influencer_id,
       influencer_profile_id: input.influencer_profile_id,
@@ -236,8 +234,7 @@ export class PaymentService {
       timing_mode: input.timing_mode,
       due_date: input.due_date,
       place_name: input.place_name,
-      business_contact_email: businessContactEmail,
-      business_contact_phone: businessContactPhone,
+      notes: input.notes,
     };
   }
 

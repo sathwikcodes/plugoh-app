@@ -152,6 +152,22 @@ export default function PayoutScreen() {
   }, [payout.data, setValue]);
 
   const onSubmit = handleSubmit(async (values) => {
+    if (values.preferred_method === 'upi') {
+      if (!values.upi_id?.trim()) {
+        Alert.alert('Add your UPI ID', 'Enter a UPI ID so we can send your payouts.');
+        return;
+      }
+    } else if (
+      !values.bank_account_no?.trim() ||
+      !values.bank_ifsc?.trim() ||
+      !values.bank_account_name?.trim()
+    ) {
+      Alert.alert(
+        'Complete your bank details',
+        'Enter your account number, IFSC, and account holder name.',
+      );
+      return;
+    }
     try {
       await mutations.updatePayout.mutateAsync(values);
       router.back();

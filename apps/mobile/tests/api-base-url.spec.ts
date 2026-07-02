@@ -17,6 +17,16 @@ describe('resolveApiBaseUrl', () => {
     ).toBe('http://192.168.1.10:4000');
   });
 
+  it('keeps localhost when the caller disables Metro host rewriting', () => {
+    expect(
+      resolveApiBaseUrl('http://localhost:4000', {
+        dev: true,
+        devMachineHost: '192.168.1.10',
+        shouldUseDevMachineHost: false,
+      }),
+    ).toBe('http://localhost:4000');
+  });
+
   it('leaves localhost when no dev host is available', () => {
     expect(resolveApiBaseUrl('http://localhost:4000', { dev: true, devMachineHost: null })).toBe(
       'http://localhost:4000',

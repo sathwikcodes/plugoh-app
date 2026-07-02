@@ -53,10 +53,7 @@ vi.mock('expo-secure-store', () => ({
 const bookingInput = {
   influencer_profile_id: '33333333-3333-4333-8333-333333333333',
   package_type: 'instagram_reel' as const,
-  objective: 'feature_product' as const,
-  timing_mode: 'asap' as const,
-  contact_email: 'brand@test.dev',
-  contact_phone: '+919999999999',
+  notes: 'Please post between 6-8pm.',
 };
 
 type PendingBookingVerifyFixture = {
@@ -88,7 +85,7 @@ describe('booking payment flow', () => {
     });
   });
 
-  it('creates booking orders with business contact fields and verifies by intent id', async () => {
+  it('creates booking orders with the selected package and notes, then verifies by intent id', async () => {
     const { runBookingPaymentFlow } = await import('@/lib/payments/booking-flow');
 
     await expect(runBookingPaymentFlow(bookingInput)).resolves.toMatchObject({
@@ -99,12 +96,7 @@ describe('booking payment flow', () => {
       {
         influencer_profile_id: bookingInput.influencer_profile_id,
         package_type: 'instagram_reel',
-        objective: 'feature_product',
-        timing_mode: 'asap',
-        due_date: undefined,
-        place_name: undefined,
-        business_contact_email: 'brand@test.dev',
-        business_contact_phone: '+919999999999',
+        notes: 'Please post between 6-8pm.',
       },
       expect.stringMatching(/^booking-order-/),
     );
@@ -184,12 +176,7 @@ describe('booking payment flow', () => {
       {
         influencer_profile_id: bookingInput.influencer_profile_id,
         package_type: 'instagram_reel',
-        objective: 'feature_product',
-        timing_mode: 'asap',
-        due_date: undefined,
-        place_name: undefined,
-        business_contact_email: 'brand@test.dev',
-        business_contact_phone: '+919999999999',
+        notes: 'Please post between 6-8pm.',
         razorpay_order_id: 'order_legacy_booking',
         razorpay_payment_id: 'pay_card',
         razorpay_signature: 'sig',

@@ -36,6 +36,7 @@ import type {
   VerifyBookingPaymentRequest,
 } from '@plugoh/contracts';
 import { api, jsonRequest } from '@/lib/api/client';
+import { compactPayload } from '@/lib/api/payload';
 
 type PaginatedResponse<T> = { items: T[]; nextOffset: number | null; total: number };
 
@@ -86,12 +87,12 @@ export const endpoints = {
   updateInfluencerProfile: (input: InfluencerProfilePatch) =>
     api<InfluencerProfileResponse>('/influencer/profile', {
       method: 'PATCH',
-      ...jsonRequest(input),
+      ...jsonRequest(compactPayload(input)),
     }),
   updateBusinessProfile: (input: BusinessProfilePatch) =>
     api<BusinessProfileSummary>('/business/profile', {
       method: 'PATCH',
-      ...jsonRequest(input),
+      ...jsonRequest(compactPayload(input)),
     }),
   updateInfluencerPricing: (input: InfluencerPricingPatch) =>
     api<InfluencerProfileResponse>('/influencer/profile/pricing', {
@@ -108,7 +109,7 @@ export const endpoints = {
   updatePayout: (input: PayoutUpsert) =>
     api<PayoutUpsert>('/influencer/payout', {
       method: 'PUT',
-      ...jsonRequest(input),
+      ...jsonRequest(compactPayload(input)),
     }),
   earnings: () => api<EarningsSummary>('/influencer/earnings'),
   campaigns: (
@@ -262,7 +263,7 @@ export async function uploadDelivery(
 export async function submitDelivery(campaignId: string, storagePath: string, notes?: string) {
   return api<{ ok: boolean }>(`/campaigns/${campaignId}/deliver`, {
     method: 'POST',
-    ...jsonRequest({ storagePath, notes }),
+    ...jsonRequest({ storage_path: storagePath, creator_note: notes }),
   });
 }
 

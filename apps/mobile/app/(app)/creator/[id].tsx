@@ -1,11 +1,29 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { Influencer } from '@plugoh/contracts';
 import { useQuery } from '@tanstack/react-query';
+import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import * as Location from 'expo-location';
 import { Image } from 'expo-image';
+import { AppleMaps, GoogleMaps, type Coordinates } from 'expo-maps';
 import { router, useLocalSearchParams } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ImageSourcePropType,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import followersImage from '@/assets/images/followers.png';
+import likesImage from '@/assets/images/likes.png';
+import megaphoneImage from '@/assets/images/megaphone.png';
+import { BookingPackageCarousel } from '@/components/booking/booking-package-carousel';
 import { GlassCircleButton } from '@/components/ui/glass-circle-button';
 import { AsyncText, ShimmerCircle, ShimmerText } from '@/components/ui/shimmer';
 import { TabScreenCanvas } from '@/components/ui/tab-screen-canvas';
@@ -41,75 +59,59 @@ function formatNumber(value?: number) {
   );
 }
 
-function formatCurrency(amount?: number | null) {
-  if (amount == null) return 'Not set';
-  return `₹${Math.round(amount).toLocaleString('en-IN')}`;
-}
+function CreatorLiquidSurface({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style: StyleProp<ViewStyle>;
+}) {
+  if (isLiquidGlassAvailable()) {
+    return (
+      <GlassView isInteractive={false} glassEffectStyle="regular" colorScheme="dark" style={style}>
+        {children}
+      </GlassView>
+    );
+  }
 
-function InfoGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <View style={styles.infoGroup}>
-      <Text style={styles.groupTitle}>{title}</Text>
-      <View style={styles.infoRows}>{children}</View>
-    </View>
+    <BlurView tint="systemUltraThinMaterialDark" intensity={80} style={style}>
+      {children}
+    </BlurView>
   );
 }
 
-function DetailLine({
-  icon,
-  label,
+function MetricGlassTile({
+  image,
   value,
+  label,
   loading,
-  isLast,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  image: ImageSourcePropType;
+  value: string;
   label: string;
-  value?: string;
   loading?: boolean;
-  isLast?: boolean;
 }) {
   return (
-    <View style={[styles.detailLine, isLast ? styles.detailLineLast : null]}>
-      <View style={styles.detailIcon}>
-        <Ionicons name={icon} size={18} color="rgba(255,255,255,0.78)" />
-      </View>
-      <View style={styles.detailCopy}>
-        <Text style={styles.detailLabel}>{label}</Text>
+    <CreatorLiquidSurface style={styles.metricGlass}>
+      <View style={styles.metricInner} accessibilityLabel={`${label}: ${value}`}>
+        <View pointerEvents="none" style={styles.metricInnerStroke} />
+        <Image
+          source={image}
+          style={styles.metricImage}
+          contentFit="contain"
+          accessibilityIgnoresInvertColors
+        />
         <AsyncText
           loading={Boolean(loading)}
-          value={value || 'Not available'}
-          selectable
-          style={styles.detailValue}
-          numberOfLines={2}
-          shimmerWidth="64%"
+          value={value}
+          style={styles.metricValue}
+          numberOfLines={1}
+          shimmerWidth={54}
           shimmerHeight={18}
         />
       </View>
-    </View>
-  );
-}
-
-function PriceLine({
-  label,
-  amount,
-  icon,
-  loading,
-  isLast,
-}: {
-  label: string;
-  amount?: number | null;
-  icon: keyof typeof Ionicons.glyphMap;
-  loading?: boolean;
-  isLast?: boolean;
-}) {
-  return (
-    <DetailLine
-      icon={icon}
-      label={label}
-      value={formatCurrency(amount)}
-      loading={loading}
-      isLast={isLast}
-    />
+    </CreatorLiquidSurface>
   );
 }
 
@@ -128,10 +130,22 @@ export default function CreatorDetailScreen() {
   const imageUrl = profileImageUrl(data);
   const handle = instagramHandle(data);
   const city = data?.city?.trim();
-  const category = data?.category?.trim();
-  const positioning = [category, city].filter(Boolean).join(' · ');
-  const startingPrice = data?.starterPrice ?? data?.price_per_reel ?? data?.price_per_post ?? null;
   const media = data?.media ?? [];
+
+  const cityGeocode = useQuery({
+    queryKey: ['creator-city-geocode', city],
+    queryFn: async () => {
+      if (!city) return null;
+      const results = await Location.geocodeAsync(city);
+      return results[0] ?? null;
+    },
+    enabled: Boolean(city) && Platform.OS === 'ios',
+    staleTime: Infinity,
+  });
+  const coordinates: Coordinates | null = cityGeocode.data
+    ? { latitude: cityGeocode.data.latitude, longitude: cityGeocode.data.longitude }
+    : null;
+  const locationPrimary = city || 'Location not specified';
 
   return (
     <TabScreenCanvas>
@@ -174,54 +188,37 @@ export default function CreatorDetailScreen() {
                 style={styles.creatorName}
                 numberOfLines={2}
                 shimmerWidth="74%"
-                shimmerHeight={34}
+                shimmerHeight={24}
               />
               {loading ? (
-                <ShimmerText width="58%" height={18} />
+                <ShimmerText width="72%" height={18} />
               ) : (
                 <Text selectable style={styles.handle} numberOfLines={1}>
                   {handle}
                 </Text>
               )}
-              {!loading && positioning ? (
-                <Text style={styles.positioning} numberOfLines={1}>
-                  {positioning}
-                </Text>
-              ) : null}
             </View>
           </View>
 
-          <View style={styles.signalRow}>
-            <View style={styles.signalPill}>
-              {loading ? (
-                <ShimmerText width={54} height={24} />
-              ) : (
-                <Text style={styles.signalValue} numberOfLines={1}>
-                  {formatNumber(data?.follower_count)}
-                </Text>
-              )}
-              <Text style={styles.signalLabel}>Followers</Text>
-            </View>
-            <View style={styles.signalPill}>
-              {loading ? (
-                <ShimmerText width={54} height={24} />
-              ) : (
-                <Text style={styles.signalValue} numberOfLines={1}>
-                  {formatNumber(data?.avg_likes_per_reel)}
-                </Text>
-              )}
-              <Text style={styles.signalLabel}>Avg likes</Text>
-            </View>
-            <View style={styles.signalPill}>
-              {loading ? (
-                <ShimmerText width={64} height={24} />
-              ) : (
-                <Text style={styles.signalValue} numberOfLines={1}>
-                  {formatCurrency(startingPrice)}
-                </Text>
-              )}
-              <Text style={styles.signalLabel}>From</Text>
-            </View>
+          <View style={styles.metricRow}>
+            <MetricGlassTile
+              image={followersImage}
+              value={formatNumber(data?.follower_count)}
+              label="Followers"
+              loading={loading}
+            />
+            <MetricGlassTile
+              image={likesImage}
+              value={formatNumber(data?.avg_likes_per_reel)}
+              label="Avg likes"
+              loading={loading}
+            />
+            <MetricGlassTile
+              image={megaphoneImage}
+              value={formatNumber(data?.avg_views_per_reel)}
+              label="Avg views"
+              loading={loading}
+            />
           </View>
         </View>
 
@@ -239,47 +236,29 @@ export default function CreatorDetailScreen() {
             <Ionicons name="arrow-forward" size={18} color="#0D0D0D" />
           </Pressable>
 
-          <InfoGroup title="Creator details">
-            <DetailLine icon="logo-instagram" label="Instagram" value={handle} loading={loading} />
-            <DetailLine icon="sparkles" label="Category" value={category} loading={loading} />
-            <DetailLine icon="location" label="Location" value={city} loading={loading} isLast />
-          </InfoGroup>
-
-          <InfoGroup title="Pricing">
-            <PriceLine
-              icon="videocam"
-              label="Reel"
-              amount={data?.price_per_reel}
-              loading={loading}
-            />
-            <PriceLine icon="image" label="Post" amount={data?.price_per_post} loading={loading} />
-            <PriceLine
-              icon="phone-portrait"
-              label="Story"
-              amount={data?.price_per_story}
-              loading={loading}
-              isLast
-            />
-          </InfoGroup>
-
           {loading ? (
-            <InfoGroup title="About">
-              <View style={styles.textBlock}>
-                <ShimmerText width="90%" height={16} />
-                <ShimmerText width="78%" height={16} />
-                <ShimmerText width="48%" height={16} />
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>About</Text>
+              <View style={styles.sectionDivider} />
+              <View style={styles.briefSkeleton}>
+                <ShimmerText width="92%" height={15} />
+                <ShimmerText width="78%" height={15} />
               </View>
-            </InfoGroup>
+            </View>
           ) : data?.bio ? (
-            <InfoGroup title="About">
-              <Text selectable style={styles.aboutText}>
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>About</Text>
+              <View style={styles.sectionDivider} />
+              <Text selectable style={styles.descriptionText}>
                 {data.bio}
               </Text>
-            </InfoGroup>
+            </View>
           ) : null}
 
           {media.length > 0 ? (
-            <InfoGroup title="Recent content">
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>Recent content</Text>
+              <View style={styles.sectionDivider} />
               <View style={styles.mediaGrid}>
                 {media.slice(0, 4).map((item, index) => (
                   <View key={item.id ?? `${item.media_url}-${index}`} style={styles.mediaTile}>
@@ -303,8 +282,88 @@ export default function CreatorDetailScreen() {
                   </View>
                 ))}
               </View>
-            </InfoGroup>
+            </View>
           ) : null}
+
+          {loading ? (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>Pricing</Text>
+              <View style={styles.sectionDivider} />
+              <View style={styles.briefSkeleton}>
+                <ShimmerText width="90%" height={20} />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>Pricing</Text>
+              <View style={styles.sectionDivider} />
+              <BookingPackageCarousel influencer={data} bleed={theme.spacing.xl} />
+            </View>
+          )}
+
+          {loading ? (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>Location</Text>
+              <View style={styles.sectionDivider} />
+              <View style={styles.locationMetaRow}>
+                <View style={styles.locationTextBlock}>
+                  <ShimmerText width={190} height={26} />
+                  <ShimmerText width={160} height={22} />
+                </View>
+              </View>
+              <View style={styles.locationCard}>
+                <View style={styles.mapLoading}>
+                  <ShimmerText width="64%" height={18} />
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>Location</Text>
+              <View style={styles.sectionDivider} />
+              <View style={styles.locationMetaRow}>
+                <View style={styles.locationTextBlock}>
+                  <Text selectable style={styles.locationPrimary} numberOfLines={1}>
+                    {locationPrimary}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.locationCard}>
+                {coordinates && Platform.OS === 'ios' ? (
+                  <AppleMaps.View
+                    style={styles.nativeMap}
+                    cameraPosition={{ coordinates, zoom: 12 }}
+                    markers={[{ id: 'creator-location', coordinates, title: locationPrimary }]}
+                    uiSettings={{
+                      compassEnabled: false,
+                      myLocationButtonEnabled: false,
+                      scaleBarEnabled: false,
+                    }}
+                  />
+                ) : coordinates && Platform.OS === 'android' ? (
+                  <GoogleMaps.View
+                    style={styles.nativeMap}
+                    cameraPosition={{ coordinates, zoom: 12 }}
+                    markers={[{ id: 'creator-location', coordinates, title: locationPrimary }]}
+                    uiSettings={{
+                      compassEnabled: false,
+                      myLocationButtonEnabled: false,
+                      zoomControlsEnabled: false,
+                      rotationGesturesEnabled: false,
+                      tiltGesturesEnabled: false,
+                    }}
+                  />
+                ) : (
+                  <View style={styles.mapFallback}>
+                    <Ionicons name="location" size={18} color="rgba(255,255,255,0.72)" />
+                    <Text selectable style={styles.mapFallbackText} numberOfLines={2}>
+                      {locationPrimary}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
     </TabScreenCanvas>
@@ -317,13 +376,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.backgroundClear,
   },
   hero: {
-    overflow: 'hidden',
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.045)',
     paddingHorizontal: theme.spacing.xl,
     paddingBottom: theme.spacing.xl,
     gap: theme.spacing.lg,
@@ -368,40 +420,59 @@ const styles = StyleSheet.create({
     gap: theme.spacing.xs,
   },
   creatorName: {
-    ...theme.typography.metric,
+    ...theme.typography.title,
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '800',
   },
   handle: {
     ...theme.typography.body,
     color: 'rgba(255,190,210,0.9)',
   },
-  positioning: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.52)',
-  },
-  signalRow: {
+  metricRow: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+    alignItems: 'stretch',
+    gap: theme.spacing.md,
   },
-  signalPill: {
+  metricGlass: {
     flex: 1,
-    minHeight: 64,
-    justifyContent: 'center',
-    gap: 2,
+    minWidth: 0,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    paddingHorizontal: theme.spacing.md,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'transparent',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 1,
   },
-  signalValue: {
-    ...theme.typography.metricSmall,
+  metricInner: {
+    minHeight: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+    position: 'relative',
+  },
+  metricInnerStroke: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  metricImage: {
+    width: 24,
+    height: 24,
+  },
+  metricValue: {
+    ...theme.typography.cardTitle,
+    fontSize: 17,
     color: '#FFFFFF',
-  },
-  signalLabel: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.48)',
+    fontWeight: '800',
+    textAlign: 'center',
   },
   body: {
     paddingHorizontal: theme.spacing.xl,
@@ -423,67 +494,78 @@ const styles = StyleSheet.create({
     color: '#0D0D0D',
     fontWeight: '800',
   },
-  infoGroup: {
+  descriptionSection: {
     gap: theme.spacing.sm,
-    paddingVertical: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
   },
-  groupTitle: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.42)',
-    textTransform: 'uppercase',
-    paddingHorizontal: theme.spacing.xs,
+  descriptionTitle: {
+    ...theme.typography.headline,
+    color: '#FFFFFF',
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: '700',
   },
-  infoRows: {
-    overflow: 'hidden',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    backgroundColor: 'rgba(255,255,255,0.055)',
+  sectionDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
-  detailLine: {
-    minHeight: 70,
+  descriptionText: {
+    ...theme.typography.body,
+    color: 'rgba(255,255,255,0.66)',
+    lineHeight: 25,
+  },
+  briefSkeleton: {
+    gap: theme.spacing.sm,
+  },
+  locationMetaRow: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.09)',
   },
-  detailLineLast: {
-    borderBottomWidth: 0,
-  },
-  detailIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  detailCopy: {
+  locationTextBlock: {
     flex: 1,
     minWidth: 0,
-    gap: 2,
+    gap: 4,
   },
-  detailLabel: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.48)',
-  },
-  detailValue: {
-    ...theme.typography.cardTitle,
+  locationPrimary: {
+    ...theme.typography.section,
     color: '#FFFFFF',
+    fontSize: 21,
+    lineHeight: 26,
+    fontWeight: '700',
   },
-  textBlock: {
-    gap: theme.spacing.sm,
+  locationCard: {
+    height: 148,
+    overflow: 'hidden',
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.075)',
+  },
+  nativeMap: {
+    width: '100%',
+    height: '100%',
+  },
+  mapLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: theme.spacing.lg,
   },
-  aboutText: {
-    ...theme.typography.body,
-    color: 'rgba(255,255,255,0.76)',
+  mapFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
-    paddingBottom: theme.spacing.lg,
+  },
+  mapFallbackText: {
+    ...theme.typography.callout,
+    color: 'rgba(255,255,255,0.72)',
+    textAlign: 'center',
   },
   mediaGrid: {
     flexDirection: 'row',

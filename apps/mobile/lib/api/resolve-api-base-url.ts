@@ -69,7 +69,7 @@ export function extractDevMachineHost(expoConstants: {
  */
 export function resolveApiBaseUrl(
   configuredBaseUrl: string | undefined,
-  options?: { dev?: boolean; devMachineHost?: string | null },
+  options?: { dev?: boolean; devMachineHost?: string | null; shouldUseDevMachineHost?: boolean },
 ) {
   const base = configuredBaseUrl?.trim() || DEFAULT_API_BASE_URL;
   const dev = options?.dev ?? __DEV__;
@@ -83,6 +83,8 @@ export function resolveApiBaseUrl(
   }
 
   if (!isLoopbackHost(url.hostname)) return base;
+
+  if (options?.shouldUseDevMachineHost === false) return base;
 
   const devMachineHost = options?.devMachineHost ?? null;
   if (!devMachineHost) return base;

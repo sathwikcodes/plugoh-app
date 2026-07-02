@@ -34,6 +34,10 @@ export const onError: ErrorHandler<AppEnv> = (error, c) => {
     log.error({ err: error, ...reqMeta }, 'Validation error');
     return fail(c, 400, 'VALIDATION_ERROR', 'Invalid request', error.issues);
   }
+  if (error instanceof SyntaxError) {
+    log.error({ err: error, ...reqMeta }, 'Malformed JSON body');
+    return fail(c, 400, 'MALFORMED_JSON', 'Request body is not valid JSON');
+  }
   if (typeof error === 'object' && 'message' in error) {
     const message = (error as { message?: string }).message ?? 'Internal server error';
     const code = (error as { code?: string }).code ?? 'DATASTORE_ERROR';

@@ -918,10 +918,7 @@ describe('Plugoh API', () => {
         influencer_profile_id: influencerProfileId,
         package_type: 'instagram_reel',
         price_offered_paise: 10000,
-        objective: 'visit_place',
-        timing_mode: 'asap',
-        business_contact_email: 'brand@test.dev',
-        business_contact_phone: '+919999999999',
+        timing_mode: 'choose_date',
       }),
     });
     expect(res.status).toBe(400);
@@ -1439,7 +1436,7 @@ describe('Plugoh API', () => {
     });
   });
 
-  it('validates full booking details before taking payment', async () => {
+  it('validates required booking fields before taking payment', async () => {
     const { app, store } = makeApp();
     const res = await app.request('/payment/create-booking-order', {
       method: 'POST',
@@ -1449,7 +1446,6 @@ describe('Plugoh API', () => {
         'idempotency-key': 'booking-order-validation',
       },
       body: JSON.stringify({
-        influencer_profile_id: influencerProfileId,
         package_type: 'instagram_reel',
       }),
     });

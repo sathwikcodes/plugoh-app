@@ -742,6 +742,16 @@ export default function CampaignDetailScreen() {
             </View>
           ) : null}
 
+          {!campaignLoading && item?.notes?.trim() ? (
+            <View style={styles.descriptionSection}>
+              <Text style={styles.descriptionTitle}>Notes</Text>
+              <View style={styles.sectionDivider} />
+              <Text selectable style={styles.descriptionText}>
+                {item.notes}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.campaignFacts}>
             <CampaignFactLine
               image={coinImage}

@@ -70,14 +70,21 @@ export function platformFeePaise(pricePaise: number) {
   return Math.round(pricePaise * PLATFORM_FEE_RATE);
 }
 
+const PACKAGE_PRICE_COLUMN: Record<string, string> = {
+  instagram_reel: 'price_per_reel_paise',
+  instagram_post: 'price_per_post_paise',
+  instagram_story: 'price_per_story_paise',
+};
+
 export function packagePricePaise(profile: Row, packageType: string) {
-  if (packageType !== 'instagram_reel') {
+  const priceColumn = PACKAGE_PRICE_COLUMN[packageType];
+  if (!priceColumn) {
     throw badRequest(
       'PACKAGE_UNAVAILABLE',
       `${packageType} pricing is not available for this creator`,
     );
   }
-  const pricePaise = Number(profile.price_per_reel_paise ?? Number.NaN);
+  const pricePaise = Number(profile[priceColumn] ?? Number.NaN);
   if (!Number.isFinite(pricePaise) || pricePaise <= 0) {
     throw badRequest(
       'PACKAGE_UNAVAILABLE',

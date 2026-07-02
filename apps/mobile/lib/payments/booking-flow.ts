@@ -12,18 +12,7 @@ type BookingPackageType = Parameters<typeof createBookingOrder>[0]['package_type
 type BookingInput = {
   influencer_profile_id: string;
   package_type: BookingPackageType;
-  objective:
-    | 'visit_place'
-    | 'feature_product'
-    | 'showcase_service'
-    | 'promote_offer'
-    | 'brand_shoutout';
-  timing_mode: 'asap' | 'choose_date';
-  due_date?: string;
-  event_name?: string;
-  place_name?: string;
-  contact_email: string;
-  contact_phone: string;
+  notes?: string;
 };
 
 export type BookingPaymentFlowStatus = 'creating_order' | 'opening_checkout' | 'verifying';
@@ -37,15 +26,11 @@ function createIdempotencyKey(scope: 'order' | 'verify') {
 }
 
 function bookingPayloadFromInput(input: BookingInput): CreateBookingOrderRequest {
+  const notes = input.notes?.trim();
   return {
     influencer_profile_id: input.influencer_profile_id,
     package_type: input.package_type,
-    objective: input.objective,
-    timing_mode: input.timing_mode,
-    due_date: input.due_date,
-    place_name: input.place_name,
-    business_contact_email: input.contact_email,
-    business_contact_phone: input.contact_phone,
+    ...(notes ? { notes } : {}),
   };
 }
 
@@ -107,7 +92,6 @@ export async function runBookingPaymentFlow(
     name: 'Plugoh',
     description: 'Campaign booking',
     order_id: order.orderId,
-    prefill: { email: input.contact_email, contact: input.contact_phone },
     theme: { color: '#E11D48' },
   }).catch(async (error: unknown) => {
     await clearPendingBookingVerify();

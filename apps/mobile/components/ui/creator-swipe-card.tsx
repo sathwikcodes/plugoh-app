@@ -215,8 +215,8 @@ export function CreatorSwipeCard({ creator, cardWidth, cardHeight, style, onView
                 style={[
                   styles.name,
                   {
-                    fontSize: px(name.length > 24 ? 29 : 34),
-                    lineHeight: px(name.length > 24 ? 34 : 40),
+                    fontSize: px(name.length > 24 ? 22 : 26),
+                    lineHeight: px(name.length > 24 ? 27 : 31),
                   },
                 ]}
                 numberOfLines={2}
@@ -225,24 +225,29 @@ export function CreatorSwipeCard({ creator, cardWidth, cardHeight, style, onView
               >
                 {name}
               </Text>
-              <Text
-                style={[styles.handle, { fontSize: px(15), lineHeight: px(20) }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.82}
-              >
-                {handle}
-              </Text>
-              {positioning ? (
+              <View style={[styles.handleRow, { gap: px(7) }]}>
                 <Text
-                  style={[styles.positioning, { fontSize: px(13), lineHeight: px(18) }]}
+                  style={[styles.handle, { fontSize: px(15), lineHeight: px(20) }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.82}
                 >
-                  {positioning}
+                  {handle}
                 </Text>
-              ) : null}
+                {positioning ? (
+                  <>
+                    <View style={[styles.handleDivider, { height: px(12) }]} />
+                    <Text
+                      style={[styles.positioning, { fontSize: px(13), lineHeight: px(18) }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.82}
+                    >
+                      {positioning}
+                    </Text>
+                  </>
+                ) : null}
+              </View>
             </View>
           </View>
 
@@ -355,18 +360,30 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 12,
   },
+  handleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    maxWidth: '100%',
+  },
   handle: {
     color: 'rgba(255,255,255,0.82)',
     fontWeight: '700',
     textAlign: 'center',
+    flexShrink: 1,
     textShadowColor: 'rgba(0,0,0,0.36)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
+  },
+  handleDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
   positioning: {
     color: 'rgba(255,255,255,0.66)',
     fontWeight: '500',
     textAlign: 'center',
+    flexShrink: 1,
     textShadowColor: 'rgba(0,0,0,0.36)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,

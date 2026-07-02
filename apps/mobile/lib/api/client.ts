@@ -1,11 +1,13 @@
 import type { ApiResponse } from '@plugoh/contracts';
 import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 import { ApiError, userMessageForStatus } from '@/lib/api/error';
 import { extractDevMachineHost, resolveApiBaseUrl } from '@/lib/api/resolve-api-base-url';
 import { useAuthStore } from '@/store/auth';
 
 const API_BASE_URL = resolveApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL, {
   devMachineHost: extractDevMachineHost(Constants),
+  shouldUseDevMachineHost: Device.isDevice,
 });
 
 export async function api<T>(

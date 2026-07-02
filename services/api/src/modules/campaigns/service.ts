@@ -29,6 +29,9 @@ import {
 import { NotificationService } from '../notifications/service.js';
 import { ProfileService } from '../profiles/service.js';
 
+const DEFAULT_BOOKING_OBJECTIVE = 'brand_shoutout';
+const DEFAULT_TIMING_MODE = 'asap';
+
 function campaignTimingBrief(input: Row) {
   if (input.timing_mode === 'choose_date') {
     return input.due_date ? `Due date: ${input.due_date}` : undefined;
@@ -82,17 +85,20 @@ export class CampaignService {
         : moneyPaise(paymentInput.platform_fee_paise);
     const feePaise = quotedFeePaise ?? platformFeePaise(pricePaise);
     const totalPaise = moneyPaise(paymentInput.total_charged_paise ?? pricePaise + feePaise);
-    const title = `${input.objective.replaceAll('_', ' ')} with ${
+    const objective = input.objective ?? DEFAULT_BOOKING_OBJECTIVE;
+    const timingMode = input.timing_mode ?? DEFAULT_TIMING_MODE;
+    const title = `${objective.replaceAll('_', ' ')} with ${
       influencer.display_name ?? influencer.instagram_username ?? 'influencer'
     }`;
-    const businessProfile = await this.store.findOne<Row>('business_profiles', {
-      eq: { user_id: user.id },
-    });
+    const [businessProfile, businessAccount] = await Promise.all([
+      this.store.findOne<Row>('business_profiles', { eq: { user_id: user.id } }),
+      this.store.findOne<Row>('profiles', { eq: { id: user.id } }),
+    ]);
     const campaignLocation = input.place_name || businessProfile?.brand_location;
     const brief = [
-      `Objective: ${input.objective}`,
+      `Objective: ${objective}`,
       `Package: ${input.package_type}`,
-      campaignTimingBrief(input),
+      campaignTimingBrief({ timing_mode: timingMode, due_date: input.due_date }),
       input.place_name ? `Place: ${input.place_name}` : undefined,
     ]
       .filter(Boolean)
@@ -103,17 +109,18 @@ export class CampaignService {
       influencer_profile_id: input.influencer_profile_id,
       title,
       brief,
+      notes: input.notes,
       package_type: input.package_type,
-      objective: input.objective,
-      timing_mode: input.timing_mode,
+      objective,
+      timing_mode: timingMode,
       due_date: input.due_date,
       place_name: input.place_name,
       ...(await geocodeValues(this.geocoding, campaignLocation, 'place')),
       price_offered_paise: pricePaise,
       platform_fee_paise: feePaise,
       status: paymentInput.status ?? 'pre_authorized',
-      business_contact_email: input.business_contact_email,
-      business_contact_phone: input.business_contact_phone,
+      business_contact_email: businessAccount?.email,
+      business_contact_phone: businessAccount?.phone,
       pre_authorized_at: nowIso(),
       expires_at: paymentInput.expires_at ?? futureIso(24 * HOUR_MS),
       created_at: nowIso(),

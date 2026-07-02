@@ -1,5 +1,6 @@
 import { BackHeader } from '@/components/ui/app-header';
 import { PrimaryButton } from '@/components/ui/primitives';
+import { SnapBadgeCarousel } from '@/components/ui/snap-badge-carousel';
 import { theme } from '@/constants/theme';
 import { useInfluencerProfile, useMarketplaceMutations } from '@/hooks/use-marketplace';
 import coinImage from '@/assets/images/coin.png';
@@ -11,35 +12,22 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   Alert,
-  FlatList,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  useWindowDimensions,
   type ImageSourcePropType,
 } from 'react-native';
-import Animated, {
-  Extrapolation,
-  interpolate,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  type SharedValue,
-} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
-const PRICE_CARD_GAP = theme.spacing.xl;
 const PRICE_CARD_HEIGHT = 220;
 const STEP = 500;
 const FIELD_BORDER = 'rgba(255,255,255,0.18)';
@@ -66,60 +54,6 @@ const packages: PricePackageItem[] = [
   { field: 'price_per_post', title: 'Post', image: postPriceImage, tone: '#5C84D6' },
 ];
 
-// ─── Price poster card ────────────────────────────────────────────────────────
-
-type PriceCardProps = {
-  item: PricePackageItem;
-  index: number;
-  cardWidth: number;
-  interval: number;
-  scrollX: SharedValue<number>;
-};
-
-const PriceCard = memo(function PriceCard({
-  item,
-  index,
-  cardWidth,
-  interval,
-  scrollX,
-}: PriceCardProps) {
-  const animatedStyle = useAnimatedStyle(() => {
-    const center = index * interval;
-    const inputRange = [center - interval, center, center + interval];
-    const rotateZ = interpolate(scrollX.value, inputRange, [-4, 0, 4], Extrapolation.CLAMP);
-    const translateY = interpolate(scrollX.value, inputRange, [18, 0, 18], Extrapolation.CLAMP);
-    const scale = interpolate(scrollX.value, inputRange, [0.46, 1, 0.46], Extrapolation.CLAMP);
-    const opacity = interpolate(scrollX.value, inputRange, [0.62, 1, 0.62], Extrapolation.CLAMP);
-    return {
-      opacity,
-      transform: [{ translateY }, { rotateZ: `${rotateZ}deg` }, { scale }],
-    };
-  }, [index, interval]);
-
-  return (
-    <Animated.View
-      style={[
-        {
-          width: cardWidth,
-          height: PRICE_CARD_HEIGHT,
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'visible',
-        },
-        animatedStyle,
-      ]}
-    >
-      <Image
-        source={item.image}
-        style={{ width: cardWidth, height: PRICE_CARD_HEIGHT }}
-        contentFit="contain"
-        accessibilityIgnoresInvertColors
-        accessibilityLabel={item.title}
-      />
-    </Animated.View>
-  );
-});
-
 // ─── Price badge carousel ─────────────────────────────────────────────────────
 
 type PriceBadgeCarouselProps = {
@@ -129,76 +63,29 @@ type PriceBadgeCarouselProps = {
 };
 
 function PriceBadgeCarousel({ items, values, onChange }: PriceBadgeCarouselProps) {
-  const listRef = useRef<FlatList<PricePackageItem>>(null);
-  const { width } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
-  const cardWidth = Math.min(Math.max(width * 0.42, 148), 172);
-  const interval = cardWidth + PRICE_CARD_GAP;
-  const sidePadding = Math.max((width - cardWidth) / 2, theme.spacing.lg);
-  const scrollX = useSharedValue(0);
-
   const activeItem = items[activeIndex] ?? items[0];
   const activeValue = values[activeItem.field];
   const textValue = activeValue > 0 ? String(activeValue) : '';
 
-  const onScroll = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollX.value = event.contentOffset.x;
-    },
-  });
-
-  const handleSettledIndex = useCallback(
-    (offsetX: number) => {
-      const nextIndex = Math.min(Math.max(Math.round(offsetX / interval), 0), items.length - 1);
-      if (nextIndex !== activeIndex && Platform.OS === 'ios') {
-        void Haptics.selectionAsync();
-      }
-      setActiveIndex(nextIndex);
-    },
-    [activeIndex, interval, items.length],
-  );
-
-  const renderItem = useCallback(
-    ({ item, index }: { item: PricePackageItem; index: number }) => (
-      <PriceCard
-        item={item}
-        index={index}
-        cardWidth={cardWidth}
-        interval={interval}
-        scrollX={scrollX}
-      />
-    ),
-    [cardWidth, interval, scrollX],
-  );
-
   return (
     <View style={styles.carouselShell}>
-      <Animated.FlatList
-        ref={listRef}
-        data={items}
-        horizontal
+      <SnapBadgeCarousel
+        items={items}
         keyExtractor={(item) => item.field}
-        renderItem={renderItem}
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={interval}
-        snapToAlignment="start"
-        scrollEventThrottle={16}
-        removeClippedSubviews={false}
-        getItemLayout={(_, index) => ({ length: interval, offset: interval * index, index })}
-        onScroll={onScroll}
-        onMomentumScrollEnd={(e) => {
-          handleSettledIndex(e.nativeEvent.contentOffset.x);
+        cardHeight={PRICE_CARD_HEIGHT}
+        onActiveIndexChange={(index) => {
+          setActiveIndex(index);
         }}
-        onScrollEndDrag={(e) => {
-          handleSettledIndex(e.nativeEvent.contentOffset.x);
-        }}
-        onScrollToIndexFailed={(info) => {
-          listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index });
-        }}
-        ItemSeparatorComponent={() => <View style={{ width: PRICE_CARD_GAP }} />}
-        contentContainerStyle={[styles.carouselContent, { paddingHorizontal: sidePadding }]}
-        style={styles.carouselList}
+        renderItem={({ item, cardWidth }) => (
+          <Image
+            source={item.image}
+            style={{ width: cardWidth, height: PRICE_CARD_HEIGHT }}
+            contentFit="contain"
+            accessibilityIgnoresInvertColors
+            accessibilityLabel={item.title}
+          />
+        )}
       />
 
       {/* Floating price editor strip */}
@@ -297,9 +184,9 @@ export default function PricingScreen() {
 
   useEffect(() => {
     if (!profile.data) return;
-    setValue('price_per_reel', profile.data.price_per_reel ?? 0);
-    setValue('price_per_post', profile.data.price_per_post ?? 0);
-    setValue('price_per_story', profile.data.price_per_story ?? 0);
+    setValue('price_per_reel', (profile.data.price_per_reel_paise ?? 0) / 100);
+    setValue('price_per_post', (profile.data.price_per_post_paise ?? 0) / 100);
+    setValue('price_per_story', (profile.data.price_per_story_paise ?? 0) / 100);
   }, [profile.data, setValue]);
 
   const setPrice = (field: PricingField, value: number) => {
@@ -310,6 +197,8 @@ export default function PricingScreen() {
     try {
       await mutations.updatePricing.mutateAsync({
         price_per_reel_paise: values.price_per_reel * 100,
+        price_per_post_paise: values.price_per_post * 100,
+        price_per_story_paise: values.price_per_story * 100,
       });
       router.back();
     } catch (error) {
@@ -386,13 +275,6 @@ const styles = StyleSheet.create({
   // ── Carousel ──
   carouselShell: {
     marginHorizontal: -theme.spacing.xxl,
-    minHeight: PRICE_CARD_HEIGHT + 140,
-  },
-  carouselList: {
-    overflow: 'visible',
-  },
-  carouselContent: {
-    alignItems: 'center',
   },
 
   // ── Floating price editor strip ──
