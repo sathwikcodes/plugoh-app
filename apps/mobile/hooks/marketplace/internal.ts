@@ -5,7 +5,7 @@ import type { CampaignMessage, MessagesPage } from '@plugoh/contracts';
 import { useQuery, type InfiniteData } from '@tanstack/react-query';
 
 export const THREAD_PAGE_SIZE = 30;
-export const THREAD_REFETCH_INTERVAL_MS = 10_000;
+export const THREAD_REFETCH_INTERVAL_MS = 2000;
 
 export type CampaignListParams = {
   limit?: number;

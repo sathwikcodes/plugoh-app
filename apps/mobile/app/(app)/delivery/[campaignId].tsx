@@ -174,7 +174,7 @@ export default function DeliveryScreen() {
       const upload = await mutations.uploadDelivery.mutateAsync({ campaignId, file: selectedFile });
       await mutations.submitDelivery.mutateAsync({
         campaignId,
-        storagePath: upload.storagePath,
+        storagePath: upload.storage_path,
         notes,
       });
       router.back();

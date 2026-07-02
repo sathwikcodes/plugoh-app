@@ -1,8 +1,9 @@
 import { CAMPAIGN_CARD_CORNER_RADIUS } from '@/constants/campaign-card-frame';
 import { theme } from '@/constants/theme';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import coinImage from '@/assets/images/coin.png';
 import type { Influencer } from '@plugoh/contracts';
 import { BlurView } from 'expo-blur';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
@@ -42,46 +43,9 @@ function initials(name: string) {
     .join('');
 }
 
-function formatNumber(value?: number) {
-  if (value == null || !Number.isFinite(value)) return 'N/A';
-  return Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(
-    value,
-  );
-}
-
-function formatCurrency(amount?: number | null) {
-  if (amount == null || !Number.isFinite(amount)) return 'Not set';
-  return `₹${Math.round(amount).toLocaleString('en-IN')}`;
-}
-
-function SignalPill({
-  label,
-  value,
-  icon,
-  scale,
-}: {
-  label: string;
-  value: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  scale: number;
-}) {
-  const px = (amount: number) => Math.round(amount * scale);
-  return (
-    <View style={[styles.signalPill, { borderRadius: px(18), paddingVertical: px(9) }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(5) }}>
-        <Ionicons name={icon} size={px(13)} color="rgba(255,255,255,0.7)" />
-        <Text style={[styles.signalLabel, { fontSize: px(11), lineHeight: px(14) }]}>{label}</Text>
-      </View>
-      <Text
-        style={[styles.signalValue, { fontSize: px(15), lineHeight: px(19) }]}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.78}
-      >
-        {value}
-      </Text>
-    </View>
-  );
+function formatPriceAmount(amount?: number | null) {
+  const displayAmount = amount != null && Number.isFinite(amount) && amount > 0 ? amount : 5000;
+  return String(Math.round(displayAmount));
 }
 
 export function CreatorSwipeCard({ creator, cardWidth, cardHeight, style, onViewPress }: Props) {
@@ -94,6 +58,7 @@ export function CreatorSwipeCard({ creator, cardWidth, cardHeight, style, onView
   const city = firstText(creator.city);
   const positioning = [category, city].filter(Boolean).join(' · ');
   const startingPrice = creator.starterPrice ?? creator.price_per_reel ?? creator.price_per_post;
+  const priceLabel = formatPriceAmount(startingPrice);
 
   return (
     <View style={[styles.wrapper, { width: cardWidth, height: cardHeight }, style]}>
@@ -143,44 +108,14 @@ export function CreatorSwipeCard({ creator, cardWidth, cardHeight, style, onView
           style={({ pressed }) => [styles.cardHitArea, pressed ? styles.cardPressed : null]}
         />
 
-        <View style={[styles.topRow, { padding: px(20) }]} pointerEvents="none">
-          <BlurView
-            tint="systemUltraThinMaterialDark"
-            intensity={72}
-            style={[
-              styles.categoryPill,
-              {
-                minHeight: px(34),
-                borderRadius: px(17),
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.categoryPillInner,
-                {
-                  minHeight: px(34),
-                  paddingHorizontal: px(11),
-                  gap: px(6),
-                },
-              ]}
-            >
-              <Ionicons name="sparkles" size={px(14)} color="rgba(255,255,255,0.94)" />
-              <Text style={[styles.categoryText, { fontSize: px(12) }]} numberOfLines={1}>
-                {category}
-              </Text>
-            </View>
-          </BlurView>
-        </View>
-
         <View
-          pointerEvents="none"
+          pointerEvents="box-none"
           style={[
             styles.content,
             {
               paddingHorizontal: px(24),
               paddingBottom: px(24),
-              gap: px(13),
+              gap: px(16),
             },
           ]}
         >
@@ -209,7 +144,7 @@ export function CreatorSwipeCard({ creator, cardWidth, cardHeight, style, onView
                 </Text>
               )}
             </View>
-            <View style={{ alignItems: 'center', gap: px(4) }}>
+            <View style={{ alignItems: 'center', gap: px(5), maxWidth: '100%' }}>
               <Text
                 selectable
                 style={[
@@ -225,55 +160,120 @@ export function CreatorSwipeCard({ creator, cardWidth, cardHeight, style, onView
               >
                 {name}
               </Text>
-              <View style={[styles.handleRow, { gap: px(7) }]}>
+              <Text
+                style={[styles.handle, { fontSize: px(15), lineHeight: px(20) }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
+              >
+                {handle}
+              </Text>
+              {positioning ? (
                 <Text
-                  style={[styles.handle, { fontSize: px(15), lineHeight: px(20) }]}
+                  style={[styles.positioning, { fontSize: px(13), lineHeight: px(18) }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.82}
                 >
-                  {handle}
+                  {positioning}
                 </Text>
-                {positioning ? (
-                  <>
-                    <View style={[styles.handleDivider, { height: px(12) }]} />
-                    <Text
-                      style={[styles.positioning, { fontSize: px(13), lineHeight: px(18) }]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.82}
-                    >
-                      {positioning}
-                    </Text>
-                  </>
-                ) : null}
-              </View>
+              ) : null}
             </View>
           </View>
 
-          <View style={[styles.signalRow, { gap: px(8) }]}>
-            <SignalPill
-              label="Followers"
-              value={formatNumber(creator.follower_count)}
-              icon="people"
-              scale={scale}
-            />
-            <SignalPill
-              label="Avg likes"
-              value={formatNumber(creator.avg_likes_per_reel)}
-              icon="heart"
-              scale={scale}
-            />
-            <SignalPill
-              label="From"
-              value={formatCurrency(startingPrice)}
-              icon="pricetag"
-              scale={scale}
-            />
-          </View>
+          <Pressable
+            onPress={onViewPress}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${name}, starting at ${priceLabel}`}
+            style={({ pressed }) => [
+              styles.priceButton,
+              {
+                minHeight: px(58),
+                borderRadius: px(29),
+              },
+              pressed ? styles.priceButtonPressed : null,
+            ]}
+          >
+            {isLiquidGlassAvailable() ? (
+              <GlassView
+                isInteractive
+                glassEffectStyle="regular"
+                colorScheme="light"
+                style={styles.priceGlassFill}
+              >
+                <PriceButtonContent priceLabel={priceLabel} iconSize={px(30)} textSize={px(24)} />
+              </GlassView>
+            ) : (
+              <BlurView tint="systemMaterialLight" intensity={92} style={styles.priceGlassFill}>
+                <PriceButtonContent priceLabel={priceLabel} iconSize={px(30)} textSize={px(24)} />
+              </BlurView>
+            )}
+          </Pressable>
         </View>
       </View>
     </View>
+  );
+}
+
+function PriceButtonContent({
+  priceLabel,
+  iconSize,
+  textSize,
+}: {
+  priceLabel: string;
+  iconSize: number;
+  textSize: number;
+}) {
+  return (
+    <>
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          'rgba(255,255,255,0.72)',
+          'rgba(255,255,255,0.48)',
+          'rgba(255,248,235,0.36)',
+          'rgba(255,255,255,0.5)',
+        ]}
+        locations={[0, 0.38, 0.7, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(255,255,255,0.72)', 'rgba(255,255,255,0.32)', 'rgba(255,255,255,0)']}
+        locations={[0, 0.5, 1]}
+        style={styles.priceTopGlint}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(132,92,255,0)', 'rgba(132,92,255,0.08)', 'rgba(255,199,114,0.12)']}
+        locations={[0, 0.52, 1]}
+        style={styles.priceBottomRefraction}
+      />
+      <View style={[styles.priceButtonContent, { height: iconSize }]}>
+        <Image
+          source={coinImage}
+          style={{ width: iconSize, height: iconSize }}
+          contentFit="contain"
+          accessible={false}
+        />
+        <Text
+          style={[
+            styles.priceButtonText,
+            {
+              fontSize: textSize,
+              lineHeight: iconSize,
+              height: iconSize,
+              transform: [{ translateY: 3 }],
+            },
+          ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.82}
+        >
+          {priceLabel}
+        </Text>
+      </View>
+    </>
   );
 }
 
@@ -300,33 +300,6 @@ const styles = StyleSheet.create({
   },
   cardPressed: {
     backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  topRow: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    zIndex: 3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  categoryPill: {
-    maxWidth: '72%',
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(255,255,255,0.055)',
-  },
-  categoryPillInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryText: {
-    color: 'rgba(255,255,255,0.94)',
-    fontWeight: '700',
   },
   content: {
     position: 'absolute',
@@ -360,54 +333,72 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 12,
   },
-  handleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    maxWidth: '100%',
-  },
   handle: {
     color: 'rgba(255,255,255,0.82)',
     fontWeight: '700',
     textAlign: 'center',
-    flexShrink: 1,
+    maxWidth: '100%',
     textShadowColor: 'rgba(0,0,0,0.36)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
-  },
-  handleDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.4)',
   },
   positioning: {
     color: 'rgba(255,255,255,0.66)',
     fontWeight: '500',
     textAlign: 'center',
-    flexShrink: 1,
+    maxWidth: '100%',
     textShadowColor: 'rgba(0,0,0,0.36)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
   },
-  signalRow: {
-    flexDirection: 'row',
-  },
-  signalPill: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'center',
-    gap: 3,
+  priceButton: {
+    overflow: 'hidden',
+    borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.86)',
+    backgroundColor: 'rgba(255,255,255,0.42)',
+    boxShadow:
+      '0 14px 22px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.74), inset 0 -1px 3px rgba(255,255,255,0.32)',
   },
-  signalLabel: {
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '700',
+  priceButtonPressed: {
+    opacity: 0.9,
   },
-  signalValue: {
-    color: '#FFFFFF',
-    fontFamily: theme.typography.mono.fontFamily,
+  priceGlassFill: {
+    flex: 1,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.36)',
+  },
+  priceTopGlint: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    top: 5,
+    height: 17,
+    borderRadius: 999,
+    opacity: 0.9,
+  },
+  priceBottomRefraction: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    bottom: 0,
+    height: 28,
+    borderRadius: 999,
+  },
+  priceButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  priceButtonText: {
+    color: '#0D1222',
+    fontFamily: theme.typography.metricSmall.fontFamily,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
 });

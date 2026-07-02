@@ -1,22 +1,18 @@
 import { BookingPackageCarousel } from '@/components/booking/booking-package-carousel';
 import { CreatorSummaryCard } from '@/components/booking/creator-summary-card';
+import { SlideToPayButton } from '@/components/booking/slide-to-pay-button';
 import { AppInput } from '@/components/ui/app-input';
 import { BackHeader } from '@/components/ui/app-header';
-import { PrimaryButton } from '@/components/ui/primitives';
 import { theme } from '@/constants/theme';
 import { ApiError } from '@/lib/api/error';
 import { getInfluencer } from '@/lib/api/endpoints';
-import {
-  recoverPendingBookingVerify,
-  runBookingPaymentFlow,
-  type BookingPaymentFlowStatus,
-} from '@/lib/payments/booking-flow';
+import { runBookingPaymentFlow, type BookingPaymentFlowStatus } from '@/lib/payments/booking-flow';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { PACKAGE_TYPES } from '@plugoh/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type PackageType = (typeof PACKAGE_TYPES)[number];
@@ -33,33 +29,6 @@ export function BookingScreen({ influencerId }: { influencerId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<BookingPaymentFlowStatus | null>(null);
   const influencerLoading = shouldShowInitialLoader(influencer);
-
-  const finishRecoveredBooking = async () => {
-    try {
-      setSubmitting(true);
-      setPaymentStatus('verifying');
-      const result = await recoverPendingBookingVerify();
-      if (result?.campaignId) {
-        router.replace({
-          pathname: '/(app)/booking/success',
-          params: { campaignId: result.campaignId },
-        });
-        return;
-      }
-      Alert.alert('Payment pending', 'We could not find a payment to finish yet.');
-    } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.userMessage
-          : error instanceof Error
-            ? error.message
-            : 'Please try again.';
-      Alert.alert('Still finishing payment', message);
-    } finally {
-      setSubmitting(false);
-      setPaymentStatus(null);
-    }
-  };
 
   const submit = async () => {
     if (!influencer.data?.id || !packageType) return;
@@ -95,10 +64,10 @@ export function BookingScreen({ influencerId }: { influencerId: string }) {
       if (message.toLowerCase().includes('cancel')) {
         Alert.alert('Payment cancelled', 'No amount was charged.');
       } else if (currentPaymentStatus.value === 'verifying') {
-        Alert.alert('Payment received', 'Payment received. Tap retry to finish your booking.', [
-          { text: 'Not now', style: 'cancel' },
-          { text: 'Retry', onPress: () => void finishRecoveredBooking() },
-        ]);
+        Alert.alert(
+          'Payment received',
+          'We are finishing your campaign automatically. You can leave this screen; it will appear once verification completes.',
+        );
       } else {
         Alert.alert('Booking failed', message);
       }
@@ -135,9 +104,6 @@ export function BookingScreen({ influencerId }: { influencerId: string }) {
           }}
           style={styles.pageHeaderRow}
         />
-        <Text style={styles.description}>
-          Server-derived pricing, escrow hold, and campaign creation.
-        </Text>
 
         <CreatorSummaryCard influencer={influencer.data} loading={influencerLoading} />
 
@@ -158,9 +124,11 @@ export function BookingScreen({ influencerId }: { influencerId: string }) {
           { paddingBottom: Math.max(insets.bottom, theme.spacing.md) + theme.spacing.md },
         ]}
       >
-        <PrimaryButton
-          label={submitLabel}
-          onPress={submit}
+        <SlideToPayButton
+          label="Slide to continue payment"
+          loadingLabel={submitLabel}
+          loading={submitting}
+          onComplete={submit}
           disabled={submitting || influencerLoading || !influencer.data?.id || !packageType}
           style={styles.submitButton}
         />
@@ -184,10 +152,6 @@ const styles = StyleSheet.create({
   },
   pageHeaderRow: {
     marginBottom: theme.spacing.xs,
-  },
-  description: {
-    ...theme.typography.body,
-    color: theme.colors.muted,
   },
   footer: {
     paddingHorizontal: theme.spacing.xxl,

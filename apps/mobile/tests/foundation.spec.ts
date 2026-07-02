@@ -3,6 +3,11 @@ import { ApiError } from '@/lib/api/error';
 import { resolveGateStatus } from '@/lib/auth/gate-status';
 import { influencerBasicsSchema } from '@/lib/forms/onboarding';
 import { invalidateQueryKeys, type QueryInvalidator } from '@/lib/query/invalidation';
+import {
+  campaignIdFromNotificationData,
+  invalidateCampaignLiveQueries,
+  type CampaignLiveInvalidator,
+} from '@/lib/query/live-sync';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 
 describe('mobile foundation', () => {
@@ -80,6 +85,33 @@ describe('mobile foundation', () => {
     expect(invalidateQueries).toHaveBeenCalledTimes(2);
     expect(invalidateQueries).toHaveBeenNthCalledWith(1, { queryKey: ['bootstrap'] });
     expect(invalidateQueries).toHaveBeenNthCalledWith(2, { queryKey: ['campaigns'] });
+  });
+
+  it('invalidates live campaign surfaces for both roles', async () => {
+    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
+    const queryClient: CampaignLiveInvalidator = { invalidateQueries };
+
+    await invalidateCampaignLiveQueries(queryClient, 'campaign-1');
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['campaigns', 'influencer'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['campaigns', 'business'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['inbox', 'influencer'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['inbox', 'business'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['notifications', 'influencer'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['notifications', 'business'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['earnings'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['campaign', 'influencer', 'campaign-1'],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['campaign', 'business', 'campaign-1'],
+    });
+  });
+
+  it('extracts campaign ids from notification data', () => {
+    expect(campaignIdFromNotificationData({ campaignId: 'campaign-1' })).toBe('campaign-1');
+    expect(campaignIdFromNotificationData({ campaignId: '' })).toBeNull();
+    expect(campaignIdFromNotificationData({ type: 'new_booking' })).toBeNull();
   });
 
   it('exposes user-safe api error messaging', () => {

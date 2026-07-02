@@ -1,6 +1,6 @@
 import { SnapBadgeCarousel } from '@/components/ui/snap-badge-carousel';
 import { theme } from '@/constants/theme';
-import { formatPaiseAsINR } from '@/lib/influencer/home-tier';
+import coinImage from '@/assets/images/coin.png';
 import postPriceImage from '@/assets/images/post_price.png';
 import reelPriceImage from '@/assets/images/reel_price.png';
 import storyPriceImage from '@/assets/images/story_price.png';
@@ -30,6 +30,10 @@ function packagePricePaise(influencer: Influencer | null | undefined, packageTyp
   if (packageType === 'instagram_reel') return influencer?.price_per_reel_paise ?? 0;
   if (packageType === 'instagram_post') return influencer?.price_per_post_paise ?? 0;
   return influencer?.price_per_story_paise ?? 0;
+}
+
+function formatPriceAmount(pricePaise: number) {
+  return Math.round(pricePaise / 100).toLocaleString('en-IN');
 }
 
 type BookingPackageCarouselProps = {
@@ -95,8 +99,21 @@ export function BookingPackageCarousel({
         )}
       />
       <View style={[styles.priceStrip, { paddingHorizontal: bleed }]}>
+        <View style={styles.priceDivider} />
         <Text style={styles.packageLabel}>{activeItem.title.toUpperCase()}</Text>
-        <Text style={styles.priceValue}>{formatPaiseAsINR(activeItem.pricePaise)}</Text>
+        <View
+          style={styles.priceRow}
+          accessibilityLabel={`${activeItem.title} package price ${formatPriceAmount(activeItem.pricePaise)}`}
+        >
+          <Image
+            source={coinImage}
+            style={styles.priceCoin}
+            contentFit="contain"
+            accessible={false}
+          />
+          <Text style={styles.priceValue}>{formatPriceAmount(activeItem.pricePaise)}</Text>
+        </View>
+        <View style={styles.priceDivider} />
       </View>
     </View>
   );
@@ -105,18 +122,47 @@ export function BookingPackageCarousel({
 const styles = StyleSheet.create({
   priceStrip: {
     alignItems: 'center',
-    paddingVertical: theme.spacing.lg,
-    gap: theme.spacing.xs,
+    justifyContent: 'center',
+    minHeight: 82,
+    paddingVertical: theme.spacing.sm,
+    gap: 2,
+  },
+  priceDivider: {
+    width: '50%',
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginVertical: theme.spacing.xs,
   },
   packageLabel: {
-    ...theme.typography.label,
-    color: 'rgba(255,255,255,0.6)',
+    fontFamily: theme.typography.body.fontFamily,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.54)',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    includeFontPadding: false,
+  },
+  priceRow: {
+    minHeight: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  priceCoin: {
+    width: 24,
+    height: 24,
   },
   priceValue: {
-    ...theme.typography.cardTitle,
-    fontSize: 26,
-    color: theme.colors.foreground,
+    fontFamily: theme.typography.metricSmall.fontFamily,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.94)',
+    textAlign: 'center',
     fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
   },
   emptyState: {
     paddingVertical: theme.spacing.xxl,

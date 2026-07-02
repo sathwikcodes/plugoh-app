@@ -60,6 +60,7 @@ export default function AppLayout() {
       {role === 'business' ? <Stack.Screen name="(brand-tabs)" /> : <Stack.Screen name="(tabs)" />}
       <Stack.Screen name="campaigns/[id]/index" />
       <Stack.Screen name="campaigns/[id]/brand" />
+      <Stack.Screen name="campaigns/[id]/delivery-status" />
       <Stack.Screen name="creator/[id]" />
       <Stack.Screen name="booking/[id]" />
       <Stack.Screen name="booking/success" />

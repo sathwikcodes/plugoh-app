@@ -254,7 +254,7 @@ export async function uploadDelivery(
     name: file.name,
     type: file.mimeType ?? 'application/octet-stream',
   } as unknown as Blob);
-  return api<{ storagePath: string }>('/delivery/upload', {
+  return api<{ storage_path: string }>('/delivery/upload', {
     method: 'POST',
     body: form,
   });

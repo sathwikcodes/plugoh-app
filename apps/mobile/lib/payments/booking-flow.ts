@@ -1,4 +1,5 @@
 import { createBookingOrder, verifyBookingPayment } from '@/lib/api/endpoints';
+import { ApiError } from '@/lib/api/error';
 import type { CreateBookingOrderRequest, VerifyBookingPaymentRequest } from '@plugoh/contracts';
 import {
   clearPendingBookingVerify,
@@ -19,7 +20,10 @@ export type BookingPaymentFlowStatus = 'creating_order' | 'opening_checkout' | '
 
 type BookingPaymentFlowOptions = {
   onStatusChange?: (status: BookingPaymentFlowStatus) => void;
+  verifyRetryDelaysMs?: number[];
 };
+
+const DEFAULT_VERIFY_RETRY_DELAYS_MS = [750, 1500, 2500, 3500, 5000];
 
 function createIdempotencyKey(scope: 'order' | 'verify') {
   return `booking-${scope}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -61,6 +65,41 @@ function checkoutErrorMessage(error: unknown) {
     if (typeof checkoutError.code === 'string') return checkoutError.code;
   }
   return String(error);
+}
+
+function shouldRetryBookingVerification(error: unknown) {
+  if (error instanceof ApiError) {
+    return (
+      error.code === 'TIMEOUT' ||
+      error.code === 'NETWORK_ERROR' ||
+      error.status === 408 ||
+      error.status === 429 ||
+      error.status >= 500
+    );
+  }
+  return true;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function verifyBookingPaymentWithRetry(
+  payload: VerifyBookingPaymentRequest,
+  idempotencyKey: string,
+  retryDelaysMs = DEFAULT_VERIFY_RETRY_DELAYS_MS,
+) {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+    try {
+      return await verifyBookingPayment(payload, idempotencyKey);
+    } catch (error) {
+      lastError = error;
+      if (!shouldRetryBookingVerification(error) || attempt >= retryDelaysMs.length) break;
+      await wait(retryDelaysMs[attempt]);
+    }
+  }
+  throw lastError;
 }
 
 export async function runBookingPaymentFlow(
@@ -117,7 +156,11 @@ export async function runBookingPaymentFlow(
     createdAt: Date.now(),
   });
   options.onStatusChange?.('verifying');
-  const verified = await verifyBookingPayment(payload, verifyIdempotencyKey);
+  const verified = await verifyBookingPaymentWithRetry(
+    payload,
+    verifyIdempotencyKey,
+    options.verifyRetryDelaysMs,
+  );
   await clearPendingBookingVerify();
   return { ...verified, pricing: order };
 }
@@ -126,7 +169,7 @@ export async function recoverPendingBookingVerify() {
   const pending = await getPendingBookingVerify();
   if (!pending) return null;
   if (!isBookingVerificationPayload(pending.payload)) return null;
-  const result = await verifyBookingPayment(pending.payload, pending.idempotencyKey);
+  const result = await verifyBookingPaymentWithRetry(pending.payload, pending.idempotencyKey);
   await clearPendingBookingVerify();
   return result;
 }

@@ -134,11 +134,27 @@ describe('booking payment flow', () => {
     expect(storageMock.values.has('pending-booking-verify')).toBe(false);
   });
 
-  it('keeps the paid verification payload pending when API verification fails', async () => {
+  it('automatically retries paid booking verification before asking for recovery', async () => {
     const { runBookingPaymentFlow } = await import('@/lib/payments/booking-flow');
     apiMock.verifyBookingPayment.mockRejectedValueOnce(new Error('Network unavailable'));
 
-    await expect(runBookingPaymentFlow(bookingInput)).rejects.toThrow('Network unavailable');
+    await expect(
+      runBookingPaymentFlow(bookingInput, { verifyRetryDelaysMs: [0] }),
+    ).resolves.toMatchObject({
+      campaignId: '55555555-5555-4555-8555-555555555555',
+    });
+
+    expect(apiMock.verifyBookingPayment).toHaveBeenCalledTimes(2);
+    expect(storageMock.values.has('pending-booking-verify')).toBe(false);
+  });
+
+  it('keeps the paid verification payload pending when automatic verification fails', async () => {
+    const { runBookingPaymentFlow } = await import('@/lib/payments/booking-flow');
+    apiMock.verifyBookingPayment.mockRejectedValue(new Error('Network unavailable'));
+
+    await expect(
+      runBookingPaymentFlow(bookingInput, { verifyRetryDelaysMs: [0, 0] }),
+    ).rejects.toThrow('Network unavailable');
 
     const pending = JSON.parse(
       storageMock.values.get('pending-booking-verify') ?? '{}',
@@ -149,6 +165,7 @@ describe('booking payment flow', () => {
       razorpay_payment_id: 'pay_card',
       razorpay_signature: 'sig',
     });
+    expect(apiMock.verifyBookingPayment).toHaveBeenCalledTimes(3);
   });
 
   it('falls back to legacy booking verification when the API cannot create a durable intent', async () => {

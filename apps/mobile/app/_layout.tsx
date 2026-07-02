@@ -6,10 +6,15 @@ import { getPushNotificationsPreference } from '@/lib/notifications/preference';
 import { registerForPushNotificationsAsync } from '@/lib/notifications/register';
 import { recoverPendingBookingVerify } from '@/lib/payments/booking-flow';
 import { createQueryClient } from '@/lib/query/client';
+import {
+  campaignIdFromNotificationData,
+  invalidateCampaignLiveQueries,
+} from '@/lib/query/live-sync';
 import { initializeAuth, teardownAuth, useAuthStore } from '@/store/auth';
 import { DarkTheme, ThemeProvider, type Theme as NavigationTheme } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
+import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -77,6 +82,30 @@ export default function RootLayout() {
     if (!getPushNotificationsPreference()) return;
     void registerForPushNotificationsAsync();
   }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    const invalidateFromData = (data: unknown) => {
+      const campaignId = campaignIdFromNotificationData(data);
+      if (!campaignId) return;
+      void invalidateCampaignLiveQueries(queryClient, campaignId);
+    };
+    const received = Notifications.addNotificationReceivedListener((notification) => {
+      invalidateFromData(notification.request.content.data);
+    });
+    const response = Notifications.addNotificationResponseReceivedListener(
+      (notificationResponse) => {
+        invalidateFromData(notificationResponse.notification.request.content.data);
+      },
+    );
+    void Notifications.getLastNotificationResponseAsync().then((notificationResponse) => {
+      invalidateFromData(notificationResponse?.notification.request.content.data);
+    });
+    return () => {
+      received.remove();
+      response.remove();
+    };
+  }, [queryClient, session]);
 
   if (fontLoadError) {
     throw fontLoadError;

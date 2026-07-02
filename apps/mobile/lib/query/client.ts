@@ -1,8 +1,10 @@
 import NetInfo from '@react-native-community/netinfo';
-import { QueryClient, onlineManager } from '@tanstack/react-query';
+import { focusManager, onlineManager, QueryClient } from '@tanstack/react-query';
+import { AppState, Platform } from 'react-native';
 import { ApiError } from '@/lib/api/error';
 
 let onlineManagerConfigured = false;
+let focusManagerConfigured = false;
 
 function configureOnlineManager() {
   if (onlineManagerConfigured) return;
@@ -13,6 +15,20 @@ function configureOnlineManager() {
       setOnline(online);
     }),
   );
+}
+
+function configureFocusManager() {
+  if (focusManagerConfigured || Platform.OS === 'web') return;
+  focusManagerConfigured = true;
+  focusManager.setEventListener((setFocused) => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setFocused(state === 'active');
+    });
+    setFocused(AppState.currentState === 'active');
+    return () => {
+      subscription.remove();
+    };
+  });
 }
 
 function shouldRetryQuery(error: unknown, failureCount: number) {
@@ -26,6 +42,7 @@ function shouldRetryQuery(error: unknown, failureCount: number) {
 
 export function createQueryClient() {
   configureOnlineManager();
+  configureFocusManager();
   return new QueryClient({
     defaultOptions: {
       queries: {

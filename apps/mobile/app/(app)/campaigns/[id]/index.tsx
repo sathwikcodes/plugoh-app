@@ -18,6 +18,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  type ImageSourcePropType,
   type StyleProp,
   Text,
   View,
@@ -32,7 +33,6 @@ import { theme } from '@/constants/theme';
 import { useBootstrap, useCampaign, useMarketplaceMutations } from '@/hooks/use-marketplace';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import type { CampaignListItem } from '@plugoh/contracts';
-import type { ImageSourcePropType } from 'react-native';
 
 function formatStatus(status?: string) {
   if (!status) return 'Status unavailable';
@@ -514,8 +514,9 @@ export default function CampaignDetailScreen() {
     role === 'influencer' &&
     item &&
     ['requested', 'payment_pending', 'pre_authorized'].includes(item.status);
-  const canDeliver = item && item.status === 'in_escrow';
-  const canApprove = role === 'business' && item?.status === 'delivery_submitted';
+  const canDeliver =
+    role === 'influencer' && item && ['in_escrow', 'changes_requested'].includes(item.status);
+  const canViewDeliveryStatus = role === 'business' && Boolean(item);
 
   const handleDecline = async () => {
     try {
@@ -647,11 +648,18 @@ export default function CampaignDetailScreen() {
             />
             <QuickActionTile
               image={deliverImage}
-              label={canApprove ? 'Review' : 'Deliver'}
-              accessibilityLabel={canApprove ? `Review ${title}` : `Deliver ${title}`}
-              disabled={campaignLoading || (!canDeliver && !canApprove)}
+              label={role === 'business' ? 'Status' : 'Deliver'}
+              accessibilityLabel={
+                role === 'business' ? `View delivery status for ${title}` : `Deliver ${title}`
+              }
+              disabled={
+                campaignLoading || (role === 'business' ? !canViewDeliveryStatus : !canDeliver)
+              }
               onPress={() => {
-                if (canApprove) return;
+                if (role === 'business') {
+                  router.push(`/(app)/campaigns/${id}/delivery-status`);
+                  return;
+                }
                 router.push(`/(app)/delivery/${id}`);
               }}
             />
@@ -672,53 +680,6 @@ export default function CampaignDetailScreen() {
                 tint="accept"
                 disabled={isResponding}
                 accessibilityLabel={`Accept ${title}`}
-              />
-            </View>
-          ) : null}
-
-          {canApprove ? (
-            <View style={styles.actionRow}>
-              <ActionPill
-                label={
-                  mutations.approveCampaignDelivery.isPending ? 'Approving...' : 'Approve delivery'
-                }
-                onPress={async () => {
-                  try {
-                    await mutations.approveCampaignDelivery.mutateAsync({
-                      id,
-                      idempotencyKey: `approve-${id}-${Date.now()}`,
-                    });
-                    await campaign.refetch();
-                  } catch (error) {
-                    Alert.alert(
-                      'Could not approve',
-                      error instanceof Error ? error.message : 'Try again.',
-                    );
-                  }
-                }}
-                tint="accept"
-                disabled={mutations.approveCampaignDelivery.isPending}
-                accessibilityLabel={`Approve delivery for ${title}`}
-              />
-              <ActionPill
-                label="Dispute"
-                onPress={async () => {
-                  try {
-                    await mutations.disputeCampaignDelivery.mutateAsync({
-                      id,
-                      reason: 'Needs revision',
-                    });
-                    await campaign.refetch();
-                  } catch (error) {
-                    Alert.alert(
-                      'Could not dispute',
-                      error instanceof Error ? error.message : 'Try again.',
-                    );
-                  }
-                }}
-                tint="decline"
-                disabled={mutations.disputeCampaignDelivery.isPending}
-                accessibilityLabel={`Dispute delivery for ${title}`}
               />
             </View>
           ) : null}

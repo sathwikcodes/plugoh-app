@@ -21,6 +21,7 @@ import {
 } from '@/lib/api/endpoints';
 import { invalidateQueryKeys } from '@/lib/query/invalidation';
 import { coreInvalidationKeys, queryKeys } from '@/lib/query/keys';
+import { invalidateCampaignLiveQueries } from '@/lib/query/live-sync';
 import { useAuthStore } from '@/store/auth';
 import type {
   BusinessOnboardingRequest,
@@ -44,6 +45,9 @@ export function useMarketplaceMutations() {
     invalidateQueryKeys(queryClient, keys);
   const invalidateCore = async () => {
     await invalidateKeys(coreInvalidationKeys);
+  };
+  const invalidateCampaignLive = async (campaignId?: string | null) => {
+    await invalidateCampaignLiveQueries(queryClient, campaignId);
   };
   // Scope thread mutations to the active role only — no cross-role inbox churn.
   const invalidateThread = async (id: string) =>
@@ -92,25 +96,35 @@ export function useMarketplaceMutations() {
     }),
     createCampaign: useMutation({
       mutationFn: createCampaign,
-      onSuccess: invalidateCore,
+      onSuccess: (data) => {
+        void invalidateCampaignLive(data.campaignId);
+      },
     }),
     acceptCampaign: useMutation({
       mutationFn: acceptCampaign,
-      onSuccess: invalidateCore,
+      onSuccess: (_data, id) => {
+        void invalidateCampaignLive(id);
+      },
     }),
     declineCampaign: useMutation({
       mutationFn: declineCampaign,
-      onSuccess: invalidateCore,
+      onSuccess: (_data, id) => {
+        void invalidateCampaignLive(id);
+      },
     }),
     approveCampaignDelivery: useMutation({
       mutationFn: ({ id, idempotencyKey }: { id: string; idempotencyKey: string }) =>
         approveCampaignDelivery(id, idempotencyKey),
-      onSuccess: invalidateCore,
+      onSuccess: (_data, variables) => {
+        void invalidateCampaignLive(variables.id);
+      },
     }),
     disputeCampaignDelivery: useMutation({
       mutationFn: ({ id, reason }: { id: string; reason: string }) =>
         disputeCampaignDelivery(id, reason),
-      onSuccess: invalidateCore,
+      onSuccess: (_data, variables) => {
+        void invalidateCampaignLive(variables.id);
+      },
     }),
     createBookingOrder: useMutation({
       mutationFn: ({
@@ -129,7 +143,9 @@ export function useMarketplaceMutations() {
         input: Parameters<typeof verifyBookingPayment>[0];
         idempotencyKey: string;
       }) => verifyBookingPayment(input, idempotencyKey),
-      onSuccess: invalidateCore,
+      onSuccess: (data) => {
+        void invalidateCampaignLive(data.campaignId);
+      },
     }),
     sendMessage: useMutation({
       mutationFn: ({ id, content }: { id: string; content: string }) => sendMessage(id, content),
@@ -197,14 +213,7 @@ export function useMarketplaceMutations() {
         notes?: string;
       }) => submitDelivery(campaignId, storagePath, notes),
       onSuccess: (_data, variables) => {
-        void invalidateKeys([
-          queryKeys.campaign('influencer', variables.campaignId),
-          queryKeys.campaign('business', variables.campaignId),
-          queryKeys.campaigns('influencer'),
-          queryKeys.campaigns('business'),
-          queryKeys.notifications('influencer'),
-          queryKeys.notifications('business'),
-        ]);
+        void invalidateCampaignLive(variables.campaignId);
       },
     }),
     deliveryUrl: useMutation({

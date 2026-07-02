@@ -1,12 +1,15 @@
 import { inbox, messages } from '@/lib/api/endpoints';
 import { queryKeys } from '@/lib/query/keys';
+import { CAMPAIGN_LIVE_REFETCH_INTERVAL_MS } from '@/lib/query/live-sync';
 import { useAuthStore } from '@/store/auth';
+import { useIsFocused } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { THREAD_PAGE_SIZE, THREAD_REFETCH_INTERVAL_MS, useRoleFromBootstrap } from './internal';
 
 export function useInbox() {
   const { role, session } = useRoleFromBootstrap();
+  const isFocused = useIsFocused();
   return useQuery({
     queryKey: queryKeys.inbox(role ?? 'influencer'),
     queryFn: () => {
@@ -14,6 +17,11 @@ export function useInbox() {
       return inbox(role);
     },
     enabled: Boolean(session && role),
+    refetchInterval: isFocused ? CAMPAIGN_LIVE_REFETCH_INTERVAL_MS : false,
+    refetchIntervalInBackground: false,
+    refetchOnMount: 'always',
+    refetchOnReconnect: 'always',
+    refetchOnWindowFocus: 'always',
   });
 }
 
@@ -24,6 +32,7 @@ export function useInbox() {
  */
 export function useThreadMessages(id: string) {
   const session = useAuthStore((state) => state.session);
+  const isFocused = useIsFocused();
   const query = useInfiniteQuery({
     queryKey: queryKeys.messages(id),
     queryFn: ({ pageParam }) =>
@@ -31,8 +40,11 @@ export function useThreadMessages(id: string) {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: Boolean(session && id),
-    refetchInterval: THREAD_REFETCH_INTERVAL_MS,
-    refetchOnWindowFocus: true,
+    refetchInterval: isFocused ? THREAD_REFETCH_INTERVAL_MS : false,
+    refetchIntervalInBackground: false,
+    refetchOnMount: 'always',
+    refetchOnReconnect: 'always',
+    refetchOnWindowFocus: 'always',
   });
   const flatMessages = useMemo(() => {
     const all = (query.data?.pages ?? []).flatMap((page) => page.messages);

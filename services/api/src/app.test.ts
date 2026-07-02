@@ -1681,6 +1681,35 @@ describe('Plugoh API', () => {
     expect(store.tables.get('campaigns')?.[0].status).toBe('completed');
   });
 
+  it('allows delivery uploads after revision is requested', async () => {
+    const { app } = makeApp({
+      campaigns: [
+        {
+          id: campaignId,
+          business_id: businessId,
+          influencer_id: influencerId,
+          title: 'Booking',
+          status: 'changes_requested',
+          price_offered_paise: 10000,
+          platform_fee_paise: 1200,
+          total_charged_paise: 11200,
+        },
+      ],
+    });
+    const form = new FormData();
+    form.append('campaignId', campaignId);
+    form.append('file', new File(['revised'], 'revision.png', { type: 'image/png' }));
+
+    const res = await app.request('/delivery/upload', {
+      method: 'POST',
+      headers: { authorization: 'Bearer influencer' },
+      body: form,
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.storage_path).toContain(`${campaignId}/${influencerId}/`);
+  });
+
   it('rejects duplicate delivery submissions', async () => {
     const { app } = makeApp({
       campaigns: [

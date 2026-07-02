@@ -20,7 +20,7 @@ export class DeliveryService {
 
   async upload(user: AuthUser, campaignId: string, file: File) {
     const campaign = await requireCampaignRole(this.store, campaignId, user.id, 'influencer');
-    requireStatus(campaign, ['in_escrow']);
+    requireStatus(campaign, ['in_escrow', 'changes_requested']);
     if (file.size > 50 * 1024 * 1024)
       throw badRequest('FILE_TOO_LARGE', 'Delivery files must be 50 MB or smaller');
     const allowed = [
