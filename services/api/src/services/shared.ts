@@ -119,6 +119,8 @@ export function withBusinessProfileImage(profile?: Row | null, account?: Row | n
     ...profile,
     brand_type: profile.brand_type ?? profile.brand_category,
     email: typeof account?.email === 'string' ? account.email : undefined,
+    ig_username: profile.ig_username ?? profile.instagram_username,
+    ig_profile_picture_url: profile.ig_profile_picture_url ?? (instagramPhoto || undefined),
     profile_photo_url: profilePhoto,
     avatar_url: accountAvatar || undefined,
     instagram_connected: hasInstagramConnection(profile),
@@ -134,6 +136,8 @@ export function withInfluencerProfileImage(profile?: Row | null, account?: Row |
 
   return {
     ...profile,
+    ig_username: profile.ig_username ?? profile.instagram_username,
+    instagram_handle: profile.instagram_handle ?? profile.instagram_username,
     profile_photo_url: profilePhoto,
     avatar_url: typeof account?.avatar_url === 'string' ? account.avatar_url : undefined,
     instagram_connected: hasInstagramConnection(profile),

@@ -197,8 +197,30 @@ class MissingBookingIntentStore extends MemoryDataStore {
   }
 }
 
+class PendingCampaignCreativeAiProvider extends FakeAiProvider {
+  campaignCreativeCalls = 0;
+
+  override async generateCampaignCreative() {
+    this.campaignCreativeCalls += 1;
+    return await new Promise<never>(() => undefined);
+  }
+}
+
 async function json(res: Response) {
   return await res.json();
+}
+
+async function wait(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForCampaignCreative(store: MemoryDataStore, id: string) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const campaign = store.tables.get('campaigns')?.find((row) => row.id === id);
+    if (campaign?.creative_status === 'ready') return campaign;
+    await wait(0);
+  }
+  return store.tables.get('campaigns')?.find((row) => row.id === id);
 }
 
 describe('Plugoh API', () => {
@@ -385,6 +407,7 @@ describe('Plugoh API', () => {
           brand_name: 'Plugoh Cafe',
           brand_category: 'restaurant_cafe',
           brand_location: 'Hyderabad',
+          instagram_username: 'plugohcafe',
           instagram_profile_picture_url: 'https://cdn.test/brand-instagram.jpg',
         },
       ],
@@ -405,7 +428,50 @@ describe('Plugoh API', () => {
     const body = await json(okRes);
     expect(store.tables.get('business_profiles')?.[0].brand_name).toBe('New Name');
     expect(body.data.profile_photo_url).toBe('https://cdn.test/brand-instagram.jpg');
+    expect(body.data.ig_username).toBe('plugohcafe');
+    expect(body.data.ig_profile_picture_url).toBe('https://cdn.test/brand-instagram.jpg');
     expect(body.data.avatar_url).toBe('https://cdn.test/brand-avatar.jpg');
+  });
+
+  it('hydrates influencer Instagram connection aliases for mobile profile screens', async () => {
+    const { app } = makeApp({
+      profiles: [
+        { id: businessId, email: 'brand@test.dev', full_name: 'Brand Owner' },
+        {
+          id: influencerId,
+          email: 'creator@test.dev',
+          full_name: 'Creator',
+          avatar_url: 'https://cdn.test/creator-avatar.jpg',
+        },
+      ],
+      influencer_profiles: [
+        {
+          id: influencerProfileId,
+          user_id: influencerId,
+          display_name: 'Creator One',
+          city: 'Hyderabad',
+          category: 'fashion',
+          instagram_username: 'creatorone',
+          instagram_profile_picture_url: 'https://cdn.test/creator-instagram.jpg',
+          instagram_connected_at: '2026-07-01T10:00:00.000Z',
+          price_per_reel_paise: 3000,
+          follower_count: 25000,
+          avg_likes_per_reel: 500,
+          is_active: true,
+        },
+      ],
+    });
+
+    const res = await app.request('/influencer/profile', {
+      headers: { authorization: 'Bearer influencer' },
+    });
+    const body = await json(res);
+
+    expect(res.status).toBe(200);
+    expect(body.data.instagram_connected).toBe(true);
+    expect(body.data.instagram_username).toBe('creatorone');
+    expect(body.data.ig_username).toBe('creatorone');
+    expect(body.data.instagram_handle).toBe('creatorone');
   });
 
   it('normalizes legacy brand_type patches without writing unknown business profile columns', async () => {
@@ -1113,9 +1179,7 @@ describe('Plugoh API', () => {
 
     expect(res.status).toBe(200);
     const campaignIdFromResponse = (await json(res)).data.campaignId;
-    const campaign = store.tables
-      .get('campaigns')
-      ?.find((row) => row.id === campaignIdFromResponse);
+    const campaign = await waitForCampaignCreative(store, campaignIdFromResponse);
     const paymentOrder = store.tables
       .get('payment_orders')
       ?.find((row) => row.campaign_id === campaignIdFromResponse);
@@ -1132,6 +1196,76 @@ describe('Plugoh API', () => {
       provider: 'razorpay',
       brand: 'Visa',
       last4: '4242',
+    });
+  });
+
+  it('returns booking verification before campaign creative generation finishes', async () => {
+    const store = new MemoryDataStore(defaultSeed());
+    const ai = new PendingCampaignCreativeAiProvider();
+    const app = createApp({
+      store,
+      config: {
+        port: 4000,
+        internalSecret: 'internal',
+        cronSecret: 'cron',
+        razorpayKeyId: 'rzp_test_public',
+        razorpayWebhookSecret: 'webhook_secret',
+        demoEnabled: true,
+      },
+      authVerifier: async (token) => {
+        if (token === 'business') return { id: businessId, email: 'brand@test.dev' };
+        if (token === 'influencer') return { id: influencerId, email: 'creator@test.dev' };
+        throw new Error('bad token');
+      },
+      providers: {
+        payment: new FakePaymentProvider(),
+        storage: new FakeStorageProvider(),
+        email: new FakeEmailProvider(),
+        geocoding: new FakeGeocodingProvider(),
+        places: new FakePlacesProvider(),
+        instagram: new FakeInstagramProvider(),
+        ai,
+      },
+    });
+    const createRes = await app.request('/payment/create-booking-order', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-order-slow-creative',
+      },
+      body: JSON.stringify(bookingPayload()),
+    });
+    const createBody = await json(createRes);
+    const orderId = createBody.data.orderId;
+    const paymentId = 'pay_card';
+
+    const verify = app.request('/payment/verify-booking-payment', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer business',
+        'content-type': 'application/json',
+        'idempotency-key': 'booking-intent-slow-creative',
+      },
+      body: JSON.stringify({
+        booking_intent_id: createBody.data.bookingIntentId,
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature(orderId, paymentId),
+      }),
+    });
+    const result = await Promise.race([verify, wait(25).then(() => 'timeout' as const)]);
+
+    expect(result).not.toBe('timeout');
+    const verifyRes = result as Response;
+    expect(verifyRes.status).toBe(200);
+    const body = await json(verifyRes);
+    expect(body.data.campaignId).toEqual(expect.any(String));
+    expect(ai.campaignCreativeCalls).toBe(1);
+    expect(store.tables.get('campaigns') ?? []).toHaveLength(1);
+    expect(store.tables.get('booking_payment_intents')?.[0]).toMatchObject({
+      status: 'completed',
+      campaign_id: body.data.campaignId,
     });
   });
 

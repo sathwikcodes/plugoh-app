@@ -246,6 +246,12 @@ export class PaymentService {
     return this.normalizeBookingPayload(payload ?? {});
   }
 
+  private queueCampaignCreative(campaignId: string) {
+    void this.campaigns.generateCreative(campaignId).catch((error: unknown) => {
+      logger.warn({ err: error, campaignId }, 'Campaign creative generation failed after booking');
+    });
+  }
+
   private async verifyBookingPaymentIntent(user: AuthUser, input: Row) {
     const intent = await this.store.getById<Row>(
       'booking_payment_intents',
@@ -363,7 +369,7 @@ export class PaymentService {
         completed_at: nowIso(),
       },
     );
-    await this.campaigns.generateCreative(created.campaignId);
+    this.queueCampaignCreative(created.campaignId);
     return { success: true, campaignId: created.campaignId };
   }
 
@@ -418,7 +424,7 @@ export class PaymentService {
       },
       { skipCreative: true },
     );
-    await this.campaigns.generateCreative(created.campaignId);
+    this.queueCampaignCreative(created.campaignId);
     return { success: true, campaignId: created.campaignId };
   }
 
