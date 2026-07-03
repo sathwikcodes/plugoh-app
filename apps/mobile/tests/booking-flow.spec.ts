@@ -56,6 +56,12 @@ const bookingInput = {
   notes: 'Please post between 6-8pm.',
 };
 
+const bookingPackageCases = [
+  ['story', 'instagram_story'],
+  ['reel', 'instagram_reel'],
+  ['post', 'instagram_post'],
+] as const;
+
 type PendingBookingVerifyFixture = {
   payload: Record<string, unknown>;
 };
@@ -118,6 +124,34 @@ describe('booking payment flow', () => {
     );
     expect(storageMock.values.has('pending-booking-verify')).toBe(false);
   });
+
+  it.each(bookingPackageCases)(
+    'creates and verifies %s booking payments with the selected package type',
+    async (_label, packageType) => {
+      const { runBookingPaymentFlow } = await import('@/lib/payments/booking-flow');
+
+      await expect(
+        runBookingPaymentFlow({ ...bookingInput, package_type: packageType }),
+      ).resolves.toMatchObject({
+        campaignId: '55555555-5555-4555-8555-555555555555',
+      });
+
+      expect(apiMock.createBookingOrder).toHaveBeenCalledWith(
+        expect.objectContaining({ package_type: packageType }),
+        expect.stringMatching(/^booking-order-/),
+      );
+      expect(apiMock.verifyBookingPayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          booking_intent_id: '44444444-4444-4444-8444-444444444444',
+          razorpay_order_id: 'order_booking',
+          razorpay_payment_id: 'pay_card',
+          razorpay_signature: 'sig',
+        }),
+        expect.stringMatching(/^booking-verify-/),
+      );
+      expect(storageMock.values.has('pending-booking-verify')).toBe(false);
+    },
+  );
 
   it('surfaces Razorpay test-card failure descriptions from checkout', async () => {
     const { runBookingPaymentFlow } = await import('@/lib/payments/booking-flow');

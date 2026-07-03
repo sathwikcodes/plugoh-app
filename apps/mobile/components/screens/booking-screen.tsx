@@ -6,7 +6,11 @@ import { BackHeader } from '@/components/ui/app-header';
 import { theme } from '@/constants/theme';
 import { ApiError } from '@/lib/api/error';
 import { getInfluencer } from '@/lib/api/endpoints';
-import { runBookingPaymentFlow, type BookingPaymentFlowStatus } from '@/lib/payments/booking-flow';
+import {
+  recoverPendingBookingVerify,
+  runBookingPaymentFlow,
+  type BookingPaymentFlowStatus,
+} from '@/lib/payments/booking-flow';
 import { shouldShowInitialLoader } from '@/lib/query/loading';
 import { PACKAGE_TYPES } from '@plugoh/contracts';
 import { useQuery } from '@tanstack/react-query';
@@ -29,6 +33,30 @@ export function BookingScreen({ influencerId }: { influencerId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<BookingPaymentFlowStatus | null>(null);
   const influencerLoading = shouldShowInitialLoader(influencer);
+
+  const finishPendingPayment = async () => {
+    try {
+      setSubmitting(true);
+      setPaymentStatus('verifying');
+      const result = await recoverPendingBookingVerify();
+      if (result?.campaignId) {
+        router.replace({
+          pathname: '/(app)/booking/success',
+          params: { campaignId: result.campaignId },
+        });
+        return;
+      }
+      Alert.alert('Still finishing', 'Your payment is safe. We will keep checking automatically.');
+    } catch {
+      Alert.alert(
+        'Still finishing',
+        'Your payment is safe. Please try again in a moment or reopen the app.',
+      );
+    } finally {
+      setSubmitting(false);
+      setPaymentStatus(null);
+    }
+  };
 
   const submit = async () => {
     if (!influencer.data?.id || !packageType) return;
@@ -66,7 +94,11 @@ export function BookingScreen({ influencerId }: { influencerId: string }) {
       } else if (currentPaymentStatus.value === 'verifying') {
         Alert.alert(
           'Payment received',
-          'We are finishing your campaign automatically. You can leave this screen; it will appear once verification completes.',
+          'Your payment is safe. We are finishing the campaign now.',
+          [
+            { text: 'Leave page', style: 'cancel' },
+            { text: 'Retry now', onPress: () => void finishPendingPayment() },
+          ],
         );
       } else {
         Alert.alert('Booking failed', message);

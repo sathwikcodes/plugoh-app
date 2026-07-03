@@ -17,6 +17,11 @@ const businessId = '11111111-1111-4111-8111-111111111111';
 const influencerId = '22222222-2222-4222-8222-222222222222';
 const influencerProfileId = '33333333-3333-4333-8333-333333333333';
 const campaignId = '44444444-4444-4444-8444-444444444444';
+const bookingPackageCases = [
+  ['story', 'instagram_story', 1500],
+  ['reel', 'instagram_reel', 3000],
+  ['post', 'instagram_post', 2400],
+] as const;
 
 function signature(orderId: string, paymentId: string) {
   return crypto.createHmac('sha256', 'test_secret').update(`${orderId}|${paymentId}`).digest('hex');
@@ -1268,6 +1273,80 @@ describe('Plugoh API', () => {
       campaign_id: body.data.campaignId,
     });
   });
+
+  it.each(bookingPackageCases)(
+    'creates and verifies %s booking payment intents from package-specific pricing',
+    async (_label, packageType, pricePaise) => {
+      const { app, store } = makeApp({
+        influencer_profiles: [
+          {
+            id: influencerProfileId,
+            user_id: influencerId,
+            display_name: 'Creator One',
+            city: 'Hyderabad',
+            category: 'food',
+            price_per_story_paise: 1500,
+            price_per_reel_paise: 3000,
+            price_per_post_paise: 2400,
+            follower_count: 25000,
+            avg_likes_per_reel: 500,
+            is_active: true,
+          },
+        ],
+      });
+      const createRes = await app.request('/payment/create-booking-order', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer business',
+          'content-type': 'application/json',
+          'idempotency-key': `booking-order-${packageType}`,
+        },
+        body: JSON.stringify(bookingPayload({ package_type: packageType })),
+      });
+      const createBody = await json(createRes);
+      const orderId = createBody.data.orderId;
+      const paymentId = `pay_card_${packageType}`;
+
+      expect(createRes.status).toBe(200);
+      expect(createBody.data.price_offered_paise).toBe(pricePaise);
+      expect(createBody.data.total_charged_paise).toBe(Math.round(pricePaise * 1.12));
+
+      const verifyRes = await app.request('/payment/verify-booking-payment', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer business',
+          'content-type': 'application/json',
+          'idempotency-key': `booking-verify-${packageType}`,
+        },
+        body: JSON.stringify({
+          booking_intent_id: createBody.data.bookingIntentId,
+          razorpay_order_id: orderId,
+          razorpay_payment_id: paymentId,
+          razorpay_signature: signature(orderId, paymentId),
+        }),
+      });
+      const verifyBody = await json(verifyRes);
+      const campaign = store.tables
+        .get('campaigns')
+        ?.find((row) => row.id === verifyBody.data.campaignId);
+      const paymentOrder = store.tables
+        .get('payment_orders')
+        ?.find((row) => row.campaign_id === verifyBody.data.campaignId);
+
+      expect(verifyRes.status).toBe(200);
+      expect(campaign).toMatchObject({
+        package_type: packageType,
+        price_offered_paise: pricePaise,
+        total_charged_paise: Math.round(pricePaise * 1.12),
+      });
+      expect(paymentOrder).toMatchObject({
+        provider_order_id: orderId,
+        provider_payment_id: paymentId,
+        status: 'authorized',
+        amount_paise: Math.round(pricePaise * 1.12),
+      });
+    },
+  );
 
   it('verifies booking payment intents idempotently without duplicate campaigns', async () => {
     const { app, store } = makeApp();
